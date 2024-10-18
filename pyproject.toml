@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "syntetic-rock-joint-generation-for-ml"
+version = "0.1.0"
+description = "Generating syntetic rock joint dataset and evaluating the dataset's generalisability by training a machine learning model which is evaluated on real rock joint data"
+authors = ["tfh <tom.frode.hansen@ngi.no>, jyc <jessica.ka.yi.chiu@ngi.no>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[tool.poetry.group.dev.dependencies]
+ipdb = "^0.13.13"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
