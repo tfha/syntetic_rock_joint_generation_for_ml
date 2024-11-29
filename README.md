@@ -20,25 +20,32 @@ Semantic segmentation is a computer vision task where the goal is to classify ea
 
 - DeepLabV3Plus
 - UNet++
-- FracSegNet?
+- FracSegNet
 - CrackSegDiff?
 
 ## Datasets and training strategies
 
-**Real-world dataset**: A dataset of real-world images of rock joints from rock cuttings in Larvik and RV-4 project.
+**Syntethic real-world dataset**: A dataset of real-world images of rock joints from rock cuttings in Larvik and RV-4 project in Norway. The labels for the dataset is produced automatically using a process developed in Grasshopper and Rhino. The process is described in the paper. Due to the generating process, the labels are not perfect. This is the key dataset to demonstrate the syntetic dataset generation technique.
 
-**Synthetic dataset**: A dataset of synthetic images generated using the method described in the paper.
+**Syntethic Frac man dataset**: A syntetic dataset generated with Frac man software.
+
+**Synthetic box dataset**: A dataset of synthetic "box" images generated using the method described in the paper. The labels for these images are perfect. This will be central in evaluating the performance of the models on the real-world synthetic data.
+
+**Real-world dataset**: A real world dataset with manually labelled rock joints. This dataset is used to evaluate the performance of the models on real-world data.
 
 Variations for training and evaluation on the synthetic dataset:
 
-- Train and evaluate only on the synthetic dataset. The goal is to evaluate the performance of the model on synthetic data and compare the performance of different models on synthetic data. Choose the best model based on the performance on the synthetic dataset.
-- Use a transfer learning approach where the syntetic dataset is used to finetune a model trained on the following datasets: A brick dataset, ... (more datasets to be added). Evaluate on the synthetic dataset.
-- Transfer learning finetuned with syntetic data and evaluated on real-world data. *The main goal of the study is to demonstrate that this model can be used to detect rock joints in real-world data.*
-- Semi-supervised or self-supervised learning on the synthetic dataset. Use a few labelled samples to finetune the model. Evaluate on the synthetic dataset.
-- Semi-supervised or self-supervised learning on the synthetic dataset. Use a few labelled samples to finetune the model. Evaluate on the real-world dataset.
-- Semi-supervised or self-supervised learning on the syntehtic dataset. Use a few labelled samples from the real-world dataset to finetune the model. Evaluate on the real-world dataset.
-- One shot segmentation on syntetic and real-world data samples using a foundation model (SAM2)
+1. Train and evaluate only on the `synthetic real-world dataset`. The goal is to evaluate the performance of the model on synthetic data and compare the performance of different models on this dataset. Choose the best model based on the performance on this process. Run hyperparameter optimization to find the best hyperparameters for this model.
 
+2. Train on the `synthetic real-world dataset` and evaluate on the `synthetic box dataset` which has near perfect labels. The main goal of the study is to demonstrate good performance for this setup.
+
+3. Train and evaluate only on the `synthetic box dataset` using different sizes of the dataset. The goal is to demonstrate the effect of different number of samples.
+
+4. Semi-supervised or self-supervised learning on the `synthetic real-world dataset` (perhaps filtered to more easily show joints in the image). Use a few labelled samples to finetune the model. Evaluate on the `synthetic box dataset`. This is the second strategy in trying to handle the problem of the label-effort and imperfect labelling.
+
+5. One shot segmentation on the `synthetic real-world dataset` and the `real-world dataset`. The goal is to investigate the quality of such an effort.
+
+For all models, experiment with transfer learning. At least for DeepLabV3+ and Unet, different pretrained models are available.
 
 ## Key tools and technologies
 
@@ -60,6 +67,7 @@ Variations for training and evaluation on the synthetic dataset:
 - Use of **docker** for containerization, reproducability and running training in the cloud.
 - Use of **dvc** for data versioning.
 - Use of **captum** for model interpretability, highlighting the importance of each pixel in the image for the model's prediction.
+- Use of **pre-commit** for code formatting and linting before each commit.
 
 ## Metrics for evaluation
 
@@ -69,7 +77,7 @@ Variations for training and evaluation on the synthetic dataset:
 
 - **Precision and Recall**: Precision indicates how many of the predicted joint traces are accurate, while recall shows how many of the true joint traces were detected. Balancing these metrics is key for generalising to different rock masses, as some joints may be subtle and easily missed (low recall) or overestimated (low precision)
 
-We illustrate the prediction mask images in fiftyone, where the predicted mask is overlaid on the original image. This allows us to visually inspect the model's performance and identify any potential issues with the model's predictions.
+We illustrate the prediction mask images qualitatively in `fiftyone`, where the predicted mask is overlaid on the original image. This allows us to visually inspect the model's performance and identify any potential issues with the model's predictions.
 
 
 ## Installation
@@ -156,10 +164,10 @@ We illustrate the prediction mask images in fiftyone, where the predicted mask i
 python scripts/train.py
 ```
 
-Use hydra configuration options with train.py to specify different models and training parameters. For example, to train a model with DeepLabV3 architecture, use the following command:
+Use hydra configuration options with train.py to specify different models and training parameters. For example, to train a model with DeepLabV3 architecture following process no. 3, use the following command:
 
 ```sh
-python scripts/train.py model=deeplabv3
+python scripts/train.py model=deeplabv3 process=3
 ```
 
 See all options with:
@@ -171,7 +179,7 @@ python scripts/train.py --help
 ### Hyperparameter Optimization
 
 ```sh
-python scripts/optimize.py model=deeplabv3
+python scripts/optimize.py model=deeplabv3 process=1
 ```
 
 ### Inspect the experiment results in MLflow
