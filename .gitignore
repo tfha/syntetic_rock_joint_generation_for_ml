@@ -1,0 +1,26 @@
+# Temp and cache files
+#######################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# VS Code
+.vscode/*
+
+# Jupyter NB Checkpoints
+.ipynb_checkpoints/
+
+# Mypy cache
+.mypy_cache/
+
+# pytest cache
+.pytest_cache/
+
+.ruff_cache/
+
+
+# Data and experiments
+#######################################
+experiments/
+data/

@@ -10,6 +10,8 @@
 
 ## Introduction
 
+Besides the specific usecase in this project, the repo structure aims to demonstrate a well defined and structured project setup for deep-learning based segmentation tasks.
+
 This project use machine learning to segment and detect rock joint traces in images. Rock joints are fractures in the rock mass that can have a significant impact on the stability of the rock mass. The detection of rock joints is important for geotechnical analysis and rock mass quality evaluation.
 
 Specifically we evaluate the performance of models trained on synthetic data and test them on real data. The syntetic dataset is generated in a process described in the following paper:
@@ -54,9 +56,9 @@ For all models, experiment with transfer learning. At least for DeepLabV3+ and U
 - Use of **pyenv** for managing Python versions.
 - Use of the **Hydra** configuration framework for easy configuration of the model and training parameters.
 - Use of **mlflow** for tracking experiments and model parameters. The path to each experiment config in hydra is stored in mlflow, so you can easily reproduce the results of each experiment.
-- Use of **tensorboard** for tracking training metrics, loss-development, computational profiling and model performance while the model is training. The distinction between the two is that tensorboard is used for tracking the training process, while mlflow is used for tracking the results of the training process.
+- Use of **tensorboard** for tracking training metrics, loss-development, computational profiling and model performance while the model is training. The distinction between the two is that tensorboard is used to investigate each train/eval process, while mlflow is used for tracking the end-results of the training process.
 - Use **pydantic** schemes to validate the configuration parameters.
-- Use of **optuna** for hyperparameter optimization.
+- Use of **optuna** for hyperparameter optimization. Each run, including hydra-config path and yaml file with hyperparameters, is tracked in mlflow.
 - Use of the **black**, **isort** and **ruff** code formatters for code formatting and linting.
 - Use of **segmentation-models-pytorch** for loading well implemented solutions for networks such as UNet, DeepLabV3, etc.
 - Use of **torchmetrics** for metrics calculation.
@@ -78,7 +80,6 @@ For all models, experiment with transfer learning. At least for DeepLabV3+ and U
 - **Precision and Recall**: Precision indicates how many of the predicted joint traces are accurate, while recall shows how many of the true joint traces were detected. Balancing these metrics is key for generalising to different rock masses, as some joints may be subtle and easily missed (low recall) or overestimated (low precision)
 
 We illustrate the prediction mask images qualitatively in `fiftyone`, where the predicted mask is overlaid on the original image. This allows us to visually inspect the model's performance and identify any potential issues with the model's predictions.
-
 
 ## Installation
 
@@ -164,10 +165,10 @@ We illustrate the prediction mask images qualitatively in `fiftyone`, where the 
 python scripts/train.py
 ```
 
-Use hydra configuration options with train.py to specify different models and training parameters. For example, to train a model with DeepLabV3 architecture following process no. 3, use the following command:
+Use hydra configuration options with train.py to specify different models and training parameters. For example, to train a model with DeepLabV3 architecture following process no. 3 and tracking all information to mlflow, use the following command:
 
 ```sh
-python scripts/train.py model=deeplabv3 process=3
+python scripts/train.py model=deeplabv3 process=3 log_mlflow=True
 ```
 
 See all options with:

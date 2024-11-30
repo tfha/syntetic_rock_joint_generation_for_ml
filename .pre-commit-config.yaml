@@ -3,7 +3,7 @@
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
     # list of supported hooks: https://pre-commit.com/hooks.html
     - id: trailing-whitespace
@@ -19,7 +19,7 @@ repos:
     # - id: name-tests-test
 
 -   repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.4.7"
+    rev: "v0.8.1"
     hooks:
         # run the linter
         - id: ruff
