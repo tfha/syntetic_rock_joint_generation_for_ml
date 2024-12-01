@@ -15,7 +15,6 @@ repos:
     - id: debug-statements
     - id: detect-private-key
     - id: check-toml
-    # - id: name-tests-test
 
 -   repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: "v0.8.1"
