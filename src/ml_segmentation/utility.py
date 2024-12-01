@@ -1,144 +1,164 @@
+import os
+import random
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import mlflow
+import numpy as np
 import pandas as pd
-import torch.nn as nn
+import torch
+import yaml
 from rich.console import Console
+from rich.table import Table
+from rich.theme import Theme
+from rich.traceback import install
 
 
-def log_mlflow_metrics_and_model(
-    mlflow_path: Path,
-    experiment_name: str,
-    metrics: dict,
-    artifacts: dict,
-    model_name: str,
-    model_params: dict,
-    undersample_level: int,
-    oversample_level: int,
-    hydra_cfg_dir: Path,
-) -> None:
+def seed_everything(seed: int = 42) -> None:
     """
-    Logs:
-    - metrics
-    - model details
-    - path to Hydra config files
-    - 5 random images from the dataset in mode raw, mask, and predicted mask
-
-    """
-    # Setting MLflow experiment and tracking URI
-    mlflow.set_tracking_uri(mlflow_path)
-    mlflow.set_experiment(experiment_name=experiment_name)
-
-    # Logging to MLflow
-    with mlflow.start_run():
-        # Log metrics
-        mlflow.log_metrics(metrics)
-
-        # Log model details
-        model_details = {
-            "model_name": model_name,
-            "scaler": "StandardScaler",
-            "undersample_level": undersample_level,
-            "oversample_level": oversample_level,
-        }
-        mlflow.log_params(model_details)
-        mlflow.log_params(model_params)
-
-        # Log confusion matrix, and eventual other figures as artifact
-        for name, fig in artifacts.items():
-            mlflow.log_figure(fig, f"{name}.png")
-
-        # Log Hydra config files as artifacts
-        hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
-
-        # Log paths of Hydra config files as MLflow parameters
-        hydra_cfg_paths = []
-        for config_file in hydra_configs:
-            mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
-            hydra_cfg_paths.append(str(config_file))
-
-        # Log paths as MLflow parameters
-        hydra_cfg_path_str = ", ".join(hydra_cfg_paths)
-        mlflow.log_param("hydra_config_paths", hydra_cfg_path_str)
-
-
-class EarlyStopping:
-    """
-    EarlyStopping is a class that implements early stopping functionality for model training.
+    Function to set random seed for reproducibility, similar to PyTorch Lightning's seed_everything.
 
     Args:
-        patience (int): The number of epochs to wait for improvement before stopping.
-        verbose (bool): If True, prints the early stopping counter.
-        delta (float): The minimum change in the monitored metric to be considered as improvement.
+        seed (int): The seed value to use for random number generators.
 
-    Attributes:
-        patience (int): The number of epochs to wait for improvement before stopping.
-        verbose (bool): If True, prints the early stopping counter.
-        delta (float): The minimum change in the monitored metric to be considered as improvement.
-        counter (int): The number of epochs since the last improvement.
-        best_score (float or None): The best score achieved so far.
-        early_stop (bool): Whether to stop the training early or not.
-        val_loss_min (float): The minimum validation loss achieved so far.
-        best_model (dict or None): The state dictionary of the best model.
+    Returns:
+        None
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(
+        seed
+    )  # Sets the seed for all CUDA devices (if using GPU)
+    torch.backends.cudnn.deterministic = (
+        True  # Ensures reproducibility in CuDNN (some slight slowdown)
+    )
+    torch.backends.cudnn.benchmark = (
+        False  # Disables benchmark mode for reproducibility
+    )
 
-    Methods:
-        __call__(val_loss, model): Updates the early stopping criteria based on the validation loss.
-        _save_best_model(model): Saves the state dictionary of the best model.
+
+def check_and_update_best_metrics(
+    metrics: dict[str, float],
+    best_metrics: dict[str, Any],
+    epoch: int,
+    training_time: float,
+) -> dict[str, Any]:
+    if best_metrics is None or metrics["loss"] < best_metrics["loss"]:
+        best_metrics = {
+            "epoch": epoch + 1,
+            "loss": metrics["loss"],
+            "iou": metrics["iou"],
+            "dice": metrics["dice"],
+            "precision": metrics["precision"],
+            "recall": metrics["recall"],
+            "training_time": training_time,
+        }
+        console = Console()
+        console.print("[bold green]New best model found![/bold green]")
+        console.print(
+            create_results_table(epoch, best_metrics, session="Best Validation")
+        )
+    return best_metrics
+
+
+# Function to create results table
+def create_results_table(
+    epoch: int, metrics: dict[str, float], session: str = "Training"
+) -> Table:
+    table = Table(title=f"Epoch {epoch + 1} {session} Results")
+    table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Value", style="magenta")
+    for metric, value in metrics.items():
+        table.add_row(metric.capitalize(), f"{value:.2f}")
+    return table
+
+
+def log_metrics_to_mlflow(
+    best_metrics: dict[str, Any],
+    model_name: str,
+    model_params: dict[str, Any],
+    train_dataset_name: str,
+    test_dataset_name: str,
+    experiment_name: str,
+    tracking_uri: str = None,
+    hydra_cfg_dir: str = None,
+    save_best_metrics: bool = True,
+    track_prediction_images: bool = False,
+    save_model: bool = False,
+) -> None:
+    if tracking_uri:
+        mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+    with mlflow.start_run():
+        # Log Hydra config files as artifacts if provided
+        if hydra_cfg_dir:
+            hydra_cfg_dir = Path(hydra_cfg_dir)
+            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+            hydra_cfg_paths = []
+            for config_file in hydra_configs:
+                mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
+                hydra_cfg_paths.append(str(config_file))
+
+        # Save best_metrics as YAML and log as an artifact
+        if save_best_metrics:
+            best_metrics_yaml = "best_metrics.yaml"
+            with open(best_metrics_yaml, "w") as f:
+                yaml.dump(best_metrics, f)
+            mlflow.log_artifact(best_metrics_yaml)
+
+        # Log Hydra config files as artifacts if provided
+        if hydra_cfg_dir:
+            hydra_cfg_dir = Path(hydra_cfg_dir)
+            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+            hydra_cfg_paths = []
+            for config_file in hydra_configs:
+                mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
+                hydra_cfg_paths.append(str(config_file))
+
+        # Log predictions as an artifact if provided
+        if track_prediction_images:
+            mlflow.log_artifact(
+                local_path=str(track_prediction_images), artifact_path="predictions"
+            )
+
+        if save_model:
+            mlflow.log_artifact(
+                local_path=str(Path("models/best_model.pth")), artifact_path="models"
+            )
+
+        # Log best metrics
+        mlflow.log_metrics(best_metrics)
+
+        # Log model details
+        mlflow.log_param("Model Name", model_name)
+        mlflow.log_params(model_params)
+        mlflow.log_param("Train Dataset", train_dataset_name)
+        mlflow.log_param("Test Dataset", test_dataset_name)
+
+
+def better_traceback() -> None:
+    """
+    run inspect on objects when debugging with ipdb
+    e.g inspect(df, metods=True)
+    """
+    os.environ["HYDRA_FULL_ERROR"] = "1"
+    install(show_locals=True)
+    from rich import inspect  # noqa
+
+
+def get_custom_console() -> Console:
+    """
+    Returns a custom console with a custom theme.
+
+    Returns:
+        Console: Rich Console object with custom theme.
 
     """
-
-    def __init__(self, patience: int = 7, verbose: bool = False, delta: float = 0.0):
-        self.patience = patience
-        self.verbose = verbose
-        self.delta = delta
-        self.counter = 0
-        self.best_score: None | float = None
-        self.early_stop: bool = False
-        self.val_loss_min: float = float("inf")
-        self.best_model: None | dict = None
-
-    def __call__(self, val_loss: float, model: nn.Module) -> None:
-        """
-        Updates the early stopping criteria based on the validation loss.
-
-        Args:
-            val_loss (float): The validation loss of the current epoch.
-            model (nn.Module): The model being trained.
-
-        Returns:
-            None
-
-        """
-        score = -val_loss
-
-        if self.best_score is None:
-            self.best_score = score
-            self._save_best_model(model)
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            if self.verbose:
-                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_score = score
-            self._save_best_model(model)
-            self.counter = 0
-
-    def _save_best_model(self, model: nn.Module) -> None:
-        """
-        Saves the state dictionary of the best model.
-
-        Args:
-            model (nn.Module): The model to save.
-
-        Returns:
-            None
-
-        """
-        self.best_model = model.state_dict()
-        self.val_loss_min = -self.best_score
+    custom_theme = Theme(
+        {"info": "bold green", "warning": "yellow", "danger": "bold red"}
+    )
+    return Console(theme=custom_theme)
 
 
 def modify_filepath(original_path: Path, endsection: str) -> Path:

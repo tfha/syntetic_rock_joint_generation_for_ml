@@ -1,0 +1,21 @@
+name: deeplabv3plus
+num_epochs: 50
+batch_size: 64
+learning_rate: 0.001
+scheduler:
+  patience: 5
+  gamma: 0.1
+params:
+  encoder_name: 'resnet34'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  encoder_output_stride: 16
+  decoder_channels: 256
+  decoder_atrous_rates: [12, 24, 36]
+  decoder_aspp_separable: true
+  decoder_aspp_dropout: 0.5
+  in_channels: 3
+  classes: 1
+  activation: null
+  upsampling: 4
+  aux_params: null

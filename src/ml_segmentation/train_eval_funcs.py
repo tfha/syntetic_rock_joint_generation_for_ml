@@ -1,0 +1,237 @@
+import random
+from pathlib import Path
+from typing import Any
+
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from rich.console import Console
+from rich.progress import track
+from rich.table import Table
+from torchmetrics import Dice, JaccardIndex, Precision, Recall
+
+
+def check_and_update_best_metrics(
+    metrics: dict[str, float],
+    best_metrics: dict[str, Any],
+    epoch: int,
+    training_time: float,
+) -> dict[str, Any]:
+    if best_metrics is None or metrics["loss"] < best_metrics["loss"]:
+        best_metrics = {
+            "epoch": epoch + 1,
+            "loss": metrics["loss"],
+            "iou": metrics["iou"],
+            "dice": metrics["dice"],
+            "precision": metrics["precision"],
+            "recall": metrics["recall"],
+            "training_time": training_time,
+        }
+        console = Console()
+        console.print("[bold green]New best model found![/bold green]")
+        console.print(
+            create_results_table(epoch, best_metrics, session="Best Validation")
+        )
+    return best_metrics
+
+
+def create_results_table(
+    epoch: int, metrics: dict[str, float], session: str = "Training"
+) -> Table:
+    table = Table(title=f"Epoch {epoch + 1} {session} Results")
+    table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Value", style="magenta")
+    for metric, value in metrics.items():
+        table.add_row(metric.capitalize(), f"{value:.4f}")
+    return table
+
+
+def train_one_epoch(
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    criterion: nn.Module,
+    optimizer: optim.Optimizer,
+    device: torch.device,
+) -> float:
+    model.train()
+    running_loss = 0.0
+    for images, masks in track(dataloader, description="Training", leave=False):
+        images, masks = images.to(device), masks.to(device)
+
+        # Zero the parameter gradients
+        optimizer.zero_grad()
+
+        # Forward pass
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+
+        # Backward pass and optimization
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item() * images.size(0)
+
+    epoch_loss = running_loss / len(dataloader.dataset)
+    return epoch_loss
+
+
+def validate_one_epoch(
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    threshold: float = 0.5,
+) -> dict[str, float]:
+    model.eval()
+    running_loss = 0.0
+    iou_metric = JaccardIndex(num_classes=2).to(device)
+    dice_metric = Dice().to(device)
+    precision_metric = Precision().to(device)
+    recall_metric = Recall().to(device)
+
+    with torch.no_grad():
+        for images, masks in track(dataloader, description="Validation", leave=False):
+            images, masks = images.to(device), masks.to(device)
+
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, masks)
+            running_loss += loss.item() * images.size(0)
+
+            # Calculate metrics
+            preds = torch.sigmoid(outputs) > threshold
+            iou_metric.update(preds, masks.int())
+            dice_metric.update(preds, masks.int())
+            precision_metric.update(preds, masks.int())
+            recall_metric.update(preds, masks.int())
+
+    epoch_loss = running_loss / len(dataloader.dataset)
+    metrics = {
+        "loss": epoch_loss,
+        "iou": round(iou_metric.compute().item(), 2),
+        "dice": round(dice_metric.compute().item(), 2),
+        "precision": round(precision_metric.compute().item(), 2),
+        "recall": round(recall_metric.compute().item(), 2),
+    }
+
+    return metrics
+
+
+class EarlyStopping:
+    """
+    EarlyStopping is a class that implements early stopping functionality for model training.
+
+    Args:
+        patience (int): The number of epochs to wait for improvement before stopping.
+        verbose (bool): If True, prints the early stopping counter.
+        delta (float): The minimum change in the monitored metric to be considered as improvement.
+
+    Attributes:
+        patience (int): The number of epochs to wait for improvement before stopping.
+        verbose (bool): If True, prints the early stopping counter.
+        delta (float): The minimum change in the monitored metric to be considered as improvement.
+        counter (int): The number of epochs since the last improvement.
+        best_score (float or None): The best score achieved so far.
+        early_stop (bool): Whether to stop the training early or not.
+        val_loss_min (float): The minimum validation loss achieved so far.
+        best_model (dict or None): The state dictionary of the best model.
+
+    Methods:
+        __call__(val_loss, model): Updates the early stopping criteria based on the validation loss.
+        _save_best_model(model): Saves the state dictionary of the best model.
+
+    """
+
+    def __init__(self, patience: int = 7, verbose: bool = False, delta: float = 0.0):
+        self.patience = patience
+        self.verbose = verbose
+        self.delta = delta
+        self.counter = 0
+        self.best_score: None | float = None
+        self.early_stop: bool = False
+        self.val_loss_min: float = float("inf")
+        self.best_model: None | dict = None
+
+    def __call__(self, val_loss: float, model: nn.Module) -> None:
+        """
+        Updates the early stopping criteria based on the validation loss.
+
+        Args:
+            val_loss (float): The validation loss of the current epoch.
+            model (nn.Module): The model being trained.
+
+        Returns:
+            None
+
+        """
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self._save_best_model(model)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            if self.verbose:
+                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self._save_best_model(model)
+            self.counter = 0
+
+    def _save_best_model(self, model: nn.Module) -> None:
+        """
+        Saves the state dictionary of the best model.
+
+        Args:
+            model (nn.Module): The model to save.
+
+        Returns:
+            None
+
+        """
+        self.best_model = model.state_dict()
+        self.val_loss_min = -self.best_score
+
+
+def save_image_predictions(
+    model: nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    device: torch.device,
+    num_samples: int = 3,
+    threshold: float = 0.5,
+    save_dir: Path = Path("plots/predictions"),
+):
+    model.eval()
+    samples = random.sample(list(dataloader), num_samples)
+
+    for idx, (images, masks) in enumerate(samples):
+        images, masks = images.to(device), masks.to(device)
+        with torch.no_grad():
+            preds = torch.sigmoid(model(images)) > threshold
+
+        # Convert tensors to CPU for plotting
+        images = images.cpu().numpy()
+        masks = masks.cpu().numpy()
+        preds = preds.cpu().numpy()
+
+        # Plot original image, true mask, and predicted mask
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        axes[0].imshow(images[0].transpose(1, 2, 0))  # Assumes channel-first format
+        axes[0].set_title("Original Image")
+        axes[1].imshow(masks[0][0], cmap="gray")  # True mask
+        axes[1].set_title("True Mask")
+        axes[2].imshow(preds[0][0], cmap="gray")  # Predicted mask
+        axes[2].set_title("Predicted Mask")
+
+        # Remove axes
+        for ax in axes:
+            ax.axis("off")
+
+        # Save the figure
+        save_dir.mkdir(parents=True, exist_ok=True)
+        save_path = save_dir / f"sample_{idx}.png"
+        plt.savefig(save_path)
+        plt.close(fig)

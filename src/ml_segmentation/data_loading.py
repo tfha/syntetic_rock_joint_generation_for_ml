@@ -1,0 +1,320 @@
+import json
+import random
+from pathlib import Path
+from typing import Any
+
+import hydra
+import torch
+from omegaconf import DictConfig, OmegaConf
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+
+from ml_segmentation.schema_config import ConfigSchema
+
+
+class SegmentationDataset(Dataset):
+    def __init__(
+        self,
+        images_dir: str | Path,
+        labels_dir: str | Path,
+        file_list: list[str],
+        transform: transforms.Compose | None = None,
+    ):
+        self.images_dir = Path(images_dir)
+        self.labels_dir = Path(labels_dir)
+        self.file_list = file_list
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.file_list)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+        image_path = self.images_dir / self.file_list[idx]
+        label_path = self.labels_dir / self.file_list[idx]
+
+        # Load image and label
+        image = Image.open(image_path).convert("RGB")
+        label = Image.open(label_path).convert("L")  # Assuming label is single channel
+
+        # Apply transformations if any
+        if self.transform:
+            image = self.transform["image"](image)
+            label = self.transform["label"](label)
+
+        return image, label
+
+
+def validate_data(images_dir: Path, labels_dir: Path, file_list: list[str]) -> None:
+    for file_name in file_list:
+        image_path = images_dir / file_name
+        label_path = labels_dir / file_name
+
+        image = Image.open(image_path).convert("RGB")
+        label = Image.open(label_path).convert("L")
+
+        # Check if image dimensions are divisible by 32
+        assert (
+            image.height % 32 == 0 and image.width % 32 == 0
+        ), f"Image dimensions (HxW): {image.height}x{image.width} are not divisible by 32"
+
+        # Check if all images have the same size
+        assert (
+            image.size == label.size
+        ), f"Image and label sizes do not match for file: {file_name}"
+
+        # Check if mask has only 0 and 1 values (binary segmentation)
+        label_array = torch.tensor(label, dtype=torch.float)
+        unique_values = torch.unique(label_array)
+        assert set(unique_values.tolist()).issubset(
+            {0, 1}
+        ), f"Mask contains values other than 0 and 1 for file: {file_name}"
+
+        # Check if the image has correct axes order (convert to CHW)
+        image_tensor = transforms.ToTensor()(image)
+        assert (
+            image_tensor.shape[0] == 3
+        ), f"Image does not have 3 channels for file: {file_name}"
+
+        # Check if mask is converted to 1HW format
+        label_tensor = torch.tensor(label, dtype=torch.float).unsqueeze(0)
+        assert (
+            label_tensor.shape[0] == 1
+        ), f"Mask does not have a single channel for file: {file_name}"
+
+
+def get_data_files(
+    images_dir: Path,
+    labels_dir: Path,
+    train_prefixes: list[str],
+    test_prefixes: list[str],
+) -> tuple[list[str], list[str]]:
+    # Filter files by prefixes for train and test, and make sure corresponding label exists
+    train_files = [
+        f.name
+        for f in images_dir.iterdir()
+        if any(f.name.startswith(prefix) for prefix in train_prefixes)
+        and f.suffix == ".png"
+        and (labels_dir / f.name).exists()
+    ]
+
+    test_files = [
+        f.name
+        for f in images_dir.iterdir()
+        if any(f.name.startswith(prefix) for prefix in test_prefixes)
+        and f.suffix == ".png"
+        and (labels_dir / f.name).exists()
+    ]
+
+    return train_files, test_files
+
+
+def split_data(
+    train_files: list[str],
+    test_files: list[str],
+    train_frac: float = 0.7,
+    val_frac: float = 0.2,
+    test_frac: float = 0.1,
+) -> tuple[list[str], list[str], list[str]]:
+    # Ensure fractions add up to 1.0
+    assert (
+        abs(train_frac + val_frac + test_frac - 1.0) < 1e-6
+    ), "Fractions must add up to 1.0"
+
+    # If train_files and test_files are similar, split into train, validation, and test
+    if set(train_files) == set(test_files):
+        all_files = train_files
+        random.shuffle(all_files)
+        train_end = int(len(all_files) * train_frac)
+        val_end = train_end + int(len(all_files) * val_frac)
+
+        train_list = all_files[:train_end]
+        val_list = all_files[train_end:val_end]
+        test_list = all_files[val_end:]
+    else:
+        # Split train files into train and validation
+        random.shuffle(train_files)
+        val_end = int(len(train_files) * val_frac / (train_frac + val_frac))
+        val_list = train_files[:val_end]
+        train_list = train_files[val_end:]
+        test_list = test_files
+
+    # Assert no duplicates and no intersections between train, validation, and test lists
+    assert len(set(train_list)) == len(train_list), "Train set contains duplicate files"
+    assert len(set(val_list)) == len(
+        val_list
+    ), "Validation set contains duplicate files"
+    assert len(set(test_list)) == len(test_list), "Test set contains duplicate files"
+    assert (
+        len(set(train_list).intersection(set(val_list))) == 0
+    ), "Train and validation sets have overlapping files"
+    assert (
+        len(set(train_list).intersection(set(test_list))) == 0
+    ), "Train and test sets have overlapping files"
+    assert (
+        len(set(val_list).intersection(set(test_list))) == 0
+    ), "Validation and test sets have overlapping files"
+
+    # Save full list and splits to disk
+    data_raw_dir = Path("data/raw")
+    data_raw_dir.mkdir(parents=True, exist_ok=True)
+    with open(data_raw_dir / "all_files.json", "w") as f:
+        json.dump(train_files + test_files, f)
+
+    data_model_ready_dir = Path("data/model_ready")
+    data_model_ready_dir.mkdir(parents=True, exist_ok=True)
+    with open(data_model_ready_dir / "train_files.json", "w") as f:
+        json.dump(train_list, f)
+    with open(data_model_ready_dir / "val_files.json", "w") as f:
+        json.dump(val_list, f)
+    with open(data_model_ready_dir / "test_files.json", "w") as f:
+        json.dump(test_list, f)
+
+    return train_list, val_list, test_list
+
+
+def get_datasets(
+    images_dir: str | Path,
+    labels_dir: str | Path,
+    train_files: list[str],
+    val_files: list[str],
+    test_files: list[str],
+    transform: dict[str, transforms.Compose] | None = None,
+) -> tuple[SegmentationDataset, SegmentationDataset, SegmentationDataset]:
+    train_dataset = SegmentationDataset(images_dir, labels_dir, train_files, transform)
+    val_dataset = SegmentationDataset(images_dir, labels_dir, val_files, transform)
+    test_dataset = SegmentationDataset(images_dir, labels_dir, test_files, transform)
+    return train_dataset, val_dataset, test_dataset
+
+
+def get_dataloaders(
+    train_dataset: SegmentationDataset,
+    val_dataset: SegmentationDataset,
+    test_dataset: SegmentationDataset,
+    batch_size: int = 4,
+    shuffle: bool = True,
+    num_workers: int = 2,
+) -> tuple[DataLoader, DataLoader, DataLoader]:
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+    return train_loader, val_loader, test_loader
+
+
+def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Compose]:
+    """
+    Using all the transforms the effective virtual dataset size will be approximately 14.4 times larger during training compared to the original 1000 images. This means that while you still only have 1000 original images saved, the model will effectively see about 14,400 variations of your images over the course of training, which significantly improves generalisation without explicitly increasing the number of stored images
+    """
+    train_transforms_list = [
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.ToTensor(),
+    ]
+
+    if optional_transforms:
+        train_transforms_list.extend(
+            [
+                transforms.RandomRotation(15),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
+                ),
+                transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
+            ]
+        )
+
+    train_transform = transforms.Compose(train_transforms_list)
+
+    label_transform = transforms.Compose(
+        [
+            transforms.ToTensor(),
+        ]
+    )
+
+    return {"image": train_transform, "label": label_transform}
+
+
+def get_prefix_lists(
+    dataset_name_train: list[str],
+    dataset_name_test: list[str],
+    prefixes_synthetic_rock_slope: list[str],
+    prefixes_synthetic_fracman: list[str],
+    prefixes_synthetic_box: list[str],
+    prefixes_real_world_box: list[str],
+) -> tuple[list[str], list[str]]:
+    train_prefixes = []
+    for dataset_name in dataset_name_train:
+        match dataset_name:
+            case "synthetic_rock_slope":
+                train_prefixes.extend(prefixes_synthetic_rock_slope)
+            case "synthetic_fracman":
+                train_prefixes.extend(prefixes_synthetic_fracman)
+            case "synthetic_box":
+                train_prefixes.extend(prefixes_synthetic_box)
+            case "real_world_box":
+                train_prefixes.extend(prefixes_real_world_box)
+            case _:
+                train_prefixes.extend([])
+
+    test_prefixes = []
+    for dataset_name in dataset_name_test:
+        match dataset_name:
+            case "synthetic_rock_slope":
+                test_prefixes.extend(prefixes_synthetic_rock_slope)
+            case "synthetic_fracman":
+                test_prefixes.extend(prefixes_synthetic_fracman)
+            case "synthetic_box":
+                test_prefixes.extend(prefixes_synthetic_box)
+            case "real_world_box":
+                test_prefixes.extend(prefixes_real_world_box)
+            case _:
+                test_prefixes.extend([])
+
+    return train_prefixes, test_prefixes
+
+
+@hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
+def testing_functionality(cfg: DictConfig) -> None:
+    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
+    pcfg = ConfigSchema(**cfg_dict)
+    images_directory = pcfg.dataset.path_raw_rockmass
+    labels_directory = pcfg.dataset.path_raw_labels
+    prefixes_list = pcfg.dataset.synthetic_box_prefixes
+
+    # Get transformations (with optional transforms enabled)
+    transforms_dict = get_transforms(optional_transforms=True)
+
+    # Split data and validate
+    train_files, test_files = split_data(
+        images_directory, labels_directory, prefixes_list
+    )
+    validate_data(images_directory, labels_directory, train_files + test_files)
+
+    # Create datasets
+    train_dataset, test_dataset = get_datasets(
+        images_directory, labels_directory, prefixes_list, transform=transforms_dict
+    )
+
+    # Get DataLoaders
+    train_loader, test_loader = get_dataloaders(
+        train_dataset, test_dataset, batch_size=8
+    )
+
+    # Iterate through the Train DataLoader
+    for images, labels in train_loader:
+        print("Train Batch:", images.shape, labels.shape)
+        break
+
+    # Iterate through the Test DataLoader
+    for images, labels in test_loader:
+        print("Test Batch:", images.shape, labels.shape)
+        break
+
+
+if __name__ == "__main__":
+    testing_functionality()

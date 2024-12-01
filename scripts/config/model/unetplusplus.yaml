@@ -1,0 +1,23 @@
+name: unetplusplus
+num_epochs: 50
+batch_size: 64
+learning_rate: 0.001
+scheduler:
+  patience: 5
+  gamma: 0.1
+params:
+  encoder_name: 'resnet34'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  decoder_use_batchnorm: true
+  decoder_channels:
+    - 256
+    - 128
+    - 64
+    - 32
+    - 16
+  decoder_attention_type: null
+  in_channels: 3
+  classes: 1
+  activation: null
+  aux_params: null

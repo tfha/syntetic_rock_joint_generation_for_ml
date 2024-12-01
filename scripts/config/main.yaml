@@ -1,32 +1,51 @@
 defaults: #points to sub-configs
-  - model: deeplabv3plus
-  - styles: styles_1.yaml # config for terminal printing. Paper plotting is in Matplotlib stylesheet
+  - model: unet
   - _self_ # main overrides sub-cfg in case of duplicates
 
 
 # EXPERIMENT CONFIG
 #####################################################################
 
+path_project: C:\Users\TFH\NGI\Jessica Ka Yi Chiu - Paper - Synthetic rock joint generation for ML
+matplotlib_config_path: ./scripts/config/figures_styles.mplstyle
+
 # NOTE: hydra configs are not passed on to cfg and don't need schema
 hydra:
   run:
-    dir: ./experiments/hydra_outputs/${now:%Y-%m-%d}/${now:%H-%M-%S} #change to onedrive folder
+    dir: ${path_project}/experiments/hydra_outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: ./experiments/hydra_outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ${path_project}/experiments/hydra_outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
 
 experiment:
   seed: 42
+  log_mlflow: false
   train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
   early_stopping_patience: 10
-  dataset_train: synthetic_real
-  dataset_test: synthetic_box
+  dataset_name_train: [synthetic_rock_slope, synthetic_fracman]
+  dataset_name_test: [synthetic_rock_slope, synthetic_fracman]
+  optional_transforms: false
+  overfit_check: false
   crossvalidation: false
-  matplotlib_config_path: ./scripts/config/figures_styles.mplstyle
+
+tensorboard:
+  path: ./experiments/tensorboard
 
 mlflow:
-  path: ./experiments/mlruns
+  path: ${path_project}/experiments/mlruns
   experiment_name: null # is set when calling scripts
+  save_model: false
+
+optuna:
+  n_trials: 5
+  path_results: experiments/hyperparameters
 
 dataset:
-  path_raw: .
+  path_raw_rockmass: ${path_project}/Data/Rockmass
+  path_raw_labels: ${path_project}/Data/Label
+  prefixes_synthetic_rock_slope: ["Larvik", "RV4"]
+  prefixes_synthetic_fracman: ["FracMan"]
+  prefixes_synthetic_box: ["Benchmark"]
+  prefixes_real_world_box: ["Box"]

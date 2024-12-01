@@ -1,15 +1,34 @@
+from typing import Any
+
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-model = smp.Unet(
-    encoder_name="resnet34",  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
-    encoder_weights="imagenet",  # use `imagenet` pre-trained weights for encoder initialization
-    in_channels=3,  # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-    classes=2,  # model output channels (number of classes in your dataset)
-)
+def choose_model(model_name: str, params: dict[str, Any]) -> nn.Module:
+    """
+    Choose a segmentation model based on the model name.
+
+    Args:
+        model_name (str): The name of the model to choose.
+
+    Returns:
+        nn.Module: The chosen model.
+
+    """
+    match model_name:
+        case "unet":
+            model = smp.Unet(**params)
+        case "deeplabv3plus":
+            model = smp.DeepLabV3Plus(**params)
+        case "unetplusplus":
+            model = smp.UnetPlusPlus(**params)
+        case "FraSegNetVGG19":
+            model = FraSegNetVGG19(**params)
+        case _:
+            raise ValueError(f"Model {model_name} not recognized.")
+    return model
 
 
 class ASPP(nn.Module):
@@ -136,8 +155,8 @@ class FraSegNetVGG19(nn.Module):
         return out
 
 
-# Instantiate and check sizes
-model = FraSegNetVGG19()
-x = torch.randn(1, 3, 224, 224)  # Batch size 1, RGB image
-output = model(x)
-print("Output shape:", output.shape)
+# # Instantiate and check sizes
+# model = FraSegNetVGG19()
+# x = torch.randn(1, 3, 224, 224)  # Batch size 1, RGB image
+# output = model(x)
+# print("Output shape:", output.shape)
