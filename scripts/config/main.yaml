@@ -18,7 +18,7 @@ hydra:
     subdir: ${hydra.job.num}
 
 experiment:
-  experiment_strategy: "standard_run"  # Options: "standard_run", "study_verification", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
+  experiment_strategy: "dataset_size_test"  # Options: "standard_run", "study_verification", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     standard_run:
       train_datasets:
@@ -37,7 +37,7 @@ experiment:
       train_datasets:
         - "synthetic_box"
       test_datasets:
-        - "real_world_box"
+        - "synthetic_box"  # why real_world_box?
     semi_supervised_learning:
       train_datasets:
         - "synthetic_rock_slope"
@@ -51,10 +51,10 @@ experiment:
         - "real_world_rock_slope"
       test_datasets: []
   seed: 42
-  log_mlflow: false
+  log_mlflow: true
   train_fraction: 0.8
-  val_fraction: 0.1
-  test_fraction: 0.1
+  val_fraction: 0.0
+  test_fraction: 0.2
   early_stopping_patience: 10
   optional_transforms: false
   overfit_check: false

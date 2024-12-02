@@ -7,6 +7,7 @@ import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from PIL import Image
+from rich.progress import track
 from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
@@ -97,28 +98,40 @@ def main(cfg: DictConfig) -> None:
         val_frac=pcfg.experiment.val_fraction,
         test_frac=pcfg.experiment.test_fraction,
     )
+
+    # Print the number of samples in train, validation, and test sets
+    console.print(f"Number of training samples: {len(train_list)}")
+    console.print(f"Number of validation samples: {len(val_list)}")
+    console.print(f"Number of test samples: {len(test_list)}")
+
+    # VALIDATE DATA
+    ############################
+    console.print("Validate data...", style="info")
     validate_data_pre_transform(
         images_directory, labels_directory, train_list + val_list + test_list
     )
-    # validate_data(images_directory, labels_directory, train_list + val_list + test_list)
 
     image_transform = transforms_dict["image"]
     label_transform = transforms_dict["label"]
     file_list = train_list + val_list + test_list
 
-    for file_name in file_list:
+    for file_name in track(
+        file_list, description="Validating data files post transform..."
+    ):
         image_path = images_directory / file_name
         label_path = labels_directory / file_name
 
         image = Image.open(image_path).convert("RGB")
         label = Image.open(label_path).convert("L")
+        label = label.point(lambda p: 255 if p == 255 else 0)
 
         # Apply transforms
         transformed_image = image_transform(image)
         transformed_label = label_transform(label)
 
-        # Step 3: Post-Transformation Validation
         validate_data_post_transform(transformed_image, transformed_label, file_name)
+
+    ############################
 
     # Create datasets
     train_dataset, val_dataset, test_dataset = get_datasets(
@@ -132,8 +145,10 @@ def main(cfg: DictConfig) -> None:
 
     # Get DataLoaders
     train_loader, val_loader, test_loader = get_dataloaders(
-        train_dataset, val_dataset, test_dataset, batch_size=8
+        train_dataset, val_dataset, test_dataset, batch_size=pcfg.model.batch_size
     )
+
+    console.print("Shapes of data:", style="info")
 
     # Iterate through the Train DataLoader
     for images, labels in train_loader:
@@ -155,7 +170,7 @@ def main(cfg: DictConfig) -> None:
     console.print("Define model...", style="info")
     model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
     # Print model summary
-    summary(model, input_size=(1, 3, 224, 224))  # Adjust input size as per your data
+    summary(model, input_size=(1, 3, 768, 768))  # Adjust input size as per your data
 
     # DEFINE LOSS FUNCTION, OPTIMIZER, SCHEDULER, EARLY STOPPING
     ########################################################################

@@ -9,6 +9,7 @@ import torch.optim as optim
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
+from torch.amp import autocast
 from torchmetrics import Dice, JaccardIndex, Precision, Recall
 
 
@@ -56,15 +57,16 @@ def train_one_epoch(
 ) -> float:
     model.train()
     running_loss = 0.0
-    for images, masks in track(dataloader, description="Training", leave=False):
+    for images, masks in track(dataloader, description="Training"):
         images, masks = images.to(device), masks.to(device)
 
         # Zero the parameter gradients
         optimizer.zero_grad()
 
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, masks)
+        with autocast(device_type="cuda"):
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, masks)
 
         # Backward pass and optimization
         loss.backward()
@@ -85,18 +87,20 @@ def validate_one_epoch(
 ) -> dict[str, float]:
     model.eval()
     running_loss = 0.0
-    iou_metric = JaccardIndex(num_classes=2).to(device)
-    dice_metric = Dice().to(device)
-    precision_metric = Precision().to(device)
-    recall_metric = Recall().to(device)
+    iou_metric = JaccardIndex(task="binary").to(device)
+    dice_metric = Dice(task="binary").to(device)
+    precision_metric = Precision(task="binary").to(device)
+    recall_metric = Recall(task="binary").to(device)
 
     with torch.no_grad():
-        for images, masks in track(dataloader, description="Validation", leave=False):
+        for images, masks in track(dataloader, description="Validation"):
             images, masks = images.to(device), masks.to(device)
 
-            # Forward pass
-            outputs = model(images)
-            loss = criterion(outputs, masks)
+            with autocast(device_type="cuda"):
+                # Forward pass
+                outputs = model(images)
+                loss = criterion(outputs, masks)
+
             running_loss += loss.item() * images.size(0)
 
             # Calculate metrics

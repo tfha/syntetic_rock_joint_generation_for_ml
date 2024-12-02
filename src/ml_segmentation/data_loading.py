@@ -7,6 +7,7 @@ import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
 from PIL import Image
+from rich.progress import track
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
@@ -36,6 +37,9 @@ class SegmentationDataset(Dataset):
         # Load image and label
         image = Image.open(image_path).convert("RGB")
         label = Image.open(label_path).convert("L")  # Assuming label is single channel
+        label = label.point(
+            lambda p: 255 if p == 255 else 0
+        )  # Convert grayscales to binary
 
         # Apply transformations if any
         if self.transform:
@@ -48,7 +52,9 @@ class SegmentationDataset(Dataset):
 def validate_data_pre_transform(
     images_dir: Path, labels_dir: Path, file_list: list[str]
 ) -> None:
-    for file_name in file_list:
+    for file_name in track(
+        file_list, description="Validating data files pre transform..."
+    ):
         image_path = images_dir / file_name
         label_path = labels_dir / file_name
 
@@ -59,6 +65,7 @@ def validate_data_pre_transform(
         try:
             image = Image.open(image_path).convert("RGB")
             label = Image.open(label_path).convert("L")
+            label = label.point(lambda p: 255 if p == 255 else 0)
         except Exception as e:
             raise AssertionError(
                 f"Failed to open image or label file: {file_name}, Error: {e}"
@@ -103,6 +110,7 @@ def validate_data(images_dir: Path, labels_dir: Path, file_list: list[str]) -> N
 
         image = Image.open(image_path).convert("RGB")
         label = Image.open(label_path).convert("L")
+        label = label.point(lambda p: 255 if p == 255 else 0)
 
         # Check if image dimensions are divisible by 32
         assert (
