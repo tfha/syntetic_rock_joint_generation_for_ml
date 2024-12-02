@@ -6,6 +6,7 @@ import hydra
 import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
+from PIL import Image
 from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
@@ -15,10 +16,11 @@ from ml_segmentation.data_loading import (
     get_data_files,
     get_dataloaders,
     get_datasets,
-    get_prefix_lists,
+    get_datasets_prefixes,
     get_transforms,
     split_data,
-    validate_data,
+    validate_data_post_transform,
+    validate_data_pre_transform,
 )
 from ml_segmentation.define_model import choose_model
 from ml_segmentation.schema_config import ConfigSchema
@@ -47,9 +49,13 @@ def main(cfg: DictConfig) -> None:
 
     # SETUP
     ########################################################################
+    console.print(
+        f"Kicking off an experiment using the experiment strategy: {pcfg.experiment.experiment_strategy}",
+        style="info",
+    )
     writer = SummaryWriter(log_dir=pcfg.tensorboard.path)
     # Create a rich console with custom theme
-    seed_everything()
+    seed_everything(pcfg.experiment.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
@@ -67,13 +73,15 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Get prefixes
-    train_prefixes_list, test_prefixes_list = get_prefix_lists(
-        pcfg.experiment.dataset_name_train,
-        pcfg.experiment.dataset_name_test,
-        pcfg.dataset.prefixes_synthetic_rock_slope,
-        pcfg.dataset.prefixes_synthetic_fracman,
-        pcfg.dataset.prefixes_synthetic_box,
-        pcfg.dataset.prefixes_real_world_box,
+    prefixes = get_datasets_prefixes(
+        experiment_strategy=pcfg.experiment.experiment_strategy,
+        dataset_strategies=pcfg.experiment.dataset_strategies,
+        dataset_prefixes=pcfg.dataset.prefixes,
+    )
+
+    train_prefixes_list, test_prefixes_list = (
+        prefixes["train_prefixes"],
+        prefixes["test_prefixes"],
     )
 
     # Get data files
@@ -89,7 +97,28 @@ def main(cfg: DictConfig) -> None:
         val_frac=pcfg.experiment.val_fraction,
         test_frac=pcfg.experiment.test_fraction,
     )
-    validate_data(images_directory, labels_directory, train_list + val_list + test_list)
+    validate_data_pre_transform(
+        images_directory, labels_directory, train_list + val_list + test_list
+    )
+    # validate_data(images_directory, labels_directory, train_list + val_list + test_list)
+
+    image_transform = transforms_dict["image"]
+    label_transform = transforms_dict["label"]
+    file_list = train_list + val_list + test_list
+
+    for file_name in file_list:
+        image_path = images_directory / file_name
+        label_path = labels_directory / file_name
+
+        image = Image.open(image_path).convert("RGB")
+        label = Image.open(label_path).convert("L")
+
+        # Apply transforms
+        transformed_image = image_transform(image)
+        transformed_label = label_transform(label)
+
+        # Step 3: Post-Transformation Validation
+        validate_data_post_transform(transformed_image, transformed_label, file_name)
 
     # Create datasets
     train_dataset, val_dataset, test_dataset = get_datasets(

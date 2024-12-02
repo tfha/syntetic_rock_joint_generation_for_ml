@@ -39,15 +39,15 @@ Semantic segmentation is a computer vision task where the goal is to classify ea
 
 Variations for training and evaluation on the synthetic dataset:
 
-1. <ins>"Transfer learning"</ins>: Train, validate and test on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset`. The goal is to evaluate the performance of the model on synthetic data only and compare the performance of different models on this dataset. Choose the best model based on the performance on this process. Run hyperparameter optimization to find the best hyperparameters for this model.
+1. *Standard run*: Train, validate and test on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset`. The goal is to evaluate the performance of the model on synthetic data only and compare the performance of different models on this dataset. Choose the best model based on the performance on this process. Run hyperparameter optimization to find the best hyperparameters for this model.
 
-2. <ins>"Deployment":</ins> Train and validate on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset`. Test on the `real-world box dataset` which has nearly perfect labels. The main goal of the study is to demonstrate good performance for this setup.
+2. *Study verification*: Train and validate on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset`. Test on the `real-world box dataset` which has nearly perfect labels. The main goal of the study is to demonstrate good performance for this setup.
 
-3. <ins>"Batch-size test":</ins> Train and validate only on the `synthetic box dataset` using different sizes of the dataset, and test on `real-world box dataset`. The goal is to demonstrate the effect of different number of samples. This is a pilot study to be presented in Eurock 2025.
+3. *Dataset-size test*: Train and validate only on the `synthetic box dataset` using different sizes of the dataset, and test on `real-world box dataset`. The goal is to demonstrate the effect of different number of samples. This is a pilot study to be presented in Eurock 2025.
 
-4. <ins>"Semi-supervised learning":</ins> Semi-supervised or self-supervised learning on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset` (perhaps filtered to more easily show joints in the image). Use a few labelled samples to finetune the model. Evaluate separately on the `real-world box dataset` and the `real-world rock slope dataset`. This is the second strategy in trying to handle the problem of the label-effort and imperfect labelling.
+4. *Semi-supervised learning*: Semi-supervised or self-supervised learning on the `synthetic rock slope dataset` combined with `synthetic FracMan dataset` (perhaps filtered to more easily show joints in the image). Use a few labelled samples to finetune the model. Evaluate separately on the `real-world box dataset` and the `real-world rock slope dataset`. This is the second strategy in trying to handle the problem of the label-effort and imperfect labelling.
 
-5. <ins>"One-shot segmentation":</ins> One-shot segmentation on the `synthetic rock slope dataset` and the `real-world rock slope dataset`. The goal is to investigate the quality of such an effort.
+5. *One-shot segmentation* One-shot segmentation on the `synthetic rock slope dataset` and the `real-world rock slope dataset`. The goal is to investigate the quality of such an effort.
 
 For all models, experiment with transfer learning. At least for DeepLabV3+ and Unet, different pretrained models are available.
 
@@ -61,16 +61,16 @@ For all models, experiment with transfer learning. At least for DeepLabV3+ and U
 - Use of **tensorboard** for tracking training metrics, loss-development, computational profiling and model performance while the model is training. The distinction between the two is that tensorboard is used to investigate each train/eval process, while mlflow is used for tracking the end-results of the training process.
 - Use **pydantic** schemes to validate the configuration parameters.
 - Use of **optuna** for hyperparameter optimization. Each run, including hydra-config path and yaml file with hyperparameters, is tracked in mlflow.
-- Use of the **black**, **isort** and **ruff** code formatters for code formatting and linting.
+- Use of the **isort** and **ruff** code formatters for code formatting and linting.
 - Use of **segmentation-models-pytorch** for loading well implemented solutions for networks such as UNet, DeepLabV3, etc.
 - Use of **torchmetrics** for metrics calculation.
 - Use of **torchsummary** for model summary.
-- Use of **fiftyone** for data visualization and data management.
-- Use of **pytorch-lightning** for training loop.
-- Use of **pytest** for testing.
-- Use of **docker** for containerization, reproducability and running training in the cloud.
-- Use of **dvc** for data versioning.
-- Use of **captum** for model interpretability, highlighting the importance of each pixel in the image for the model's prediction.
+<!-- - Use of **fiftyone** for data visualization and data management. -->
+<!-- - Use of **pytorch-lightning** for training loop. -->
+<!-- - Use of **pytest** for testing. -->
+<!-- - Use of **docker** for containerization, reproducability and running training in the cloud. -->
+<!-- - Use of **dvc** for data versioning. -->
+<!-- - Use of **captum** for model interpretability, highlighting the importance of each pixel in the image for the model's prediction. -->
 - Use of **pre-commit** for code formatting and linting before each commit.
 
 ## Metrics for evaluation

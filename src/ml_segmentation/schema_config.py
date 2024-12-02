@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,6 @@ class Scheduler(BaseModel):
     gamma: float
 
 
-# Define the main configuration schema
 class ModelConfig(BaseModel):
     name: str = Field(
         ...,
@@ -25,7 +25,26 @@ class ModelConfig(BaseModel):
     params: dict[str, Any] = Field(..., description="Dictionary of model parameters.")
 
 
+class ExperimentStrategy(str, Enum):
+    STANDARD_RUN = "standard_run"
+    STUDY_VERIFICATION = "study_verification"
+    DATASET_SIZE_TEST = "dataset_size_test"
+    SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
+    ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
+
+
 class ExperimentConfig(BaseModel):
+    experiment_strategy: ExperimentStrategy = Field(
+        ..., description="The experiment strategy chosen for this run."
+    )
+    dataset_strategies: dict[str, dict[str, list[str]]] = Field(
+        ...,
+        description=(
+            "Mapping of experiment strategies to their corresponding dataset configurations. "
+            "Each strategy includes 'train_datasets' and 'test_datasets', "
+            "which are lists of dataset names used for training and testing respectively."
+        ),
+    )
     seed: int = Field(..., description="Random seed for reproducibility.")
     log_mlflow: bool = Field(..., description="Whether to log to mlflow or not.")
     train_fraction: float = Field(
@@ -38,13 +57,20 @@ class ExperimentConfig(BaseModel):
     early_stopping_patience: int = Field(
         ..., description="Patience for early stopping in training."
     )
-    dataset_name_train: str = Field(..., description="Dataset name for training.")
-    dataset_name_test: str = Field(..., description="Dataset name for testing.")
     optional_transforms: bool = Field(
         ..., description="Whether optional image transforms are used."
     )
     overfit_check: bool = Field(..., description="Whether overfit check is used.")
     crossvalidation: bool = Field(..., description="Whether cross-validation is used.")
+
+
+class DatasetConfig(BaseModel):
+    path_raw_rockmass: Path = Field(..., description="Path to raw rock mass data.")
+    path_raw_labels: Path = Field(..., description="Path to raw labels data.")
+    prefixes: dict[str, list[str]] = Field(
+        ...,
+        description="Mapping of dataset names to lists of prefixes used to filter files for that dataset.",
+    )
 
 
 class MlflowConfig(BaseModel):
@@ -65,23 +91,6 @@ class OptunaConfig(BaseModel):
     )
     path_results: Path = Field(
         ..., description="Directory path for storing hyperparameter results."
-    )
-
-
-class DatasetConfig(BaseModel):
-    path_raw_rockmass: Path = Field(..., description="Path to raw rock mass data.")
-    path_raw_labels: Path = Field(..., description="Path to raw labels data.")
-    prefixes_synthetic_rock_slope: list[str] = Field(
-        ..., description="Prefixes for synthetic rock slope data."
-    )
-    prefixes_synthetic_fracman: list[str] = Field(
-        ..., description="Prefixes for synthetic fracman data."
-    )
-    prefixes_synthetic_box: list[str] = Field(
-        ..., description="Prefixes for synthetic box data."
-    )
-    prefixes_real_world_box: list[str] = Field(
-        ..., description="Prefixes for real world box data."
     )
 
 
