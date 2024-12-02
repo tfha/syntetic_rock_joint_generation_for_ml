@@ -272,18 +272,20 @@ def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Co
     """
     # Define the size to which the images and labels should be cropped, divisible by 32
     crop_size = 768  # Example size that is divisible by 32
+    resize_size = 384  # Example size that is divisible by 32
 
     train_transforms_list = [
-        transforms.CenterCrop(crop_size),  # Centre crop to the specified size
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
+        transforms.CenterCrop(crop_size),
+        transforms.Resize((resize_size, resize_size), interpolation=Image.BILINEAR),
+        # transforms.RandomHorizontalFlip(),
+        # transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
     ]
 
     if optional_transforms:
         train_transforms_list.extend(
             [
-                transforms.RandomRotation(15),
+                # transforms.RandomRotation(15),
                 transforms.ColorJitter(
                     brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
                 ),
@@ -299,6 +301,7 @@ def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Co
             transforms.CenterCrop(
                 crop_size
             ),  # Centre crop to the same size as the images
+            transforms.Resize((resize_size, resize_size), interpolation=Image.NEAREST),
             transforms.ToTensor(),
         ]
     )

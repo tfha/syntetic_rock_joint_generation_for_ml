@@ -1,0 +1,7 @@
+dice: 0.99
+epoch: 1
+iou: 0.99
+loss: 0.057784408744838506
+precision: 0.99
+recall: 1.0
+training_time: 51.79593634605408

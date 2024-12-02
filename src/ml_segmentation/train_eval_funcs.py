@@ -54,10 +54,18 @@ def train_one_epoch(
     criterion: nn.Module,
     optimizer: optim.Optimizer,
     device: torch.device,
+    scaler: torch.amp.GradScaler,
+    max_batches: int | None = None,
 ) -> float:
     model.train()
     running_loss = 0.0
-    for images, masks in track(dataloader, description="Training"):
+
+    for batch_idx, (images, masks) in enumerate(
+        track(dataloader, description="Training")
+    ):
+        if max_batches is not None and batch_idx >= max_batches:
+            break
+
         images, masks = images.to(device), masks.to(device)
 
         # Zero the parameter gradients
@@ -69,8 +77,9 @@ def train_one_epoch(
             loss = criterion(outputs, masks)
 
         # Backward pass and optimization
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         running_loss += loss.item() * images.size(0)
 
@@ -84,16 +93,22 @@ def validate_one_epoch(
     criterion: nn.Module,
     device: torch.device,
     threshold: float = 0.5,
+    max_batches: int | None = None,
 ) -> dict[str, float]:
     model.eval()
     running_loss = 0.0
     iou_metric = JaccardIndex(task="binary").to(device)
-    dice_metric = Dice(task="binary").to(device)
+    dice_metric = Dice(num_classes=2).to(device)
     precision_metric = Precision(task="binary").to(device)
     recall_metric = Recall(task="binary").to(device)
 
     with torch.no_grad():
-        for images, masks in track(dataloader, description="Validation"):
+        for batch_idx, (images, masks) in enumerate(
+            track(dataloader, description="Validation")
+        ):
+            if max_batches is not None and batch_idx >= max_batches:
+                break
+
             images, masks = images.to(device), masks.to(device)
 
             with autocast(device_type="cuda"):
@@ -207,7 +222,7 @@ def save_image_predictions(
     num_samples: int = 3,
     threshold: float = 0.5,
     save_dir: Path = Path("plots/predictions"),
-):
+) -> None:
     model.eval()
     samples = random.sample(list(dataloader), num_samples)
 

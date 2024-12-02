@@ -61,6 +61,12 @@ class ExperimentConfig(BaseModel):
         ..., description="Whether optional image transforms are used."
     )
     overfit_check: bool = Field(..., description="Whether overfit check is used.")
+    sanity_check: int | None = Field(
+        ..., description="Whether to run a sanity check for a number of batches."
+    )
+    quality_control_data: bool = Field(
+        ..., description="Whether quality control data is used."
+    )
     crossvalidation: bool = Field(..., description="Whether cross-validation is used.")
 
 

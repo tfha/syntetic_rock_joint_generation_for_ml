@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import hydra
+import segmentation_models_pytorch as smp  # noqa
 import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
@@ -60,7 +61,7 @@ def main(cfg: DictConfig) -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
-    pcfg.mlflow.experiment_name = "train_test"
+    pcfg.mlflow.experiment_name = f"train_test_{pcfg.experiment.experiment_strategy}"
 
     # LOAD DATA
     ###############################################################
@@ -106,30 +107,33 @@ def main(cfg: DictConfig) -> None:
 
     # VALIDATE DATA
     ############################
-    console.print("Validate data...", style="info")
-    validate_data_pre_transform(
-        images_directory, labels_directory, train_list + val_list + test_list
-    )
+    if pcfg.experiment.quality_control_data:
+        console.print("Validate data...", style="info")
+        validate_data_pre_transform(
+            images_directory, labels_directory, train_list + val_list + test_list
+        )
 
-    image_transform = transforms_dict["image"]
-    label_transform = transforms_dict["label"]
-    file_list = train_list + val_list + test_list
+        image_transform = transforms_dict["image"]
+        label_transform = transforms_dict["label"]
+        file_list = train_list + val_list + test_list
 
-    for file_name in track(
-        file_list, description="Validating data files post transform..."
-    ):
-        image_path = images_directory / file_name
-        label_path = labels_directory / file_name
+        for file_name in track(
+            file_list, description="Validating data files post transform..."
+        ):
+            image_path = images_directory / file_name
+            label_path = labels_directory / file_name
 
-        image = Image.open(image_path).convert("RGB")
-        label = Image.open(label_path).convert("L")
-        label = label.point(lambda p: 255 if p == 255 else 0)
+            image = Image.open(image_path).convert("RGB")
+            label = Image.open(label_path).convert("L")
+            label = label.point(lambda p: 255 if p == 255 else 0)
 
-        # Apply transforms
-        transformed_image = image_transform(image)
-        transformed_label = label_transform(label)
+            # Apply transforms
+            transformed_image = image_transform(image)
+            transformed_label = label_transform(label)
 
-        validate_data_post_transform(transformed_image, transformed_label, file_name)
+            validate_data_post_transform(
+                transformed_image, transformed_label, file_name
+            )
 
     ############################
 
@@ -152,17 +156,17 @@ def main(cfg: DictConfig) -> None:
 
     # Iterate through the Train DataLoader
     for images, labels in train_loader:
-        print("Train Batch:", images.shape, labels.shape)
+        print("Train Batch (image, label):", images.shape, labels.shape)
         break
 
     # Iterate through the Validation DataLoader
     for images, labels in val_loader:
-        print("Validation Batch:", images.shape, labels.shape)
+        print("Validation Batch (image, label):", images.shape, labels.shape)
         break
 
     # Iterate through the Test DataLoader
     for images, labels in test_loader:
-        print("Test Batch:", images.shape, labels.shape)
+        print("Test Batch (image, label):", images.shape, labels.shape)
         break
 
     # DEFINE MODEL
@@ -181,6 +185,7 @@ def main(cfg: DictConfig) -> None:
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
+    scaler = torch.amp.GradScaler(device="cuda")
     scheduler = ReduceLROnPlateau(
         optimizer,
         mode="min",
@@ -203,6 +208,10 @@ def main(cfg: DictConfig) -> None:
 
     # TRAINING, VALIDATION, AND LOGGING
     ########################################################################
+
+    # Ting aa sjekke: sjekk om Unet modellen har sigmoid activation i output layer. Det skal den IKKE ha.
+    # Test eventuelt Diceloss, dvs som beskrevet i segmentation_models_pytorch dokumentasjonen.
+
     console.print("Training and validation...", style="info")
 
     start_time = time.time()
@@ -214,7 +223,13 @@ def main(cfg: DictConfig) -> None:
 
             # Train for one epoch
             train_loss = train_one_epoch(
-                model, train_loader, criterion, optimizer, device
+                model,
+                train_loader,
+                criterion,
+                optimizer,
+                device,
+                scaler,
+                max_batches=pcfg.experiment.sanity_check,
             )
             train_metrics = {"loss": train_loss}
             console.print(
@@ -226,7 +241,14 @@ def main(cfg: DictConfig) -> None:
             )
 
             # Validate for one epoch
-            metrics = validate_one_epoch(model, test_loader, criterion, device)
+            metrics = validate_one_epoch(
+                model,
+                test_loader,
+                criterion,
+                device,
+                threshold=0.5,
+                max_batches=pcfg.experiment.sanity_check,
+            )
             console.print(create_results_table(epoch, metrics, session="Validation"))
             writer.add_scalar("Validation/Loss", metrics["loss"], epoch)
             writer.add_scalar("Validation/IoU", metrics["iou"], epoch)
@@ -244,19 +266,20 @@ def main(cfg: DictConfig) -> None:
             )
 
             # Check early stopping condition
-            early_stopping(metrics["loss"], model)
-            if early_stopping.early_stop:
-                console.print(
-                    "Early stopping triggered. Training stopped.", style="warning"
-                )
-                break
+            if not pcfg.experiment.sanity_check:
+                early_stopping(metrics["loss"], model)
+                if early_stopping.early_stop:
+                    console.print(
+                        "Early stopping triggered. Training stopped.", style="warning"
+                    )
+                    break
 
     except KeyboardInterrupt:
         console.print("Training interrupted by keyboard.", style="warning")
 
     finally:
         writer.close()
-        console.print("Training complete.")
+        console.print("Training complete.", style="info")
 
         # LOG RESULTS AND CONFIG TO MLFLOW
         ###############################################################
@@ -273,15 +296,14 @@ def main(cfg: DictConfig) -> None:
                 test_loader,
                 device,
                 num_samples=3,
-                save_path=Path("plots/predictions"),
+                save_dir=Path("plots/predictions"),
             )
             experiment_name = "train_test"
             log_metrics_to_mlflow(
                 best_metrics,
                 pcfg.model.name,
                 pcfg.model.params,
-                pcfg.experiment.dataset_name_train,
-                pcfg.experiment.dataset_name_test,
+                pcfg.experiment.experiment_strategy,
                 experiment_name,
                 tracking_uri=pcfg.mlflow.path,
                 hydra_cfg_dir=HydraConfig.get().run.dir,

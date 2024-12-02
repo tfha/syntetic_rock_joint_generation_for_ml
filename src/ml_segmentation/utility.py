@@ -78,8 +78,7 @@ def log_metrics_to_mlflow(
     best_metrics: dict[str, Any],
     model_name: str,
     model_params: dict[str, Any],
-    train_dataset_name: str,
-    test_dataset_name: str,
+    experiment_strategy: str,
     experiment_name: str,
     tracking_uri: str = None,
     hydra_cfg_dir: str = None,
@@ -119,7 +118,7 @@ def log_metrics_to_mlflow(
         # Log predictions as an artifact if provided
         if track_prediction_images:
             mlflow.log_artifact(
-                local_path=str(track_prediction_images), artifact_path="predictions"
+                local_path="plots/predictions", artifact_path="predictions"
             )
 
         if save_model:
@@ -133,8 +132,7 @@ def log_metrics_to_mlflow(
         # Log model details
         mlflow.log_param("Model Name", model_name)
         mlflow.log_params(model_params)
-        mlflow.log_param("Train Dataset", train_dataset_name)
-        mlflow.log_param("Test Dataset", test_dataset_name)
+        mlflow.log_param("Experiment strategy", experiment_strategy)
 
 
 def better_traceback() -> None:
@@ -143,7 +141,7 @@ def better_traceback() -> None:
     e.g inspect(df, metods=True)
     """
     os.environ["HYDRA_FULL_ERROR"] = "1"
-    install(show_locals=True)
+    install(show_locals=False)
     from rich import inspect  # noqa
 
 

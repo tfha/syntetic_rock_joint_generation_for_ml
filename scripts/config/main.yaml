@@ -57,7 +57,9 @@ experiment:
   test_fraction: 0.2
   early_stopping_patience: 10
   optional_transforms: false
-  overfit_check: false
+  overfit_check: true
+  sanity_check: null
+  quality_control_data: false
   crossvalidation: false
 
 dataset:
@@ -77,7 +79,7 @@ dataset:
       - "Canada"
 
 tensorboard:
-  path: ./experiments/tensorboard
+  path: ./experiments/tensorboard_logs
 
 mlflow:
   path: ${path_project}/experiments/mlruns
