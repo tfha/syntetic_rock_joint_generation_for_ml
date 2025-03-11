@@ -18,6 +18,17 @@ hydra:
     subdir: ${hydra.job.num}
 
 experiment:
+  seed: 42
+  log_mlflow: true
+  train_fraction: 0.8
+  val_fraction: 0.0
+  test_fraction: 0.2
+  early_stopping_patience: 10
+  optional_transforms: false
+  overfit_check: false
+  sanity_check: null
+  quality_control_data: false
+  crossvalidation: false
   experiment_strategy: "dataset_size_test"  # Options: "standard_run", "study_verification", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     standard_run:
@@ -50,21 +61,12 @@ experiment:
         - "synthetic_rock_slope"
         - "real_world_rock_slope"
       test_datasets: []
-  seed: 42
-  log_mlflow: true
-  train_fraction: 0.8
-  val_fraction: 0.0
-  test_fraction: 0.2
-  early_stopping_patience: 10
-  optional_transforms: false
-  overfit_check: true
-  sanity_check: null
-  quality_control_data: false
-  crossvalidation: false
+
 
 dataset:
-  path_raw_rockmass: ${path_project}/Data/Rockmass
-  path_raw_labels: ${path_project}/Data/Label
+  path_images: ${path_project}/Data/rockmass
+  path_raw_mask_labels: ${path_project}/Data/label/raw
+  path_processed_mask_labels: ${path_project}/Data/label/binary
   prefixes:
     synthetic_rock_slope:
       - "Larvik"

@@ -1,15 +1,18 @@
+import os  # noqa
 import time
 from pathlib import Path
 from typing import Any
 
 import hydra
+import numpy as np  # noqa
 import segmentation_models_pytorch as smp  # noqa
 import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from PIL import Image
 from rich.progress import track
-from torch import nn, optim
+from segmentation_models_pytorch.losses import DiceLoss  # noqa
+from torch import nn, optim  # noqa
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
@@ -24,20 +27,24 @@ from ml_segmentation.data_loading import (
     validate_data_post_transform,
     validate_data_pre_transform,
 )
+from ml_segmentation.debug_functionality import (  # noqa
+    better_traceback,
+    visualize_sample,
+)
 from ml_segmentation.define_model import choose_model
 from ml_segmentation.schema_config import ConfigSchema
+from ml_segmentation.train_eval_funcs import EarlyStopping  # noqa
 from ml_segmentation.train_eval_funcs import (
-    EarlyStopping,
     save_image_predictions,
     train_one_epoch,
     validate_one_epoch,
 )
 from ml_segmentation.utility import (
-    better_traceback,
     check_and_update_best_metrics,
     create_results_table,
     get_custom_console,
     log_metrics_to_mlflow,
+    log_metrics_to_tensorboard,
     seed_everything,
 )
 
@@ -66,8 +73,8 @@ def main(cfg: DictConfig) -> None:
     # LOAD DATA
     ###############################################################
     console.print("Loading training and testing data..", style="info")
-    images_directory = pcfg.dataset.path_raw_rockmass
-    labels_directory = pcfg.dataset.path_raw_labels
+    images_directory = pcfg.dataset.path_images
+    labels_directory = pcfg.dataset.path_processed_mask_labels
 
     # Get transformations
     transforms_dict = get_transforms(
@@ -91,7 +98,7 @@ def main(cfg: DictConfig) -> None:
         images_directory, labels_directory, train_prefixes_list, test_prefixes_list
     )
 
-    # Split data and validate
+    # Split data
     train_list, val_list, test_list = split_data(
         train_files,
         test_files,
@@ -123,9 +130,8 @@ def main(cfg: DictConfig) -> None:
             image_path = images_directory / file_name
             label_path = labels_directory / file_name
 
-            image = Image.open(image_path).convert("RGB")
-            label = Image.open(label_path).convert("L")
-            label = label.point(lambda p: 255 if p == 255 else 0)
+            image = Image.open(image_path)
+            label = Image.open(label_path)
 
             # Apply transforms
             transformed_image = image_transform(image)
@@ -147,27 +153,37 @@ def main(cfg: DictConfig) -> None:
         transform=transforms_dict,
     )
 
+    # # View sample for quality control
+    # sample_idx = np.random.randint(0, len(train_dataset))
+    # image, label = train_dataset[sample_idx]
+    # visualize_sample(image, label)
+
     # Get DataLoaders
+    # num_cpu = os.cpu_count()
     train_loader, val_loader, test_loader = get_dataloaders(
-        train_dataset, val_dataset, test_dataset, batch_size=pcfg.model.batch_size
+        train_dataset,
+        val_dataset,
+        test_dataset,
+        batch_size=pcfg.model.batch_size,
+        num_workers=2,
     )
 
-    console.print("Shapes of data:", style="info")
+    # console.print("Shapes of data:", style="info")
 
-    # Iterate through the Train DataLoader
-    for images, labels in train_loader:
-        print("Train Batch (image, label):", images.shape, labels.shape)
-        break
+    # # Iterate through the Train DataLoader
+    # for images, labels in train_loader:
+    #     print("Train Batch (image, label):", images.shape, labels.shape)
+    #     break
 
-    # Iterate through the Validation DataLoader
-    for images, labels in val_loader:
-        print("Validation Batch (image, label):", images.shape, labels.shape)
-        break
+    # # Iterate through the Validation DataLoader
+    # for images, labels in val_loader:
+    #     print("Validation Batch (image, label):", images.shape, labels.shape)
+    #     break
 
-    # Iterate through the Test DataLoader
-    for images, labels in test_loader:
-        print("Test Batch (image, label):", images.shape, labels.shape)
-        break
+    # # Iterate through the Test DataLoader
+    # for images, labels in test_loader:
+    #     print("Test Batch (image, label):", images.shape, labels.shape)
+    #     break
 
     # DEFINE MODEL
     ###############################################################
@@ -183,7 +199,10 @@ def main(cfg: DictConfig) -> None:
         style="info",
     )
 
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
+    criterion = DiceLoss(
+        mode="binary", from_logits=True
+    )  # works better for imbalanced datasets
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
     scaler = torch.amp.GradScaler(device="cuda")
     scheduler = ReduceLROnPlateau(
@@ -191,11 +210,10 @@ def main(cfg: DictConfig) -> None:
         mode="min",
         factor=pcfg.model.scheduler.gamma,
         patience=pcfg.model.scheduler.patience,
-        verbose=True,
     )
-    early_stopping = EarlyStopping(
-        patience=pcfg.experiment.early_stopping_patience, verbose=True
-    )
+    # early_stopping = EarlyStopping(
+    #     patience=pcfg.experiment.early_stopping_patience, verbose=True
+    # )
 
     # ALTERNATIVE RUNS FOR DEBUG AND CHECKS
     ########################################################################
@@ -209,108 +227,119 @@ def main(cfg: DictConfig) -> None:
     # TRAINING, VALIDATION, AND LOGGING
     ########################################################################
 
-    # Ting aa sjekke: sjekk om Unet modellen har sigmoid activation i output layer. Det skal den IKKE ha.
     # Test eventuelt Diceloss, dvs som beskrevet i segmentation_models_pytorch dokumentasjonen.
+    # Kan mask eller image eller true image ha feil verdier for svart og hvit. Foelg form og verdier i data gjennom alle trinn og sjekk at ting fungerer som forventet.
+    # Test uten resnet for initalisation
+    # Test ut weighting i loss function pga unbalanced dataset
+    # Test med preprocessing function from segmentation_models_pytorch
 
     console.print("Training and validation...", style="info")
 
     start_time = time.time()
     best_metrics = None
 
-    try:
-        for epoch in range(num_epochs):
-            console.print(f"Epoch {epoch + 1}/{num_epochs}")
+    # try:
+    for epoch in range(num_epochs):
+        console.print(f"Epoch {epoch + 1}/{num_epochs}")
 
-            # Train for one epoch
-            train_loss = train_one_epoch(
-                model,
-                train_loader,
-                criterion,
-                optimizer,
-                device,
-                scaler,
-                max_batches=pcfg.experiment.sanity_check,
-            )
-            train_metrics = {"loss": train_loss}
-            console.print(
-                create_results_table(epoch, train_metrics, session="Training")
-            )
-            writer.add_scalar("Training/Loss", train_loss, epoch)
-            writer.add_scalar(
-                "Training/Learning Rate", optimizer.param_groups[0]["lr"], epoch
-            )
+        # Train for one epoch
+        metrics_training = train_one_epoch(
+            model=model,
+            dataloader=train_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            device=device,
+            scaler=scaler,
+            threshold=0.5,
+            max_batches=pcfg.experiment.sanity_check,
+        )
+        console.print(create_results_table(epoch, metrics_training, session="Training"))
 
-            # Validate for one epoch
-            metrics = validate_one_epoch(
-                model,
-                test_loader,
-                criterion,
-                device,
-                threshold=0.5,
-                max_batches=pcfg.experiment.sanity_check,
-            )
-            console.print(create_results_table(epoch, metrics, session="Validation"))
-            writer.add_scalar("Validation/Loss", metrics["loss"], epoch)
-            writer.add_scalar("Validation/IoU", metrics["iou"], epoch)
-            writer.add_scalar("Validation/Dice", metrics["dice"], epoch)
-            writer.add_scalar("Validation/Precision", metrics["precision"], epoch)
-            writer.add_scalar("Validation/Recall", metrics["recall"], epoch)
+        metrics_training["learning_rate"] = optimizer.param_groups[0]["lr"]
 
-            # Step the scheduler
-            scheduler.step(metrics["loss"])
+        log_metrics_to_tensorboard(
+            writer=writer, metrics=metrics_training, prefix="Training", epoch=epoch
+        )
 
-            # Update best metrics if applicable
-            training_time = time.time() - start_time
-            best_metrics = check_and_update_best_metrics(
-                metrics, best_metrics, epoch, training_time
-            )
+        # Validate for one epoch
+        metrics_validation = validate_one_epoch(
+            model=model,
+            dataloader=test_loader,
+            criterion=criterion,
+            device=device,
+            threshold=0.5,
+            max_batches=pcfg.experiment.sanity_check,
+        )
 
-            # Check early stopping condition
-            if not pcfg.experiment.sanity_check:
-                early_stopping(metrics["loss"], model)
-                if early_stopping.early_stop:
-                    console.print(
-                        "Early stopping triggered. Training stopped.", style="warning"
-                    )
-                    break
+        console.print(
+            create_results_table(epoch, metrics_validation, session="Validation")
+        )
 
-    except KeyboardInterrupt:
-        console.print("Training interrupted by keyboard.", style="warning")
+        log_metrics_to_tensorboard(
+            writer=writer, metrics=metrics_validation, prefix="Validation", epoch=epoch
+        )
 
-    finally:
-        writer.close()
-        console.print("Training complete.", style="info")
+        # writer.add_scalar("Validation/Loss", metrics_validation["loss"], epoch)
+        # writer.add_scalar("Validation/IoU", metrics_validation["iou"], epoch)
+        # writer.add_scalar("Validation/Dice", metrics_validation["dice"], epoch)
+        # writer.add_scalar("Validation/Precision", metrics_validation["precision"], epoch)
+        # writer.add_scalar("Validation/Recall", metrics_validation["recall"], epoch)
 
-        # LOG RESULTS AND CONFIG TO MLFLOW
-        ###############################################################
-        console.print("Logging results to mlflow...", style="info")
+        # Step the scheduler
+        scheduler.step(metrics_validation["loss"])
 
-        if early_stopping.best_model:
-            model.load_state_dict(early_stopping.best_model)
-            model_path = Path("models/best_model.pth")
-            torch.save(model.state_dict(), model_path)
+        # Update best metrics if applicable
+        training_time = time.time() - start_time
+        best_metrics = check_and_update_best_metrics(
+            metrics_validation, best_metrics, epoch, training_time
+        )
 
-        if pcfg.experiment.log_mlflow:
-            save_image_predictions(
-                model,
-                test_loader,
-                device,
-                num_samples=3,
-                save_dir=Path("plots/predictions"),
-            )
-            experiment_name = "train_test"
-            log_metrics_to_mlflow(
-                best_metrics,
-                pcfg.model.name,
-                pcfg.model.params,
-                pcfg.experiment.experiment_strategy,
-                experiment_name,
-                tracking_uri=pcfg.mlflow.path,
-                hydra_cfg_dir=HydraConfig.get().run.dir,
-                save_best_metrics=True,
-                track_prediction_images=True,
-                save_model=pcfg.mlflow.save_model,
-            )
+        # Check early stopping condition
+        # if not pcfg.experiment.sanity_check:
+        #     early_stopping(metrics_validation["loss"], model)
+        #     if early_stopping.early_stop:
+        #         console.print(
+        #             "Early stopping triggered. Training stopped.", style="warning"
+        #         )
+        #         break
+
+    # except KeyboardInterrupt:
+    # console.print("Training interrupted by keyboard.", style="warning")
+
+    # finally:
+    writer.close()
+    console.print("Training complete.", style="info")
+
+    # LOG RESULTS AND CONFIG TO MLFLOW
+    ###############################################################
+    console.print("Logging results to mlflow...", style="info")
+
+    # if early_stopping.best_model:
+    #     model.load_state_dict(early_stopping.best_model)
+    #     model_path = Path("models/best_model.pth")
+    #     torch.save(model.state_dict(), model_path)
+
+    if pcfg.experiment.log_mlflow:
+        save_image_predictions(
+            model,
+            test_loader,
+            device,
+            num_samples=3,
+            save_dir=Path("plots/predictions"),
+        )
+        experiment_name = "train_test"
+        log_metrics_to_mlflow(
+            best_metrics,
+            pcfg.model.name,
+            pcfg.model.params,
+            pcfg.experiment.experiment_strategy,
+            experiment_name,
+            tracking_uri=pcfg.mlflow.path,
+            hydra_cfg_dir=HydraConfig.get().run.dir,
+            save_best_metrics=True,
+            track_prediction_images=True,
+            save_model=pcfg.mlflow.save_model,
+        )
 
 
 if __name__ == "__main__":

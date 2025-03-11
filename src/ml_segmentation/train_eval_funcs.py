@@ -9,7 +9,8 @@ import torch.optim as optim
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-from torch.amp import autocast
+
+# from torch.amp import autocast
 from torchmetrics import Dice, JaccardIndex, Precision, Recall
 
 
@@ -54,24 +55,30 @@ def train_one_epoch(
     criterion: nn.Module,
     optimizer: optim.Optimizer,
     device: torch.device,
-    scaler: torch.amp.GradScaler,
+    scaler: torch.cuda.amp.GradScaler,
+    threshold: float = 0.5,
     max_batches: int | None = None,
-) -> float:
+) -> dict[str, float]:
     model.train()
     running_loss = 0.0
 
+    # Initialize metrics
+    iou_metric = JaccardIndex(task="binary").to(device)
+    dice_metric = Dice(num_classes=2).to(device)
+    precision_metric = Precision(task="binary").to(device)
+    recall_metric = Recall(task="binary").to(device)
+
     for batch_idx, (images, masks) in enumerate(
-        track(dataloader, description="Training")
+        track(dataloader, description="Training", total=len(dataloader))
     ):
         if max_batches is not None and batch_idx >= max_batches:
             break
 
         images, masks = images.to(device), masks.to(device)
 
-        # Zero the parameter gradients
-        optimizer.zero_grad()
+        optimizer.zero_grad()  # Zero the parameter gradients
 
-        with autocast(device_type="cuda"):
+        with torch.amp.autocast(device_type="cuda"):  # Mixed precision training
             # Forward pass
             outputs = model(images)
             loss = criterion(outputs, masks)
@@ -83,8 +90,63 @@ def train_one_epoch(
 
         running_loss += loss.item() * images.size(0)
 
+        # Calculate metrics
+        with torch.no_grad():
+            preds = torch.sigmoid(outputs) > threshold
+            iou_metric.update(preds, masks.int())
+            dice_metric.update(preds, masks.int())
+            precision_metric.update(preds, masks.int())
+            recall_metric.update(preds, masks.int())
+
     epoch_loss = running_loss / len(dataloader.dataset)
-    return epoch_loss
+    metrics = {
+        "loss": epoch_loss,
+        "iou": round(iou_metric.compute().item(), 2),
+        "dice": round(dice_metric.compute().item(), 2),
+        "precision": round(precision_metric.compute().item(), 2),
+        "recall": round(recall_metric.compute().item(), 2),
+    }
+
+    return metrics
+
+
+# def train_one_epoch(
+#     model: nn.Module,
+#     dataloader: torch.utils.data.DataLoader,
+#     criterion: nn.Module,
+#     optimizer: optim.Optimizer,
+#     device: torch.device,
+#     scaler: torch.amp.GradScaler,
+#     max_batches: int | None = None,
+# ) -> float:
+#     model.train()
+#     running_loss = 0.0
+
+#     # for batch_idx, (images, masks) in enumerate(track(dataloader, description="Training")):
+#     for batch_idx, (images, masks) in enumerate(dataloader):
+#         if max_batches is not None and batch_idx >= max_batches:
+#             break
+
+
+#         images, masks = images.to(device), masks.to(device)
+
+#         # Zero the parameter gradients
+#         optimizer.zero_grad()
+
+#         with autocast(device_type="cuda"): # mixed precision training
+#             # Forward pass
+#             outputs = model(images)
+#             loss = criterion(outputs, masks)
+
+#         # Backward pass and optimization
+#         scaler.scale(loss).backward()
+#         scaler.step(optimizer)
+#         scaler.update()
+
+#         running_loss += loss.item() * images.size(0)
+
+#     epoch_loss = running_loss / len(dataloader.dataset)
+#     return epoch_loss
 
 
 def validate_one_epoch(
@@ -104,14 +166,14 @@ def validate_one_epoch(
 
     with torch.no_grad():
         for batch_idx, (images, masks) in enumerate(
-            track(dataloader, description="Validation")
+            track(dataloader, description="Validation", total=len(dataloader))
         ):
             if max_batches is not None and batch_idx >= max_batches:
                 break
 
             images, masks = images.to(device), masks.to(device)
 
-            with autocast(device_type="cuda"):
+            with torch.amp.autocast(device_type="cuda"):
                 # Forward pass
                 outputs = model(images)
                 loss = criterion(outputs, masks)
@@ -233,8 +295,12 @@ def save_image_predictions(
 
         # Convert tensors to CPU for plotting
         images = images.cpu().numpy()
-        masks = masks.cpu().numpy()
-        preds = preds.cpu().numpy()
+        masks = (
+            1 - masks.cpu().numpy()
+        )  # Invert mask for black lines on white background
+        preds = (
+            1 - preds.cpu().numpy()
+        )  # Invert prediction for black lines on white background
 
         # Plot original image, true mask, and predicted mask
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))

@@ -71,8 +71,11 @@ class ExperimentConfig(BaseModel):
 
 
 class DatasetConfig(BaseModel):
-    path_raw_rockmass: Path = Field(..., description="Path to raw rock mass data.")
-    path_raw_labels: Path = Field(..., description="Path to raw labels data.")
+    path_images: Path = Field(..., description="Path to raw rock mass data.")
+    path_raw_mask_labels: Path = Field(..., description="Path to raw labels data.")
+    path_processed_mask_labels: Path = Field(
+        ..., description="Path to processed masks."
+    )
     prefixes: dict[str, list[str]] = Field(
         ...,
         description="Mapping of dataset names to lists of prefixes used to filter files for that dataset.",

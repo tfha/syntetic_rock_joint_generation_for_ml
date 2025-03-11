@@ -1,4 +1,3 @@
-import os
 import random
 from pathlib import Path
 from typing import Any, Callable
@@ -11,7 +10,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.theme import Theme
-from rich.traceback import install
+from torch.utils.tensorboard import SummaryWriter
 
 
 def seed_everything(seed: int = 42) -> None:
@@ -74,6 +73,25 @@ def create_results_table(
     return table
 
 
+def log_metrics_to_tensorboard(
+    writer: SummaryWriter,
+    metrics: dict[str, float],
+    prefix: str,
+    epoch: int,
+) -> None:
+    """
+    Logs metrics to TensorBoard.
+
+    Args:
+        writer (SummaryWriter): TensorBoard SummaryWriter instance.
+        metrics (dict[str, float]): Dictionary of metrics to log.
+        prefix (str): Prefix for metric names (e.g., 'Validation' or 'Training').
+        epoch (int): Current epoch number.
+    """
+    for metric_name, metric_value in metrics.items():
+        writer.add_scalar(f"{prefix}/{metric_name}", metric_value, epoch)
+
+
 def log_metrics_to_mlflow(
     best_metrics: dict[str, Any],
     model_name: str,
@@ -133,16 +151,6 @@ def log_metrics_to_mlflow(
         mlflow.log_param("Model Name", model_name)
         mlflow.log_params(model_params)
         mlflow.log_param("Experiment strategy", experiment_strategy)
-
-
-def better_traceback() -> None:
-    """
-    run inspect on objects when debugging with ipdb
-    e.g inspect(df, metods=True)
-    """
-    os.environ["HYDRA_FULL_ERROR"] = "1"
-    install(show_locals=False)
-    from rich import inspect  # noqa
 
 
 def get_custom_console() -> Console:

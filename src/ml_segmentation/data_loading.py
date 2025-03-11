@@ -36,17 +36,108 @@ class SegmentationDataset(Dataset):
 
         # Load image and label
         image = Image.open(image_path).convert("RGB")
-        label = Image.open(label_path).convert("L")  # Assuming label is single channel
-        label = label.point(
-            lambda p: 255 if p == 255 else 0
-        )  # Convert grayscales to binary
+        label = Image.open(label_path)
 
         # Apply transformations if any
         if self.transform:
             image = self.transform["image"](image)
             label = self.transform["label"](label)
+            # Invert label to match the segmentation model's requirements
+            label = 1 - label
 
         return image, label
+
+
+def get_datasets(
+    images_dir: str | Path,
+    labels_dir: str | Path,
+    train_files: list[str],
+    val_files: list[str],
+    test_files: list[str],
+    transform: dict[str, transforms.Compose] | None = None,
+) -> tuple[SegmentationDataset, SegmentationDataset, SegmentationDataset]:
+    train_dataset = SegmentationDataset(images_dir, labels_dir, train_files, transform)
+    val_dataset = SegmentationDataset(images_dir, labels_dir, val_files, transform)
+    test_dataset = SegmentationDataset(images_dir, labels_dir, test_files, transform)
+    return train_dataset, val_dataset, test_dataset
+
+
+def get_dataloaders(
+    train_dataset: SegmentationDataset,
+    val_dataset: SegmentationDataset,
+    test_dataset: SegmentationDataset,
+    batch_size: int = 4,
+    shuffle: bool = True,
+    num_workers: int = 2,
+) -> tuple[DataLoader, DataLoader, DataLoader]:
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
+    )
+    return train_loader, val_loader, test_loader
+
+
+def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Compose]:
+    """
+    Using all the transforms the effective virtual dataset size will be approximately 14.4 times larger during training compared to the original 1000 images. This means that while you still only have 1000 original images saved, the model will effectively see about 14,400 variations of your images over the course of training, which significantly improves generalisation without explicitly increasing the number of stored images
+    """
+    # Define the size to which the images and labels should be cropped, divisible by 32
+    crop_size = 768  # Example size that is divisible by 32
+    # resize_size = 384  # Example size that is divisible by 32
+
+    train_transforms_list = [
+        transforms.CenterCrop(crop_size),
+        # transforms.Resize((resize_size, resize_size), interpolation=Image.BILINEAR),
+        # transforms.RandomHorizontalFlip(),
+        # transforms.RandomVerticalFlip(),
+        transforms.ToTensor(),  # transforms the image to a tensor in the range [0, 1]
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        ),  # normalizes the image to have a mean and standard deviation of 0.5
+    ]
+
+    if optional_transforms:
+        train_transforms_list.extend(
+            [
+                # transforms.RandomRotation(15),
+                transforms.ColorJitter(
+                    brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
+                ),
+                # transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
+            ]
+        )
+
+    train_transform = transforms.Compose(train_transforms_list)
+
+    # Apply the same center crop to the labels
+    label_transform = transforms.Compose(
+        [
+            transforms.CenterCrop(
+                crop_size
+            ),  # Centre crop to the same size as the images
+            # transforms.Resize((resize_size, resize_size), interpolation=Image.NEAREST),
+            transforms.ToTensor(),
+        ]
+    )
+
+    return {"image": train_transform, "label": label_transform}
 
 
 def validate_data_pre_transform(
@@ -63,9 +154,8 @@ def validate_data_pre_transform(
         assert label_path.exists(), f"Label file missing: {file_name}"
 
         try:
-            image = Image.open(image_path).convert("RGB")
-            label = Image.open(label_path).convert("L")
-            label = label.point(lambda p: 255 if p == 255 else 0)
+            image = Image.open(image_path)
+            label = Image.open(label_path)
         except Exception as e:
             raise AssertionError(
                 f"Failed to open image or label file: {file_name}, Error: {e}"
@@ -101,45 +191,6 @@ def validate_data_post_transform(
     assert set(unique_values.tolist()).issubset(
         {0, 1}
     ), f"Label contains values other than 0 and 1 for file: {file_name}"
-
-
-def validate_data(images_dir: Path, labels_dir: Path, file_list: list[str]) -> None:
-    for file_name in file_list:
-        image_path = images_dir / file_name
-        label_path = labels_dir / file_name
-
-        image = Image.open(image_path).convert("RGB")
-        label = Image.open(label_path).convert("L")
-        label = label.point(lambda p: 255 if p == 255 else 0)
-
-        # Check if image dimensions are divisible by 32
-        assert (
-            image.height % 32 == 0 and image.width % 32 == 0
-        ), f"Image dimensions (HxW): {image.height}x{image.width} are not divisible by 32"
-
-        # Check if all images have the same size
-        assert (
-            image.size == label.size
-        ), f"Image and label sizes do not match for file: {file_name}"
-
-        # Check if mask has only 0 and 1 values (binary segmentation)
-        label_array = torch.tensor(label, dtype=torch.float)
-        unique_values = torch.unique(label_array)
-        assert set(unique_values.tolist()).issubset(
-            {0, 1}
-        ), f"Mask contains values other than 0 and 1 for file: {file_name}"
-
-        # Check if the image has correct axes order (convert to CHW)
-        image_tensor = transforms.ToTensor()(image)
-        assert (
-            image_tensor.shape[0] == 3
-        ), f"Image does not have 3 channels for file: {file_name}"
-
-        # Check if mask is converted to 1HW format
-        label_tensor = torch.tensor(label, dtype=torch.float).unsqueeze(0)
-        assert (
-            label_tensor.shape[0] == 1
-        ), f"Mask does not have a single channel for file: {file_name}"
 
 
 def get_data_files(
@@ -232,83 +283,6 @@ def split_data(
     return train_list, val_list, test_list
 
 
-def get_datasets(
-    images_dir: str | Path,
-    labels_dir: str | Path,
-    train_files: list[str],
-    val_files: list[str],
-    test_files: list[str],
-    transform: dict[str, transforms.Compose] | None = None,
-) -> tuple[SegmentationDataset, SegmentationDataset, SegmentationDataset]:
-    train_dataset = SegmentationDataset(images_dir, labels_dir, train_files, transform)
-    val_dataset = SegmentationDataset(images_dir, labels_dir, val_files, transform)
-    test_dataset = SegmentationDataset(images_dir, labels_dir, test_files, transform)
-    return train_dataset, val_dataset, test_dataset
-
-
-def get_dataloaders(
-    train_dataset: SegmentationDataset,
-    val_dataset: SegmentationDataset,
-    test_dataset: SegmentationDataset,
-    batch_size: int = 4,
-    shuffle: bool = True,
-    num_workers: int = 2,
-) -> tuple[DataLoader, DataLoader, DataLoader]:
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-    )
-    test_loader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-    )
-    return train_loader, val_loader, test_loader
-
-
-def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Compose]:
-    """
-    Using all the transforms the effective virtual dataset size will be approximately 14.4 times larger during training compared to the original 1000 images. This means that while you still only have 1000 original images saved, the model will effectively see about 14,400 variations of your images over the course of training, which significantly improves generalisation without explicitly increasing the number of stored images
-    """
-    # Define the size to which the images and labels should be cropped, divisible by 32
-    crop_size = 768  # Example size that is divisible by 32
-    resize_size = 384  # Example size that is divisible by 32
-
-    train_transforms_list = [
-        transforms.CenterCrop(crop_size),
-        transforms.Resize((resize_size, resize_size), interpolation=Image.BILINEAR),
-        # transforms.RandomHorizontalFlip(),
-        # transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),
-    ]
-
-    if optional_transforms:
-        train_transforms_list.extend(
-            [
-                # transforms.RandomRotation(15),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
-                ),
-                transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
-            ]
-        )
-
-    train_transform = transforms.Compose(train_transforms_list)
-
-    # Apply the same center crop to the labels
-    label_transform = transforms.Compose(
-        [
-            transforms.CenterCrop(
-                crop_size
-            ),  # Centre crop to the same size as the images
-            transforms.Resize((resize_size, resize_size), interpolation=Image.NEAREST),
-            transforms.ToTensor(),
-        ]
-    )
-
-    return {"image": train_transform, "label": label_transform}
-
-
 def get_datasets_prefixes(
     experiment_strategy: str,
     dataset_strategies: dict[str, dict[str, list[str]]],
@@ -367,3 +341,46 @@ def testing_functionality(cfg: DictConfig) -> None:
 
 if __name__ == "__main__":
     testing_functionality()
+
+
+# LEGACY CODE
+################################################################
+
+
+# def validate_data(images_dir: Path, labels_dir: Path, file_list: list[str]) -> None:
+#     for file_name in file_list:
+#         image_path = images_dir / file_name
+#         label_path = labels_dir / file_name
+
+#         image = Image.open(image_path).convert("RGB")
+#         label = Image.open(label_path).convert("L")
+#         label = label.point(lambda p: 255 if p == 255 else 0)
+
+#         # Check if image dimensions are divisible by 32
+#         assert (
+#             image.height % 32 == 0 and image.width % 32 == 0
+#         ), f"Image dimensions (HxW): {image.height}x{image.width} are not divisible by 32"
+
+#         # Check if all images have the same size
+#         assert (
+#             image.size == label.size
+#         ), f"Image and label sizes do not match for file: {file_name}"
+
+#         # Check if mask has only 0 and 1 values (binary segmentation)
+#         label_array = torch.tensor(label, dtype=torch.float)
+#         unique_values = torch.unique(label_array)
+#         assert set(unique_values.tolist()).issubset(
+#             {0, 1}
+#         ), f"Mask contains values other than 0 and 1 for file: {file_name}"
+
+#         # Check if the image has correct axes order (convert to CHW)
+#         image_tensor = transforms.ToTensor()(image)
+#         assert (
+#             image_tensor.shape[0] == 3
+#         ), f"Image does not have 3 channels for file: {file_name}"
+
+#         # Check if mask is converted to 1HW format
+#         label_tensor = torch.tensor(label, dtype=torch.float).unsqueeze(0)
+#         assert (
+#             label_tensor.shape[0] == 1
+#         ), f"Mask does not have a single channel for file: {file_name}"
