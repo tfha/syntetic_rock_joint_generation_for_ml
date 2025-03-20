@@ -20,45 +20,61 @@ hydra:
 experiment:
   seed: 42
   log_mlflow: true
+  compare_metric: loss # metric for comparison in chosing new best model
+  num_workers: 2 # number of workers for data loading
   train_fraction: 0.8
   val_fraction: 0.0
   test_fraction: 0.2
-  early_stopping_patience: 10
+  early_stopping_patience: 5
   optional_transforms: false
   overfit_check: false
-  sanity_check: null
+  sanity_check_num_batches: null # set to a low number to speed up training in order to check if functionality is working, e.g. 1-3
   quality_control_data: false
   crossvalidation: false
-  experiment_strategy: "dataset_size_test"  # Options: "standard_run", "study_verification", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
+  experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
-    standard_run:
+    verification_box:
       train_datasets:
-        - "synthetic_rock_slope"
-        - "synthetic_fracman"
+        - "synthetic_box"
       test_datasets:
-        - "synthetic_rock_slope"
-        - "synthetic_fracman"
-    study_verification:
+        - "synthetic_box"
+    verification_dfn:
       train_datasets:
-        - "synthetic_rock_slope"
-        - "synthetic_fracman"
+        - "synthetic_dfn"
+      test_datasets:
+        - "synthetic_dfn"
+    main_objective_dfn_rock_slope:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "real_world_rock_slope"
+    main_objective_dfn_box:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "real_world_box"
+    main_objective_box_rock_slope:
+      train_datasets:
+        - "synthetic_box"
+      test_datasets:
+        - "real_world_rock_slope"
+    main_objective_box_box:
+      train_datasets:
+        - "synthetic_box"
       test_datasets:
         - "real_world_box"
     dataset_size_test:
       train_datasets:
-        - "synthetic_box"
+        - "synthetic_dfn"
       test_datasets:
-        - "synthetic_box"  # why real_world_box?
+        - "real_world_rock_slope"
     semi_supervised_learning:
       train_datasets:
-        - "synthetic_rock_slope"
-        - "synthetic_fracman"
+        - "real_world_rock_slope"
       test_datasets:
-        - "real_world_box"
         - "real_world_rock_slope"
     one_shot_segmentation:
       train_datasets:
-        - "synthetic_rock_slope"
         - "real_world_rock_slope"
       test_datasets: []
 
@@ -68,17 +84,15 @@ dataset:
   path_raw_mask_labels: ${path_project}/Data/label/raw
   path_processed_mask_labels: ${path_project}/Data/label/binary
   prefixes:
-    synthetic_rock_slope:
-      - "Larvik"
-      - "RV4"
-    synthetic_fracman:
+    synthetic_dfn:
       - "FracMan"
     synthetic_box:
       - "Benchmark"
     real_world_box:
       - "Box"
     real_world_rock_slope:
-      - "Canada"
+      - "Larvik"
+      - "RV4"
 
 tensorboard:
   path: ./experiments/tensorboard_logs

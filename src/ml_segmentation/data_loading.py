@@ -124,7 +124,7 @@ def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Co
             ]
         )
 
-    train_transform = transforms.Compose(train_transforms_list)
+    image_transform = transforms.Compose(train_transforms_list)
 
     # Apply the same center crop to the labels
     label_transform = transforms.Compose(
@@ -137,12 +137,39 @@ def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Co
         ]
     )
 
-    return {"image": train_transform, "label": label_transform}
+    return {"image": image_transform, "label": label_transform}
 
 
 def validate_data_pre_transform(
     images_dir: Path, labels_dir: Path, file_list: list[str]
 ) -> None:
+    """
+    Validates dataset files before transformations are applied.
+    This function performs basic validation checks on paired image and label files to ensure:
+    1. Both image and label files exist at the specified paths
+    2. Both files can be opened as valid images
+    3. Image dimensions match between each image and its corresponding label
+    Parameters
+    ----------
+    images_dir : Path
+        Directory path containing the image files
+    labels_dir : Path
+        Directory path containing the label files
+    file_list : list[str]
+        List of file names to validate (should be the same name in both directories)
+    Returns
+    -------
+    None
+        Function only validates and raises AssertionError if validation fails
+    Raises
+    ------
+    AssertionError
+        If an image or label file is missing, cannot be opened, or dimensions don't match
+    Notes
+    -----
+    Uses rich.progress.track for progress visualization during validation
+    """
+
     for file_name in track(
         file_list, description="Validating data files pre transform..."
     ):
@@ -162,9 +189,9 @@ def validate_data_pre_transform(
             )
 
         # Light validation to ensure image and label can be read properly
-        assert (
-            image.size == label.size
-        ), f"Image and label sizes do not match for file: {file_name}"
+        assert image.size == label.size, (
+            f"Image and label sizes do not match for file: {file_name}"
+        )
 
 
 def validate_data_post_transform(
@@ -172,25 +199,25 @@ def validate_data_post_transform(
 ) -> None:
     # Check if image dimensions are divisible by 32
     _, height, width = image_tensor.shape
-    assert (
-        height % 32 == 0 and width % 32 == 0
-    ), f"Transformed image dimensions (HxW): {height}x{width} are not divisible by 32 for file: {file_name}"
+    assert height % 32 == 0 and width % 32 == 0, (
+        f"Transformed image dimensions (HxW): {height}x{width} are not divisible by 32 for file: {file_name}"
+    )
 
     # Check if the image has correct channels
-    assert (
-        image_tensor.shape[0] == 3
-    ), f"Image does not have 3 channels for file: {file_name}"
+    assert image_tensor.shape[0] == 3, (
+        f"Image does not have 3 channels for file: {file_name}"
+    )
 
     # Check if label tensor has a single channel
-    assert (
-        label_tensor.shape[0] == 1
-    ), f"Label does not have a single channel for file: {file_name}"
+    assert label_tensor.shape[0] == 1, (
+        f"Label does not have a single channel for file: {file_name}"
+    )
 
     # Check if mask contains only 0 and 1 values (binary segmentation)
     unique_values = torch.unique(label_tensor)
-    assert set(unique_values.tolist()).issubset(
-        {0, 1}
-    ), f"Label contains values other than 0 and 1 for file: {file_name}"
+    assert set(unique_values.tolist()).issubset({0, 1}), (
+        f"Label contains values other than 0 and 1 for file: {file_name}"
+    )
 
 
 def get_data_files(
@@ -199,7 +226,19 @@ def get_data_files(
     train_prefixes: list[str],
     test_prefixes: list[str],
 ) -> tuple[list[str], list[str]]:
-    # Filter files by prefixes for train and test, and make sure corresponding label exists
+    """
+    Get lists of training and testing image file names based on given prefixes.
+    This function filters image files in the specified directory by their prefixes and ensures that corresponding label files exist in the labels directory.
+    Args:
+        images_dir (Path): Directory containing the image files.
+        labels_dir (Path): Directory containing the label files.
+        train_prefixes (list[str]): List of prefixes to filter training image files.
+        test_prefixes (list[str]): List of prefixes to filter testing image files.
+    Returns:
+        tuple[list[str], list[str]]: A tuple containing two lists:
+            - train_files: List of training image file names.
+            - test_files: List of testing image file names.
+    """
     train_files = [
         f.name
         for f in images_dir.iterdir()
@@ -226,14 +265,42 @@ def split_data(
     val_frac: float = 0.1,
     test_frac: float = 0.1,
 ) -> tuple[list[str], list[str], list[str]]:
-    # Ensure fractions add up to 1.0
-    assert (
-        abs(train_frac + val_frac + test_frac - 1.0) < 1e-6
-    ), "Fractions must add up to 1.0"
+    """
+    Split data into training, validation, and test sets based on provided file lists. This function handles two scenarios:
+    1. If train_files and test_files are identical, it splits all files into train, validation, and test sets according to the provided fractions.
+    2. If train_files and test_files are different, it splits train_files into train and validation sets, while using test_files as the test set.
+    The function also saves the file lists to disk in JSON format.
 
-    # If train_files and test_files are similar, split into train, validation, and test
+    Parameters:
+    -----------
+    train_files : list[str]
+        List of file paths for training data
+    test_files : list[str]
+        List of file paths for test data
+    train_frac : float, optional
+        Fraction of data to use for training (default: 0.8)
+    val_frac : float, optional
+        Fraction of data to use for validation (default: 0.1)
+    test_frac : float, optional
+        Fraction of data to use for testing (default: 0.1)
+
+    Returns:
+    --------
+    tuple[list[str], list[str], list[str]]
+        Tuple containing three lists: (train_files, validation_files, test_files)
+
+    Raises:
+    -------
+    ValueError
+        If fractions don't add up to 1.0, or if there are duplicates or overlapping files in the splits
+    """
+    # Ensure fractions sum up to 1.0
+    if not abs(train_frac + val_frac + test_frac - 1.0) < 1e-6:
+        raise ValueError("Fractions must sum to 1.0.")
+
+    # If train_files and test_files are identical, split all into train, validation, and test
     if set(train_files) == set(test_files):
-        all_files = train_files
+        all_files = train_files[:]
         random.shuffle(all_files)
         train_end = int(len(all_files) * train_frac)
         val_end = train_end + int(len(all_files) * val_frac)
@@ -242,30 +309,32 @@ def split_data(
         val_list = all_files[train_end:val_end]
         test_list = all_files[val_end:]
     else:
-        # Split train files into train and validation
+        # Split train_files into train and validation
+        train_files = train_files[:]
         random.shuffle(train_files)
         val_end = int(len(train_files) * val_frac / (train_frac + val_frac))
         val_list = train_files[:val_end]
         train_list = train_files[val_end:]
         test_list = test_files
 
-    # Assert no duplicates and no intersections between train, validation, and test lists
-    assert len(set(train_list)) == len(train_list), "Train set contains duplicate files"
-    assert len(set(val_list)) == len(
-        val_list
-    ), "Validation set contains duplicate files"
-    assert len(set(test_list)) == len(test_list), "Test set contains duplicate files"
-    assert (
-        len(set(train_list).intersection(set(val_list))) == 0
-    ), "Train and validation sets have overlapping files"
-    assert (
-        len(set(train_list).intersection(set(test_list))) == 0
-    ), "Train and test sets have overlapping files"
-    assert (
-        len(set(val_list).intersection(set(test_list))) == 0
-    ), "Validation and test sets have overlapping files"
+    # Validate uniqueness and separation
+    def check_no_duplicates(files, label):
+        if len(files) != len(set(files)):
+            raise ValueError(f"{label} set contains duplicate files.")
 
-    # Save full list and splits to disk
+    def check_no_overlap(set1, set2, label1, label2):
+        if set1 & set2:
+            raise ValueError(f"{label1} and {label2} sets have overlapping files.")
+
+    check_no_duplicates(train_list, "Train")
+    check_no_duplicates(val_list, "Validation")
+    check_no_duplicates(test_list, "Test")
+
+    check_no_overlap(set(train_list), set(val_list), "Train", "Validation")
+    check_no_overlap(set(train_list), set(test_list), "Train", "Test")
+    check_no_overlap(set(val_list), set(test_list), "Validation", "Test")
+
+    # Save file lists
     data_raw_dir = Path("data/raw")
     data_raw_dir.mkdir(parents=True, exist_ok=True)
     with open(data_raw_dir / "all_files.json", "w") as f:

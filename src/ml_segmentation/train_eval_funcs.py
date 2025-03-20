@@ -19,12 +19,39 @@ def check_and_update_best_metrics(
     best_metrics: dict[str, Any],
     epoch: int,
     training_time: float,
+    compare_metric: str = "loss",
 ) -> dict[str, Any]:
-    if best_metrics is None or metrics["loss"] < best_metrics["loss"]:
+    """
+    Check and update the best metrics if the current metrics are better.
+    Args:
+        metrics (dict[str, float]): A dictionary containing the current metrics with keys
+            "loss", "iou", "dice", "precision", and "recall".
+        best_metrics (dict[str, Any]): A dictionary containing the best metrics so far.
+            If None, the current metrics will be considered the best.
+        epoch (int): The current epoch number.
+        training_time (float): The total training time up to the current epoch.
+        compare_metric (str, optional): The metric to use for comparison. Default is "loss".
+            For "loss", lower is better. For "iou", "dice", "precision", "recall", higher is better.
+    Returns:
+        dict[str, Any]: Updated best metrics dictionary if the current metrics are better,
+        otherwise returns the original best metrics.
+    """
+
+    is_better = False
+    if best_metrics is None:
+        is_better = True
+    elif compare_metric == "loss":
+        is_better = metrics[compare_metric] < best_metrics[compare_metric]
+    else:  # For metrics like "iou", "dice", "precision", "recall", higher is better
+        is_better = metrics[compare_metric] > best_metrics[compare_metric]
+
+    if is_better:
         best_metrics = {
             "epoch": epoch + 1,
             "loss": metrics["loss"],
             "iou": metrics["iou"],
+            "iou_background": metrics["iou_background"],
+            "iou_joints": metrics["iou_joints"],
             "dice": metrics["dice"],
             "precision": metrics["precision"],
             "recall": metrics["recall"],
@@ -59,11 +86,30 @@ def train_one_epoch(
     threshold: float = 0.5,
     max_batches: int | None = None,
 ) -> dict[str, float]:
+    """
+    Train the model for one epoch.
+
+    Args:
+        model (nn.Module): The model to train.
+        dataloader (torch.utils.data.DataLoader): DataLoader for the training data.
+        criterion (nn.Module): Loss function.
+        optimizer (optim.Optimizer): Optimizer.
+        device (torch.device): Device to run the training on (CPU or GPU).
+        scaler (torch.cuda.amp.GradScaler): Gradient scaler for mixed precision training.
+        threshold (float, optional): Threshold for converting model outputs to binary predictions. Defaults to 0.5.
+        max_batches (int | None, optional): Maximum number of batches to process. If None, process all batches. Defaults to None.
+
+    Returns:
+        dict[str, float]: Dictionary containing the training loss and metrics (IoU, Dice, Precision, Recall).
+    """
     model.train()
     running_loss = 0.0
 
     # Initialize metrics
-    iou_metric = JaccardIndex(task="binary").to(device)
+    binary_iou_metric = JaccardIndex(task="binary").to(device)
+    # For per-class IoU, use separate binary IoU metrics
+    background_iou_metric = JaccardIndex(task="binary").to(device)
+    joint_iou_metric = JaccardIndex(task="binary").to(device)
     dice_metric = Dice(num_classes=2).to(device)
     precision_metric = Precision(task="binary").to(device)
     recall_metric = Recall(task="binary").to(device)
@@ -85,6 +131,7 @@ def train_one_epoch(
 
         # Backward pass and optimization
         scaler.scale(loss).backward()
+        scaler.unscale_(optimizer)
         scaler.step(optimizer)
         scaler.update()
 
@@ -93,60 +140,42 @@ def train_one_epoch(
         # Calculate metrics
         with torch.no_grad():
             preds = torch.sigmoid(outputs) > threshold
-            iou_metric.update(preds, masks.int())
+            binary_iou_metric.update(preds, masks.int())
+
+            # For masks where joints=0 (black) and background=1 (white):
+            # Calculate IoU for background (where mask == 1)
+            # For background IoU, we're treating areas where mask=1 as the positive class
+            background_preds = preds
+            background_masks = masks
+            background_iou_metric.update(background_preds, background_masks)
+
+            # Calculate IoU for joints (where mask == 0)
+            # For joint IoU, we need to invert both predictions and masks to treat joints as the positive class
+            joint_preds = (
+                ~preds
+            )  # Invert to focus on areas where prediction is 0 (joints)
+            joint_masks = (
+                ~masks.bool()
+            )  # Invert to focus on areas where mask is 0 (joints)
+            joint_iou_metric.update(joint_preds, joint_masks)
+
             dice_metric.update(preds, masks.int())
             precision_metric.update(preds, masks.int())
             recall_metric.update(preds, masks.int())
 
     epoch_loss = running_loss / len(dataloader.dataset)
+
     metrics = {
         "loss": epoch_loss,
-        "iou": round(iou_metric.compute().item(), 2),
-        "dice": round(dice_metric.compute().item(), 2),
-        "precision": round(precision_metric.compute().item(), 2),
-        "recall": round(recall_metric.compute().item(), 2),
+        "iou": round(binary_iou_metric.compute().item(), 4),
+        "iou_background": round(background_iou_metric.compute().item(), 4),
+        "iou_joints": round(joint_iou_metric.compute().item(), 4),
+        "dice": round(dice_metric.compute().item(), 4),
+        "precision": round(precision_metric.compute().item(), 4),
+        "recall": round(recall_metric.compute().item(), 4),
     }
 
     return metrics
-
-
-# def train_one_epoch(
-#     model: nn.Module,
-#     dataloader: torch.utils.data.DataLoader,
-#     criterion: nn.Module,
-#     optimizer: optim.Optimizer,
-#     device: torch.device,
-#     scaler: torch.amp.GradScaler,
-#     max_batches: int | None = None,
-# ) -> float:
-#     model.train()
-#     running_loss = 0.0
-
-#     # for batch_idx, (images, masks) in enumerate(track(dataloader, description="Training")):
-#     for batch_idx, (images, masks) in enumerate(dataloader):
-#         if max_batches is not None and batch_idx >= max_batches:
-#             break
-
-
-#         images, masks = images.to(device), masks.to(device)
-
-#         # Zero the parameter gradients
-#         optimizer.zero_grad()
-
-#         with autocast(device_type="cuda"): # mixed precision training
-#             # Forward pass
-#             outputs = model(images)
-#             loss = criterion(outputs, masks)
-
-#         # Backward pass and optimization
-#         scaler.scale(loss).backward()
-#         scaler.step(optimizer)
-#         scaler.update()
-
-#         running_loss += loss.item() * images.size(0)
-
-#     epoch_loss = running_loss / len(dataloader.dataset)
-#     return epoch_loss
 
 
 def validate_one_epoch(
@@ -159,7 +188,12 @@ def validate_one_epoch(
 ) -> dict[str, float]:
     model.eval()
     running_loss = 0.0
-    iou_metric = JaccardIndex(task="binary").to(device)
+
+    # Initialize metrics
+    binary_iou_metric = JaccardIndex(task="binary").to(device)
+    # For per-class IoU, use separate binary IoU metrics
+    background_iou_metric = JaccardIndex(task="binary").to(device)
+    joint_iou_metric = JaccardIndex(task="binary").to(device)
     dice_metric = Dice(num_classes=2).to(device)
     precision_metric = Precision(task="binary").to(device)
     recall_metric = Recall(task="binary").to(device)
@@ -182,18 +216,39 @@ def validate_one_epoch(
 
             # Calculate metrics
             preds = torch.sigmoid(outputs) > threshold
-            iou_metric.update(preds, masks.int())
+            binary_iou_metric.update(preds, masks.int())
+
+            # For masks where joints=0 (black) and background=1 (white):
+            # Calculate IoU for background (where mask == 1)
+            # For background IoU, we're treating areas where mask=1 as the positive class
+            background_preds = preds
+            background_masks = masks
+            background_iou_metric.update(background_preds, background_masks)
+
+            # Calculate IoU for joints (where mask == 0)
+            # For joint IoU, we need to invert both predictions and masks to treat joints as the positive class
+            joint_preds = (
+                ~preds
+            )  # Invert to focus on areas where prediction is 0 (joints)
+            joint_masks = (
+                ~masks.bool()
+            )  # Invert to focus on areas where mask is 0 (joints)
+            joint_iou_metric.update(joint_preds, joint_masks)
+
             dice_metric.update(preds, masks.int())
             precision_metric.update(preds, masks.int())
             recall_metric.update(preds, masks.int())
 
     epoch_loss = running_loss / len(dataloader.dataset)
+
     metrics = {
         "loss": epoch_loss,
-        "iou": round(iou_metric.compute().item(), 2),
-        "dice": round(dice_metric.compute().item(), 2),
-        "precision": round(precision_metric.compute().item(), 2),
-        "recall": round(recall_metric.compute().item(), 2),
+        "iou": round(binary_iou_metric.compute().item(), 4),
+        "iou_background": round(background_iou_metric.compute().item(), 4),
+        "iou_joints": round(joint_iou_metric.compute().item(), 4),
+        "dice": round(dice_metric.compute().item(), 4),
+        "precision": round(precision_metric.compute().item(), 4),
+        "recall": round(recall_metric.compute().item(), 4),
     }
 
     return metrics
@@ -288,6 +343,8 @@ def save_image_predictions(
     model.eval()
     samples = random.sample(list(dataloader), num_samples)
 
+    save_dir.mkdir(parents=True, exist_ok=True)
+
     for idx, (images, masks) in enumerate(samples):
         images, masks = images.to(device), masks.to(device)
         with torch.no_grad():
@@ -304,11 +361,18 @@ def save_image_predictions(
 
         # Plot original image, true mask, and predicted mask
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        axes[0].imshow(images[0].transpose(1, 2, 0))  # Assumes channel-first format
+
+        # Normalize and transpose image correctly for display
+        img_to_display = images[0].transpose(1, 2, 0)  # Move channels to the end
+        img_to_display = (img_to_display - img_to_display.min()) / (
+            img_to_display.max() - img_to_display.min() + 1e-8
+        )
+
+        axes[0].imshow(img_to_display)  # Already transposed above
         axes[0].set_title("Original Image")
-        axes[1].imshow(masks[0][0], cmap="gray")  # True mask
+        axes[1].imshow(masks[0][0], cmap="gray")
         axes[1].set_title("True Mask")
-        axes[2].imshow(preds[0][0], cmap="gray")  # Predicted mask
+        axes[2].imshow(preds[0][0], cmap="gray")
         axes[2].set_title("Predicted Mask")
 
         # Remove axes
@@ -316,7 +380,6 @@ def save_image_predictions(
             ax.axis("off")
 
         # Save the figure
-        save_dir.mkdir(parents=True, exist_ok=True)
         save_path = save_dir / f"sample_{idx}.png"
         plt.savefig(save_path)
         plt.close(fig)

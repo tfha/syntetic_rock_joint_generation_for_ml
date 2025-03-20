@@ -1,4 +1,5 @@
 import random
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -37,30 +38,6 @@ def seed_everything(seed: int = 42) -> None:
     )
 
 
-def check_and_update_best_metrics(
-    metrics: dict[str, float],
-    best_metrics: dict[str, Any],
-    epoch: int,
-    training_time: float,
-) -> dict[str, Any]:
-    if best_metrics is None or metrics["loss"] < best_metrics["loss"]:
-        best_metrics = {
-            "epoch": epoch + 1,
-            "loss": metrics["loss"],
-            "iou": metrics["iou"],
-            "dice": metrics["dice"],
-            "precision": metrics["precision"],
-            "recall": metrics["recall"],
-            "training_time": training_time,
-        }
-        console = Console()
-        console.print("[bold green]New best model found![/bold green]")
-        console.print(
-            create_results_table(epoch, best_metrics, session="Best Validation")
-        )
-    return best_metrics
-
-
 # Function to create results table
 def create_results_table(
     epoch: int, metrics: dict[str, float], session: str = "Training"
@@ -90,6 +67,7 @@ def log_metrics_to_tensorboard(
     """
     for metric_name, metric_value in metrics.items():
         writer.add_scalar(f"{prefix}/{metric_name}", metric_value, epoch)
+    writer.flush()  # Flush the writer to ensure that all pending events have been written to disk.
 
 
 def log_metrics_to_mlflow(
@@ -118,11 +96,15 @@ def log_metrics_to_mlflow(
                 hydra_cfg_paths.append(str(config_file))
 
         # Save best_metrics as YAML and log as an artifact
-        if save_best_metrics:
-            best_metrics_yaml = "best_metrics.yaml"
-            with open(best_metrics_yaml, "w") as f:
-                yaml.dump(best_metrics, f)
-            mlflow.log_artifact(best_metrics_yaml)
+        if save_best_metrics and best_metrics is not None:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                best_metrics_path = Path(temp_dir) / "best_metrics.yaml"
+                with open(best_metrics_path, "w") as f:
+                    yaml.dump(best_metrics, f)
+                mlflow.log_artifact(str(best_metrics_path))
+
+                # Log as MLflow artifact
+                mlflow.log_artifact(str(best_metrics_path))
 
         # Log Hydra config files as artifacts if provided
         if hydra_cfg_dir:

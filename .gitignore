@@ -19,6 +19,7 @@ __pycache__/
 
 .ruff_cache/
 
+.coverage
 
 # Data and experiments
 #######################################
@@ -28,3 +29,5 @@ data/
 models/
 
 plots/
+
+docs/

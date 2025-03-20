@@ -1,3 +1,20 @@
+"""
+This module defines the configuration schema for a machine learning segmentation project using Pydantic models.
+It includes configurations for the model, experiment, dataset, logging, and hyperparameter optimization.
+Classes:
+    Scheduler: Configuration for the learning rate scheduler.
+    ModelConfig: Configuration for the model, including parameters like name, number of epochs, batch size, learning rate, and scheduler.
+    ExperimentStrategy: Enum class defining various experiment strategies.
+    ExperimentConfig: Configuration for the experiment, including strategies, dataset configurations, and other training parameters.
+    DatasetConfig: Configuration for the dataset paths and prefixes.
+    MlflowConfig: Configuration for MLflow logging.
+    TensorboardConfig: Configuration for Tensorboard logging.
+    OptunaConfig: Configuration for Optuna hyperparameter optimization.
+    ConfigSchema: The main configuration schema that includes all other configurations.
+Functions:
+    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
+"""
+
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -26,8 +43,12 @@ class ModelConfig(BaseModel):
 
 
 class ExperimentStrategy(str, Enum):
-    STANDARD_RUN = "standard_run"
-    STUDY_VERIFICATION = "study_verification"
+    VERIFICATION_BOX = "verification_box"
+    VERIFICATION_DFN = "verification_dfn"
+    MAIN_OBJECTIVE_DFN_ROCK_SLOPE = "main_objective_dfn_rock_slope"
+    MAIN_OBJECTIVE_DFN_BOX = "main_objective_dfn_box"
+    MAIN_OBJECITVE_BOX_ROCK_SLOPE = "main_objective_box_rock_slope"
+    MAIN_OBJECTIVE_BOX_BOX = "main_objective_box_box"
     DATASET_SIZE_TEST = "dataset_size_test"
     SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
     ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
@@ -47,6 +68,10 @@ class ExperimentConfig(BaseModel):
     )
     seed: int = Field(..., description="Random seed for reproducibility.")
     log_mlflow: bool = Field(..., description="Whether to log to mlflow or not.")
+    compare_metric: str = Field(
+        ..., description="Metric used for comparison in choosing new best metrics."
+    )
+    num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float = Field(
         ..., description="Fraction of data used for training."
     )
@@ -61,7 +86,7 @@ class ExperimentConfig(BaseModel):
         ..., description="Whether optional image transforms are used."
     )
     overfit_check: bool = Field(..., description="Whether overfit check is used.")
-    sanity_check: int | None = Field(
+    sanity_check_num_batches: int | None = Field(
         ..., description="Whether to run a sanity check for a number of batches."
     )
     quality_control_data: bool = Field(
