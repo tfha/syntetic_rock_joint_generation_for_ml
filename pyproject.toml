@@ -32,7 +32,8 @@ optuna = "^4.1.0"
 torchmetrics = "^1.6.0"
 torchinfo = "^1.8.0"
 pillow = "^11.0.0"
-
+pytest = "^8.3.5"
+pytest-cov = "^6.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"

@@ -1,5 +1,5 @@
-import os
 import random
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -11,7 +11,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.theme import Theme
-from rich.traceback import install
+from torch.utils.tensorboard import SummaryWriter
 
 
 def seed_everything(seed: int = 42) -> None:
@@ -38,30 +38,6 @@ def seed_everything(seed: int = 42) -> None:
     )
 
 
-def check_and_update_best_metrics(
-    metrics: dict[str, float],
-    best_metrics: dict[str, Any],
-    epoch: int,
-    training_time: float,
-) -> dict[str, Any]:
-    if best_metrics is None or metrics["loss"] < best_metrics["loss"]:
-        best_metrics = {
-            "epoch": epoch + 1,
-            "loss": metrics["loss"],
-            "iou": metrics["iou"],
-            "dice": metrics["dice"],
-            "precision": metrics["precision"],
-            "recall": metrics["recall"],
-            "training_time": training_time,
-        }
-        console = Console()
-        console.print("[bold green]New best model found![/bold green]")
-        console.print(
-            create_results_table(epoch, best_metrics, session="Best Validation")
-        )
-    return best_metrics
-
-
 # Function to create results table
 def create_results_table(
     epoch: int, metrics: dict[str, float], session: str = "Training"
@@ -74,12 +50,31 @@ def create_results_table(
     return table
 
 
+def log_metrics_to_tensorboard(
+    writer: SummaryWriter,
+    metrics: dict[str, float],
+    prefix: str,
+    epoch: int,
+) -> None:
+    """
+    Logs metrics to TensorBoard.
+
+    Args:
+        writer (SummaryWriter): TensorBoard SummaryWriter instance.
+        metrics (dict[str, float]): Dictionary of metrics to log.
+        prefix (str): Prefix for metric names (e.g., 'Validation' or 'Training').
+        epoch (int): Current epoch number.
+    """
+    for metric_name, metric_value in metrics.items():
+        writer.add_scalar(f"{prefix}/{metric_name}", metric_value, epoch)
+    writer.flush()  # Flush the writer to ensure that all pending events have been written to disk.
+
+
 def log_metrics_to_mlflow(
     best_metrics: dict[str, Any],
     model_name: str,
     model_params: dict[str, Any],
-    train_dataset_name: str,
-    test_dataset_name: str,
+    experiment_strategy: str,
     experiment_name: str,
     tracking_uri: str = None,
     hydra_cfg_dir: str = None,
@@ -101,11 +96,15 @@ def log_metrics_to_mlflow(
                 hydra_cfg_paths.append(str(config_file))
 
         # Save best_metrics as YAML and log as an artifact
-        if save_best_metrics:
-            best_metrics_yaml = "best_metrics.yaml"
-            with open(best_metrics_yaml, "w") as f:
-                yaml.dump(best_metrics, f)
-            mlflow.log_artifact(best_metrics_yaml)
+        if save_best_metrics and best_metrics is not None:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                best_metrics_path = Path(temp_dir) / "best_metrics.yaml"
+                with open(best_metrics_path, "w") as f:
+                    yaml.dump(best_metrics, f)
+                mlflow.log_artifact(str(best_metrics_path))
+
+                # Log as MLflow artifact
+                mlflow.log_artifact(str(best_metrics_path))
 
         # Log Hydra config files as artifacts if provided
         if hydra_cfg_dir:
@@ -119,7 +118,7 @@ def log_metrics_to_mlflow(
         # Log predictions as an artifact if provided
         if track_prediction_images:
             mlflow.log_artifact(
-                local_path=str(track_prediction_images), artifact_path="predictions"
+                local_path="plots/predictions", artifact_path="predictions"
             )
 
         if save_model:
@@ -133,18 +132,7 @@ def log_metrics_to_mlflow(
         # Log model details
         mlflow.log_param("Model Name", model_name)
         mlflow.log_params(model_params)
-        mlflow.log_param("Train Dataset", train_dataset_name)
-        mlflow.log_param("Test Dataset", test_dataset_name)
-
-
-def better_traceback() -> None:
-    """
-    run inspect on objects when debugging with ipdb
-    e.g inspect(df, metods=True)
-    """
-    os.environ["HYDRA_FULL_ERROR"] = "1"
-    install(show_locals=True)
-    from rich import inspect  # noqa
+        mlflow.log_param("Experiment strategy", experiment_strategy)
 
 
 def get_custom_console() -> Console:

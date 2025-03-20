@@ -1,12 +1,40 @@
+"""
+Script to run a training session on your local machine.
+This script performs the following steps:
+1. Setup: Initializes logging, sets random seeds, and configures the device.
+2. Load Data: Loads and preprocesses training, validation, and test datasets.
+3. Validate Data: Optionally validates data before and after transformations.
+4. Define Model: Initializes the model based on the configuration.
+5. Define Loss, Optimizer, Scheduler: Sets up the loss function, optimizer, learning rate scheduler, and early stopping.
+6. Training and Validation: Trains the model for a specified number of epochs, performs validation, and logs metrics.
+7. Logging: Logs results and configuration to MLflow. Results during training are logged to TensorBoard.
+
+Functions:
+    main(cfg: DictConfig) -> None
+        Main function to run the training session.
+Args:
+    cfg (DictConfig): Configuration object containing all the parameters for the training session.
+Usage:
+    Run this script with the appropriate configuration file to start a training session.
+    Example:
+        python scripts/train_eval.py model=unet
+"""
+
+import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import hydra
+import numpy as np
 import torch
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
-from torch import nn, optim
+from PIL import Image
+from rich.progress import track
+from segmentation_models_pytorch.losses import DiceLoss
+from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
@@ -15,25 +43,30 @@ from ml_segmentation.data_loading import (
     get_data_files,
     get_dataloaders,
     get_datasets,
-    get_prefix_lists,
+    get_datasets_prefixes,
     get_transforms,
     split_data,
-    validate_data,
+    validate_data_post_transform,
+    validate_data_pre_transform,
+)
+from ml_segmentation.debug_functionality import (
+    better_traceback,
+    visualize_sample,
 )
 from ml_segmentation.define_model import choose_model
 from ml_segmentation.schema_config import ConfigSchema
 from ml_segmentation.train_eval_funcs import (
     EarlyStopping,
+    check_and_update_best_metrics,
     save_image_predictions,
     train_one_epoch,
     validate_one_epoch,
 )
 from ml_segmentation.utility import (
-    better_traceback,
-    check_and_update_best_metrics,
     create_results_table,
     get_custom_console,
     log_metrics_to_mlflow,
+    log_metrics_to_tensorboard,
     seed_everything,
 )
 
@@ -44,36 +77,46 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**cfg_dict)
     console = get_custom_console()
     console.print(pcfg)
+    input("Press any Enter to continue...")  # Pause here to inspect config
 
     # SETUP
     ########################################################################
-    writer = SummaryWriter(log_dir=pcfg.tensorboard.path)
     # Create a rich console with custom theme
-    seed_everything()
-
+    console.print(
+        f"Kicking off an experiment using the experiment strategy: {pcfg.experiment.experiment_strategy}",
+        style="info",
+    )
+    # Create a unique log directory for each run
+    log_dir = os.path.join(
+        pcfg.tensorboard.path, datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
+    writer = SummaryWriter(log_dir=log_dir)
+    seed_everything(pcfg.experiment.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
-    pcfg.mlflow.experiment_name = "train_test"
+    pcfg.mlflow.experiment_name = f"train_test_{pcfg.experiment.experiment_strategy}"
 
     # LOAD DATA
     ###############################################################
     console.print("Loading training and testing data..", style="info")
-    images_directory = pcfg.dataset.path_raw_rockmass
-    labels_directory = pcfg.dataset.path_raw_labels
+    images_directory = pcfg.dataset.path_images
+    labels_directory = pcfg.dataset.path_processed_mask_labels
 
     # Get transformations
     transforms_dict = get_transforms(
         optional_transforms=pcfg.experiment.optional_transforms
     )
 
-    # Get prefixes
-    train_prefixes_list, test_prefixes_list = get_prefix_lists(
-        pcfg.experiment.dataset_name_train,
-        pcfg.experiment.dataset_name_test,
-        pcfg.dataset.prefixes_synthetic_rock_slope,
-        pcfg.dataset.prefixes_synthetic_fracman,
-        pcfg.dataset.prefixes_synthetic_box,
-        pcfg.dataset.prefixes_real_world_box,
+    # Get prefixes for files in the dataset to use for training and testing
+    prefixes = get_datasets_prefixes(
+        experiment_strategy=pcfg.experiment.experiment_strategy,
+        dataset_strategies=pcfg.experiment.dataset_strategies,
+        dataset_prefixes=pcfg.dataset.prefixes,
+    )
+
+    train_prefixes_list, test_prefixes_list = (
+        prefixes["train_prefixes"],
+        prefixes["test_prefixes"],
     )
 
     # Get data files
@@ -81,7 +124,7 @@ def main(cfg: DictConfig) -> None:
         images_directory, labels_directory, train_prefixes_list, test_prefixes_list
     )
 
-    # Split data and validate
+    # Split data
     train_list, val_list, test_list = split_data(
         train_files,
         test_files,
@@ -89,9 +132,44 @@ def main(cfg: DictConfig) -> None:
         val_frac=pcfg.experiment.val_fraction,
         test_frac=pcfg.experiment.test_fraction,
     )
-    validate_data(images_directory, labels_directory, train_list + val_list + test_list)
 
-    # Create datasets
+    # Print the number of samples in train, validation, and test sets
+    console.print(f"Number of training samples: {len(train_list)}")
+    console.print(f"Number of validation samples: {len(val_list)}")
+    console.print(f"Number of test samples: {len(test_list)}")
+
+    # VALIDATE DATA - OPTIONAL
+    ############################
+    if pcfg.experiment.quality_control_data:
+        console.print("Validate data...", style="info")
+        image_transform = transforms_dict["image"]
+        label_transform = transforms_dict["label"]
+        file_list = train_list + val_list + test_list
+
+        for file_name in track(
+            file_list, description="Validating data files pre and post transform..."
+        ):
+            image_path = images_directory / file_name
+            label_path = labels_directory / file_name
+
+            image = Image.open(image_path)
+            label = Image.open(label_path)
+
+            # Validate pre-transform
+            validate_data_pre_transform(image, label, file_name)
+
+            # Apply transforms
+            transformed_image = image_transform(image)
+            transformed_label = label_transform(label)
+
+            # Validate post-transform
+            validate_data_post_transform(
+                transformed_image, transformed_label, file_name
+            )
+
+    ############################
+
+    # Create pytorch datasets objects
     train_dataset, val_dataset, test_dataset = get_datasets(
         images_directory,
         labels_directory,
@@ -101,48 +179,76 @@ def main(cfg: DictConfig) -> None:
         transform=transforms_dict,
     )
 
+    # View sample for quality control
+    if pcfg.experiment.quality_control_data:
+        console.print("Visualize sample...", style="info")
+        sample_idx = np.random.randint(0, len(train_dataset))
+        image, label = train_dataset[sample_idx]
+        visualize_sample(image, label)
+        input("Press any key to continue...")  # Pause here
+
     # Get DataLoaders
     train_loader, val_loader, test_loader = get_dataloaders(
-        train_dataset, val_dataset, test_dataset, batch_size=8
+        train_dataset,
+        val_dataset,
+        test_dataset,
+        batch_size=pcfg.model.batch_size,
+        num_workers=pcfg.experiment.num_workers,
     )
 
-    # Iterate through the Train DataLoader
-    for images, labels in train_loader:
-        print("Train Batch:", images.shape, labels.shape)
-        break
+    if pcfg.experiment.quality_control_data:
+        console.print("Shapes of data:", style="info")
 
-    # Iterate through the Validation DataLoader
-    for images, labels in val_loader:
-        print("Validation Batch:", images.shape, labels.shape)
-        break
+        # Iterate through the Train DataLoader
+        for images, labels in train_loader:
+            print("Train Batch (image, label):", images.shape, labels.shape)
+            break
 
-    # Iterate through the Test DataLoader
-    for images, labels in test_loader:
-        print("Test Batch:", images.shape, labels.shape)
-        break
+        # Iterate through the Validation DataLoader
+        for images, labels in val_loader:
+            print("Validation Batch (image, label):", images.shape, labels.shape)
+            break
+
+        # Iterate through the Test DataLoader
+        for images, labels in test_loader:
+            print("Test Batch (image, label):", images.shape, labels.shape)
+            break
+
+        input("Press any key to continue...")  # Pause here
 
     # DEFINE MODEL
     ###############################################################
     console.print("Define model...", style="info")
     model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
+    # Initialize the model with the specified name and parameters
+    model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
     # Print model summary
-    summary(model, input_size=(1, 3, 224, 224))  # Adjust input size as per your data
+    summary(
+        model, input_size=(1, 3, 768, 768), verbose=1
+    )  # Adjust input size as per your data
 
     # DEFINE LOSS FUNCTION, OPTIMIZER, SCHEDULER, EARLY STOPPING
     ########################################################################
     console.print(
-        "Define loss function, optimizer, scheduler, and early stopping...",
+        "Define loss function, optimizer, scheduler, and early stopping callback...",
         style="info",
     )
 
-    criterion = nn.BCEWithLogitsLoss()
+    # criterion = nn.BCEWithLogitsLoss()
+    criterion = DiceLoss(
+        mode="binary", from_logits=True
+    )  # works better for imbalanced datasets than the classic BCEWithLogitsLoss
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
-    scheduler = ReduceLROnPlateau(
-        optimizer,
-        mode="min",
-        factor=pcfg.model.scheduler.gamma,
-        patience=pcfg.model.scheduler.patience,
-        verbose=True,
+    scaler = torch.amp.GradScaler(
+        device="cuda"
+    )  # Automatic Mixed Precision makes training faster and more memory efficient
+    scheduler = (
+        ReduceLROnPlateau(  # Reduce learning rate when a metric has stopped improving
+            optimizer,
+            mode="min",
+            factor=pcfg.model.scheduler.gamma,
+            patience=pcfg.model.scheduler.patience,
+        )
     )
     early_stopping = EarlyStopping(
         patience=pcfg.experiment.early_stopping_patience, verbose=True
@@ -155,96 +261,122 @@ def main(cfg: DictConfig) -> None:
     if pcfg.experiment.overfit_check:  # Tested model should overfit
         console.print("Overfit check...", style="warning")
         test_loader = train_loader
-        num_epochs = 3
+        num_epochs = 10  # need several epochs to stabilize the loss
 
     # TRAINING, VALIDATION, AND LOGGING
     ########################################################################
+
     console.print("Training and validation...", style="info")
 
     start_time = time.time()
     best_metrics = None
 
-    try:
+    try:  # makes it possible to stop the training with Ctrl+C and log the results
         for epoch in range(num_epochs):
             console.print(f"Epoch {epoch + 1}/{num_epochs}")
 
             # Train for one epoch
-            train_loss = train_one_epoch(
-                model, train_loader, criterion, optimizer, device
+            metrics_training = train_one_epoch(
+                model=model,
+                dataloader=train_loader,
+                criterion=criterion,
+                optimizer=optimizer,
+                device=device,
+                scaler=scaler,
+                threshold=0.5,
+                max_batches=pcfg.experiment.sanity_check_num_batches,
             )
-            train_metrics = {"loss": train_loss}
             console.print(
-                create_results_table(epoch, train_metrics, session="Training")
+                create_results_table(epoch, metrics_training, session="Training")
             )
-            writer.add_scalar("Training/Loss", train_loss, epoch)
-            writer.add_scalar(
-                "Training/Learning Rate", optimizer.param_groups[0]["lr"], epoch
+
+            metrics_training["learning_rate"] = optimizer.param_groups[0]["lr"]
+
+            log_metrics_to_tensorboard(
+                writer=writer, metrics=metrics_training, prefix="Training", epoch=epoch
             )
 
             # Validate for one epoch
-            metrics = validate_one_epoch(model, test_loader, criterion, device)
-            console.print(create_results_table(epoch, metrics, session="Validation"))
-            writer.add_scalar("Validation/Loss", metrics["loss"], epoch)
-            writer.add_scalar("Validation/IoU", metrics["iou"], epoch)
-            writer.add_scalar("Validation/Dice", metrics["dice"], epoch)
-            writer.add_scalar("Validation/Precision", metrics["precision"], epoch)
-            writer.add_scalar("Validation/Recall", metrics["recall"], epoch)
+            metrics_validation = validate_one_epoch(
+                model=model,
+                dataloader=test_loader,
+                criterion=criterion,
+                device=device,
+                threshold=0.5,
+                max_batches=pcfg.experiment.sanity_check_num_batches,
+            )
+
+            console.print(
+                create_results_table(epoch, metrics_validation, session="Validation")
+            )
+
+            log_metrics_to_tensorboard(
+                writer=writer,
+                metrics=metrics_validation,
+                prefix="Validation",
+                epoch=epoch,
+            )
 
             # Step the scheduler
-            scheduler.step(metrics["loss"])
+            scheduler.step(metrics_validation["loss"])
 
             # Update best metrics if applicable
             training_time = time.time() - start_time
             best_metrics = check_and_update_best_metrics(
-                metrics, best_metrics, epoch, training_time
+                metrics_validation,
+                best_metrics,
+                epoch,
+                training_time,
+                compare_metric=pcfg.experiment.compare_metric,
             )
 
             # Check early stopping condition
-            early_stopping(metrics["loss"], model)
-            if early_stopping.early_stop:
-                console.print(
-                    "Early stopping triggered. Training stopped.", style="warning"
-                )
-                break
+            if not pcfg.experiment.sanity_check_num_batches:
+                early_stopping(metrics_validation["loss"], model)
+                if early_stopping.early_stop:
+                    console.print(
+                        "Early stopping triggered. Training stopped.", style="warning"
+                    )
+                    break
 
     except KeyboardInterrupt:
         console.print("Training interrupted by keyboard.", style="warning")
 
     finally:
         writer.close()
-        console.print("Training complete.")
+        console.print("Training complete.", style="info")
 
-        # LOG RESULTS AND CONFIG TO MLFLOW
-        ###############################################################
-        console.print("Logging results to mlflow...", style="info")
+    # LOG RESULTS AND CONFIG TO MLFLOW
+    ###############################################################
+    console.print("Logging results to mlflow...", style="info")
 
-        if early_stopping.best_model:
-            model.load_state_dict(early_stopping.best_model)
-            model_path = Path("models/best_model.pth")
-            torch.save(model.state_dict(), model_path)
+    if early_stopping.best_model is not None:
+        console.print("Saving best model...", style="info")
+        model.load_state_dict(early_stopping.best_model)
+        model_path = Path("models/best_model.pth")
+        torch.save(model.state_dict(), model_path)
 
-        if pcfg.experiment.log_mlflow:
-            save_image_predictions(
-                model,
-                test_loader,
-                device,
-                num_samples=3,
-                save_path=Path("plots/predictions"),
-            )
-            experiment_name = "train_test"
-            log_metrics_to_mlflow(
-                best_metrics,
-                pcfg.model.name,
-                pcfg.model.params,
-                pcfg.experiment.dataset_name_train,
-                pcfg.experiment.dataset_name_test,
-                experiment_name,
-                tracking_uri=pcfg.mlflow.path,
-                hydra_cfg_dir=HydraConfig.get().run.dir,
-                save_best_metrics=True,
-                track_prediction_images=True,
-                save_model=pcfg.mlflow.save_model,
-            )
+    if pcfg.experiment.log_mlflow:
+        save_image_predictions(
+            model,
+            test_loader,
+            device,
+            num_samples=3,
+            save_dir=Path("plots/predictions"),
+        )
+        experiment_name = "train_test"
+        log_metrics_to_mlflow(
+            best_metrics,
+            pcfg.model.name,
+            pcfg.model.params,
+            pcfg.experiment.experiment_strategy,
+            experiment_name,
+            tracking_uri=pcfg.mlflow.path,
+            hydra_cfg_dir=HydraConfig.get().run.dir,
+            save_best_metrics=True,
+            track_prediction_images=True,
+            save_model=pcfg.mlflow.save_model,
+        )
 
 
 if __name__ == "__main__":

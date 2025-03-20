@@ -1,3 +1,21 @@
+"""
+This module defines the configuration schema for a machine learning segmentation project using Pydantic models.
+It includes configurations for the model, experiment, dataset, logging, and hyperparameter optimization.
+Classes:
+    Scheduler: Configuration for the learning rate scheduler.
+    ModelConfig: Configuration for the model, including parameters like name, number of epochs, batch size, learning rate, and scheduler.
+    ExperimentStrategy: Enum class defining various experiment strategies.
+    ExperimentConfig: Configuration for the experiment, including strategies, dataset configurations, and other training parameters.
+    DatasetConfig: Configuration for the dataset paths and prefixes.
+    MlflowConfig: Configuration for MLflow logging.
+    TensorboardConfig: Configuration for Tensorboard logging.
+    OptunaConfig: Configuration for Optuna hyperparameter optimization.
+    ConfigSchema: The main configuration schema that includes all other configurations.
+Functions:
+    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
+"""
+
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +30,6 @@ class Scheduler(BaseModel):
     gamma: float
 
 
-# Define the main configuration schema
 class ModelConfig(BaseModel):
     name: str = Field(
         ...,
@@ -25,9 +42,36 @@ class ModelConfig(BaseModel):
     params: dict[str, Any] = Field(..., description="Dictionary of model parameters.")
 
 
+class ExperimentStrategy(str, Enum):
+    VERIFICATION_BOX = "verification_box"
+    VERIFICATION_DFN = "verification_dfn"
+    MAIN_OBJECTIVE_DFN_ROCK_SLOPE = "main_objective_dfn_rock_slope"
+    MAIN_OBJECTIVE_DFN_BOX = "main_objective_dfn_box"
+    MAIN_OBJECITVE_BOX_ROCK_SLOPE = "main_objective_box_rock_slope"
+    MAIN_OBJECTIVE_BOX_BOX = "main_objective_box_box"
+    DATASET_SIZE_TEST = "dataset_size_test"
+    SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
+    ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
+
+
 class ExperimentConfig(BaseModel):
+    experiment_strategy: ExperimentStrategy = Field(
+        ..., description="The experiment strategy chosen for this run."
+    )
+    dataset_strategies: dict[str, dict[str, list[str]]] = Field(
+        ...,
+        description=(
+            "Mapping of experiment strategies to their corresponding dataset configurations. "
+            "Each strategy includes 'train_datasets' and 'test_datasets', "
+            "which are lists of dataset names used for training and testing respectively."
+        ),
+    )
     seed: int = Field(..., description="Random seed for reproducibility.")
     log_mlflow: bool = Field(..., description="Whether to log to mlflow or not.")
+    compare_metric: str = Field(
+        ..., description="Metric used for comparison in choosing new best metrics."
+    )
+    num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float = Field(
         ..., description="Fraction of data used for training."
     )
@@ -38,13 +82,29 @@ class ExperimentConfig(BaseModel):
     early_stopping_patience: int = Field(
         ..., description="Patience for early stopping in training."
     )
-    dataset_name_train: str = Field(..., description="Dataset name for training.")
-    dataset_name_test: str = Field(..., description="Dataset name for testing.")
     optional_transforms: bool = Field(
         ..., description="Whether optional image transforms are used."
     )
     overfit_check: bool = Field(..., description="Whether overfit check is used.")
+    sanity_check_num_batches: int | None = Field(
+        ..., description="Whether to run a sanity check for a number of batches."
+    )
+    quality_control_data: bool = Field(
+        ..., description="Whether quality control data is used."
+    )
     crossvalidation: bool = Field(..., description="Whether cross-validation is used.")
+
+
+class DatasetConfig(BaseModel):
+    path_images: Path = Field(..., description="Path to raw rock mass data.")
+    path_raw_mask_labels: Path = Field(..., description="Path to raw labels data.")
+    path_processed_mask_labels: Path = Field(
+        ..., description="Path to processed masks."
+    )
+    prefixes: dict[str, list[str]] = Field(
+        ...,
+        description="Mapping of dataset names to lists of prefixes used to filter files for that dataset.",
+    )
 
 
 class MlflowConfig(BaseModel):
@@ -65,23 +125,6 @@ class OptunaConfig(BaseModel):
     )
     path_results: Path = Field(
         ..., description="Directory path for storing hyperparameter results."
-    )
-
-
-class DatasetConfig(BaseModel):
-    path_raw_rockmass: Path = Field(..., description="Path to raw rock mass data.")
-    path_raw_labels: Path = Field(..., description="Path to raw labels data.")
-    prefixes_synthetic_rock_slope: list[str] = Field(
-        ..., description="Prefixes for synthetic rock slope data."
-    )
-    prefixes_synthetic_fracman: list[str] = Field(
-        ..., description="Prefixes for synthetic fracman data."
-    )
-    prefixes_synthetic_box: list[str] = Field(
-        ..., description="Prefixes for synthetic box data."
-    )
-    prefixes_real_world_box: list[str] = Field(
-        ..., description="Prefixes for real world box data."
     )
 
 

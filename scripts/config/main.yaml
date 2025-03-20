@@ -19,19 +19,83 @@ hydra:
 
 experiment:
   seed: 42
-  log_mlflow: false
+  log_mlflow: true
+  compare_metric: loss # metric for comparison in chosing new best model
+  num_workers: 2 # number of workers for data loading
   train_fraction: 0.8
-  val_fraction: 0.1
-  test_fraction: 0.1
-  early_stopping_patience: 10
-  dataset_name_train: [synthetic_rock_slope, synthetic_fracman]
-  dataset_name_test: [synthetic_rock_slope, synthetic_fracman]
+  val_fraction: 0.0
+  test_fraction: 0.2
+  early_stopping_patience: 5
   optional_transforms: false
   overfit_check: false
+  sanity_check_num_batches: null # set to a low number to speed up training in order to check if functionality is working, e.g. 1-3
+  quality_control_data: false
   crossvalidation: false
+  experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
+  dataset_strategies:
+    verification_box:
+      train_datasets:
+        - "synthetic_box"
+      test_datasets:
+        - "synthetic_box"
+    verification_dfn:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "synthetic_dfn"
+    main_objective_dfn_rock_slope:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "real_world_rock_slope"
+    main_objective_dfn_box:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "real_world_box"
+    main_objective_box_rock_slope:
+      train_datasets:
+        - "synthetic_box"
+      test_datasets:
+        - "real_world_rock_slope"
+    main_objective_box_box:
+      train_datasets:
+        - "synthetic_box"
+      test_datasets:
+        - "real_world_box"
+    dataset_size_test:
+      train_datasets:
+        - "synthetic_dfn"
+      test_datasets:
+        - "real_world_rock_slope"
+    semi_supervised_learning:
+      train_datasets:
+        - "real_world_rock_slope"
+      test_datasets:
+        - "real_world_rock_slope"
+    one_shot_segmentation:
+      train_datasets:
+        - "real_world_rock_slope"
+      test_datasets: []
+
+
+dataset:
+  path_images: ${path_project}/Data/rockmass
+  path_raw_mask_labels: ${path_project}/Data/label/raw
+  path_processed_mask_labels: ${path_project}/Data/label/binary
+  prefixes:
+    synthetic_dfn:
+      - "FracMan"
+    synthetic_box:
+      - "Benchmark"
+    real_world_box:
+      - "Box"
+    real_world_rock_slope:
+      - "Larvik"
+      - "RV4"
 
 tensorboard:
-  path: ./experiments/tensorboard
+  path: ./experiments/tensorboard_logs
 
 mlflow:
   path: ${path_project}/experiments/mlruns
@@ -41,11 +105,3 @@ mlflow:
 optuna:
   n_trials: 5
   path_results: experiments/hyperparameters
-
-dataset:
-  path_raw_rockmass: ${path_project}/Data/Rockmass
-  path_raw_labels: ${path_project}/Data/Label
-  prefixes_synthetic_rock_slope: ["Larvik", "RV4"]
-  prefixes_synthetic_fracman: ["FracMan"]
-  prefixes_synthetic_box: ["Benchmark"]
-  prefixes_real_world_box: ["Box"]
