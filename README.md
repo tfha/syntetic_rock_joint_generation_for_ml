@@ -106,7 +106,7 @@ For all models, experiment with transfer learning using pretrained models as a b
 - Use of **torchsummary** for model summary.
 <!-- - Use of **fiftyone** for data visualization and data management. -->
 <!-- - Use of **pytorch-lightning** for training loop. -->
-<!-- - Use of **pytest** for testing. -->
+- Use of **pytest** for testing.
 <!-- - Use of **docker** for containerization, reproducability and running training in the cloud. -->
 <!-- - Use of **dvc** for data versioning. -->
 <!-- - Use of **captum** for model interpretability, highlighting the importance of each pixel in the image for the model's prediction. -->
@@ -198,18 +198,23 @@ We illustrate the prediction mask images qualitatively in `fiftyone`, where the 
     poetry run pre-commit install
     ```
 
+7. **Github Copilot**:
+    If you have Github Copilot installed, you can use it to help you write code. We have defined custom instructions that Copilot will use as context when generating, reviewing and testing code. You can find the instructions in the `.github/copilot_instructions` file. To activate the instructions you need to set `github.copilot.chat.codeGeneration.useInstructionsFiles` to `true` in your VSCode settings.
+
+    More info in this url: [https://code.visualstudio.com/docs/copilot/copilot-customization](https://code.visualstudio.com/docs/copilot/copilot-customization)
+
 ## Usage
 
 ### Train and Evaluate the Model
 
 ```sh
-python scripts/train.py
+python scripts/train_eval.py
 ```
 
 Use hydra configuration options with train.py to specify different datasets, models and training parameters. For example, to train a model with DeepLabV3 architecture training on `synthetic_box`, evaluating on `synthetic_box`and tracking all information to mlflow, use the following command:
 
 ```sh
-python scripts/train.py model=deeplabv3 dataset_train=[synthetic_box] dataset_test=[synthetic_box] log_mlflow=True
+python scripts/train_eval.py model=deeplabv3 dataset_train=[synthetic_box] dataset_test=[synthetic_box] log_mlflow=True
 ```
 
 Some flags are included for quality control and debugging:

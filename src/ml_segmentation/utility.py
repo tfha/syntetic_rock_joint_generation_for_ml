@@ -38,10 +38,18 @@ def seed_everything(seed: int = 42) -> None:
     )
 
 
-# Function to create results table
 def create_results_table(
     epoch: int, metrics: dict[str, float], session: str = "Training"
 ) -> Table:
+    """
+    Creates a results table for a given epoch and session with specified metrics.
+    Args:
+        epoch (int): The current epoch number.
+        metrics (dict[str, float]): A dictionary containing metric names as keys and their corresponding values.
+        session (str, optional): The session type, either "Training" or "Validation". Defaults to "Training".
+    Returns:
+        Table: A formatted table displaying the metrics and their values for the given epoch and session.
+    """
     table = Table(title=f"Epoch {epoch + 1} {session} Results")
     table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
     table.add_column("Value", style="magenta")

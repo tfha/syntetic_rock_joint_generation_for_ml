@@ -142,12 +142,16 @@ def main(cfg: DictConfig) -> None:
     ############################
     if pcfg.experiment.quality_control_data:
         console.print("Validate data...", style="info")
+        validate_data_pre_transform(
+            images_directory, labels_directory, train_list + val_list + test_list
+        )
+
         image_transform = transforms_dict["image"]
         label_transform = transforms_dict["label"]
         file_list = train_list + val_list + test_list
 
         for file_name in track(
-            file_list, description="Validating data files pre and post transform..."
+            file_list, description="Validating data files post transform..."
         ):
             image_path = images_directory / file_name
             label_path = labels_directory / file_name
@@ -155,17 +159,14 @@ def main(cfg: DictConfig) -> None:
             image = Image.open(image_path)
             label = Image.open(label_path)
 
-            # Validate pre-transform
-            validate_data_pre_transform(image, label, file_name)
-
             # Apply transforms
             transformed_image = image_transform(image)
             transformed_label = label_transform(label)
 
-            # Validate post-transform
             validate_data_post_transform(
                 transformed_image, transformed_label, file_name
             )
+        input("Press any key to continue...")  # Pause here
 
     ############################
 
@@ -220,12 +221,12 @@ def main(cfg: DictConfig) -> None:
     ###############################################################
     console.print("Define model...", style="info")
     model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
-    # Initialize the model with the specified name and parameters
-    model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
-    # Print model summary
-    summary(
-        model, input_size=(1, 3, 768, 768), verbose=1
-    )  # Adjust input size as per your data
+    if pcfg.experiment.quality_control_data:
+        # Print model summary
+        summary(
+            model, input_size=(1, 3, 768, 768), verbose=1
+        )  # Adjust input size as per your data
+        input("Press any key to continue...")  # Pause here
 
     # DEFINE LOSS FUNCTION, OPTIMIZER, SCHEDULER, EARLY STOPPING
     ########################################################################
@@ -323,11 +324,7 @@ def main(cfg: DictConfig) -> None:
             # Update best metrics if applicable
             training_time = time.time() - start_time
             best_metrics = check_and_update_best_metrics(
-                metrics_validation,
-                best_metrics,
-                epoch,
-                training_time,
-                compare_metric=pcfg.experiment.compare_metric,
+                metrics_validation, best_metrics, epoch, training_time
             )
 
             # Check early stopping condition

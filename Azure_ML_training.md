@@ -1,104 +1,218 @@
-# Azure ML
+# Azure ML documentation
+
+TODO: Move this tutorial to a new repo in NGI, including the Titanic example.
 
 
 ## Table of Contents
 - [Azure ML](#azure-ml)
-- [Table of Contents](#table-of-contents)
-- [Tools and system setup](#tools-and-system-setup)
-    - [Azure account/subscription](#azure-accountsubscription)
+  - [Table of Contents](#table-of-contents)
+  - [Tools- and system setup](#tools--and-system-setup)
+    - [Azure account](#azure-account)
+    - [Azure subscription](#azure-subscription)
     - [Azure CLI](#azure-cli)
     - [VSCode integrated with Azure ML](#vscode-integrated-with-azure-ml)
-- [Azure Assets and Resources](#azure-assets-and-resources)
+  - [Azure Assets and Resources](#azure-assets-and-resources)
     - [Workspace](#workspace)
-        - [Organising workspaces](#organising-workspaces)
-        - [Setting up a workspace](#setting-up-a-workspace)
-        - [Content stored in a workspace](#content-stored-in-a-workspace)
-        - [Connect to a workspace](#connect-to-a-workspace)
+      - [Organising workspaces:](#organising-workspaces)
+      - [Setting up a workspace:](#setting-up-a-workspace)
+      - [Content stored in a workspace:](#content-stored-in-a-workspace)
+      - [Connect to a workspace:](#connect-to-a-workspace)
     - [Compute instance](#compute-instance)
-    - [Datastore](#datastore)
-        - [Prepare and upload your dataset to Azure blob storage](#prepare-and-upload-your-dataset-to-azure-blob-storage)
-        - [Register the dataset](#register-the-dataset)
+    - [Datastore - including how to reference data in a datastore](#datastore---including-how-to-reference-data-in-a-datastore)
+      - [1. Prepare and upload your dataset to Azure blob storage](#1-prepare-and-upload-your-dataset-to-azure-blob-storage)
+      - [2. Register the dataset](#2-register-the-dataset)
     - [Environment](#environment)
     - [Models](#models)
     - [Pipelines](#pipelines)
     - [Component](#component)
-- [Training a model in Azure ML](#training-a-model-in-azure-ml)
-- [Experiment tracking in Azure ML](#experiment-tracking-in-azure-ml)
+  - [Training a model in Azure ML](#training-a-model-in-azure-ml)
+    - [Typical workflow for training a model in Azure ML](#typical-workflow-for-training-a-model-in-azure-ml)
+    - [Complete script for training a model in Azure ML](#complete-script-for-training-a-model-in-azure-ml)
+  - [Experiment tracking in Azure ML](#experiment-tracking-in-azure-ml)
     - [MLflow](#mlflow)
     - [Tensorboard](#tensorboard)
-- [Dataset versioning in Azure ML](#dataset-versioning-in-azure-ml)
-- [AutoML](#automl)
-- [Learning resources](#learning-resources)
+  - [Dataset versioning in Azure ML](#dataset-versioning-in-azure-ml)
+    - [Register a Dataset in Azure ML](#register-a-dataset-in-azure-ml)
+      - [Example: Register a Dataset](#example-register-a-dataset)
+    - [View Dataset Versions](#view-dataset-versions)
+      - [List All Versions of a Dataset](#list-all-versions-of-a-dataset)
+    - [Use a Specific Dataset Version in an Experiment](#use-a-specific-dataset-version-in-an-experiment)
+      - [Example: Use a Specific Dataset Version](#example-use-a-specific-dataset-version)
+    - [Dataset Versioning in the Experiment Log](#dataset-versioning-in-the-experiment-log)
+      - [Retrieve Dataset Information from a Job](#retrieve-dataset-information-from-a-job)
+    - [5. Benefits of Dataset Versioning](#5-benefits-of-dataset-versioning)
+    - [6. Updating Datasets](#6-updating-datasets)
+      - [Register a New Version](#register-a-new-version)
+    - [7. Data Asset Management in Azure ML Studio](#7-data-asset-management-in-azure-ml-studio)
+    - [8. Integrating with Git and CI/CD](#8-integrating-with-git-and-cicd)
+  - [AutoML](#automl)
+  - [Example tutorials](#example-tutorials)
+    - [Predicting Titanic survival](#predicting-titanic-survival)
+    - [Rock joint detection](#rock-joint-detection)
+    - [LabOAI](#laboai)
+  - [Learning resources](#learning-resources)
 
 
 ---
 
-Azure ML has a comprehensive documentation. In this documentation for a code academy course in MLOps and professional ML development in Azure ML we have tried to simplify the most important parts of Azure ML and to extract the parts which currently are most relevant for NGI.
+## Related Azure concepts
 
-Reference: https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
+We start by defining some relevant Azure concepts. This is not a complete list of all Azure concepts, but it is a good starting point for understanding the Azure ecosystem. For a complete list of Azure concepts, please refer to the [Azure documentation](https://learn.microsoft.com/en-us/azure/?view=azure-cli-latest).
 
-Azure ML is a cloud-based service for creating, managing, and deploying machine learning models. It provides a centralized place for data scientists and developers to work with all the artifacts for machine learning, including datasets, training scripts, and trained models. Azure ML give make it easy to scale your ML training by harnessing powerful cloud compute resources, such as nodes with several GPU's with lots of memory. Below we have listed the parts in a typical MLOps worklfow that is facilitated by Azure ML.
+### Azure portal
 
-- Experiment tracking to mlflow or tensorboard
-- Model training
-- Model deployment
+Azure Portal is the web-based interface for managing Azure resources. It provides a user-friendly way to create, configure, and monitor Azure services, including Azure Machine Learning. You can access the Azure Portal at https://portal.azure.com/.
+
+### Azure ML
+
+Azure ML is a cloud-based service for creating, managing, and deploying machine learning models. It provides a centralized place for data scientists and developers to work with all the artifacts for machine learning, including datasets, training scripts, and trained models. You can create a model in Azure ML or use a model built from an open-source platform, such as PyTorch, TensorFlow, or scikit-learn. Azure ML make it easy to scale your ML training by harnessing powerful cloud compute resources, such as nodes with several GPU's with lots of memory. Azure ML is for individuals and teams implementing `MLOps` within their organization to bring ML models into production in a secure and auditable production environment. You reach Azure ML through http://ml.azure.com.
+
+Azure ML has a comprehensive documentation. In this documentation for a `code academy course` in MLOps and professional ML development in Azure ML we have tried to simplify the most important parts of Azure ML and to extract the parts which currently are most relevant for NGI.
+
+In this tutorial we have listed the parts in a typical MLOps workflow that is facilitated by Azure ML. We will describe and run these operations mainly in the form of Python scripts, but the experiments, the models and other artifacts will be visualised in `Azure ML studio`: http://ml.azure.com.
+
+The main operations carried out in Azure ML Studio are:
+
+- Model processing, training, evaluation by defining reusable ML pipelines. NOTE: You don't need `Airflow` or other orchestration tools to run pipelines in Azure ML. Azure ML has its own orchestration engine.
+- Hyperparameter tuning
+- Reusable environments for training and deployment
+- Model evaluation
+- Experiment tracking to mlflow and/or tensorboard
+- Dataset versioning
+- Model versioning
+- Model packaging, registration and deployment
 - Monitoring of deployed models
 - Retraining of deployed models
 
 MLOps steps not covered by Azure ML can be found in the [MLOps](MLOps.md) document.
 
+There are a few other tools which can be accessed through Azure ML Studio, such as `AutoML`, `Data labeling`, and `Azure ML designer`. These tools are not covered in detail in this document, but they can be useful for specific use cases.
 
-References:
-- https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
+#### Azure ML Designer
+
+Azure ML Designer is a drag-and-drop interface for building machine learning models without writing code. It allows users to create and manage machine learning workflows visually. This can be useful for users who are not familiar with programming or prefer a more visual approach to building models. Azure ML Designer provides a set of pre-built modules for common tasks, such as data preprocessing, model training, and evaluation. Users can connect these modules to create a complete machine learning pipeline. Azure ML Designer is a good tool for quickly prototyping machine learning models and workflows.
+
+Reference: https://learn.microsoft.com/en-us/azure/machine-learning/concept-designer?view=azure-ml-py&tabs=python#overview
+
+#### AutoML
+
+AutoML is a feature in Azure Machine Learning that automates the process of building and tuning machine learning models. It helps users quickly create high-quality models without requiring extensive knowledge of machine learning algorithms or hyperparameter tuning. AutoML can automatically select the best algorithm, preprocess the data, and optimize hyperparameters to achieve the best performance. This can save time and effort for data scientists and developers, allowing them to focus on other aspects of their projects. AutoML is particularly useful for users who are new to machine learning or have limited experience with model development. AutoML can also be used as a quick first step to identify the best algorithms and hyperparameters for a specific problem before moving on to more advanced techniques or custom model development.
+
+Reference: https://learn.microsoft.com/en-us/azure/machine-learning/concept-automated-ml?view=azure-ml-py&tabs=python#overview
+
+#### Data labeling
+
+Azure ML Data Labeling is a feature that helps users annotate and label data for machine learning tasks. It provides a user-friendly interface for creating and managing labeling projects, allowing users to upload datasets, define labeling tasks, and collaborate with labelers. Data Labeling supports various types of data, including images, text, and audio. Users can create custom labeling tasks, such as object detection, image classification, and text classification. The labeled data can then be used to train machine learning models in Azure ML. Data Labeling is particularly useful for users who need to prepare large datasets for supervised learning tasks.
+
+Reference: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-label-data?view=azureml-api-2
+
+#### References:
+
+- https://learn.microsoft.com/en-us/azure/machine-learning/concept-model-management-and-deployment?view=azureml-api-2
+https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
 - https://medium.com/henkel-data-and-analytics/how-to-use-azure-ml-studio-an-eye-opening-model-training-tutorial-for-beginners-from-henkels-data-5035ee10a6d2
 
-## Tools and system setup
+### Azure AI Foundry portal
 
-### Azure account/subscription
+ Azure AI Foundry portal is a unified platform for developing and deploying `generative AI apps` and Azure AI APIs responsibly. It includes a rich set of AI capabilities, simplified user interface and code-first experiences, offering a one-stop shop to build, test, deploy, and manage intelligent solutions. Generative AI development is not the main topic of this document, but it is worth mentioning that Azure AI Foundry portal is a powerful tool for building and deploying generative AI applications. It provides a set of pre-built models and APIs for common tasks, such as text generation, image generation, and speech synthesis. The portal also includes tools for managing and monitoring the performance of your applications. Azure AI Foundry portal is a good choice for users who want to quickly build and deploy generative AI applications without having to worry about the underlying infrastructure.
 
-To use Azure ML you need an Azure account. You can create a free account at https://go.microsoft.com/fwlink/?linkid=2227353&clcid=0x409&l=en-us&icid=azurefreeaccount. The free account gives you access to a limited set of Azure services for 12 months. You can use the free account to explore Azure ML and other Azure services. Once you have an Azure account, you can create an Azure Machine Learning workspace to start building, training, and deploying machine learning models.
+ Reference: https://learn.microsoft.com/en-us/azure/ai-foundry/?view=azure-ai-foundry-portal&tabs=python-sdk#overview
+### Azure DevOps
+
+#### Examples
+
+Throughout this documentation we will often refer to an example NGI project called `RockJointDetection`. This project is a machine learning project that aims to detect rock joints in images. The project is used as an example to demonstrate the functionality of Azure ML and how to use it for machine learning projects. The project is available here in Azure Devops: https://dev.azure.com/ngi001/NGI/_git/syntetic_rock_joint_generation_for_ml
+
+## Tools- and system setup
+
+### Azure account
+
+To use Azure ML you need an Azure account. In NGI all employees have an Azure account. You can check if you have an Azure account by logging into the Azure portal at https://portal.azure.com/. If you are logged in, you have an Azure account. If you are not logged in, you can log in with your NGI email address and password. If you dont have an account you can also create a free account at https://go.microsoft.com/fwlink/?linkid=2227353&clcid=0x409&l=en-us&icid=azurefreeaccount. The free account gives you access to a limited set of Azure services for 12 months. You can use the free account to explore Azure ML and other Azure services.
 
 Reference: https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account?icid=azurefreeaccount
 
+### Azure subscription
+
+An Azure subscription is a logical container used to provision resources in Azure. It holds the details of all your resources, such as compute nodes, virtual machines, storage accounts, and databases. Each Azure subscription is associated with a specific Azure account and can be managed through the Azure portal. You can create multiple subscriptions under a single Azure account to organize and manage your resources based on different projects or departments. For this tutorial we have made a subscription called `ngi_mlops_sandbox`. You can check your subscriptions in the Azure portal by clicking on `Subscriptions` in the top menu. Ask IT services (Christian Demeter) to create an Azure subscription for you if you do not have one.
+
+Once you have an Azure account and subscription, you can create an Azure Machine Learning workspace to start building, training, and deploying machine learning models. More about workspaces can be found in the [Workspace](#workspace) section below.
 
 ### Azure CLI
 
-Azure CLI is a command-line tool that provides a set of commands for managing Azure resources. You can use Azure CLI to create and manage Azure resources, such as virtual machines, storage accounts, and Azure Machine Learning workspaces. Azure CLI is available for Windows, macOS, and Linux. You can install Azure CLI on your local machine or use the Azure Cloud Shell, which is a browser-based shell that comes pre-installed with Azure CLI.
+Azure CLI is a command-line tool that provides a set of commands for managing Azure resources. You can use Azure CLI to create and manage Azure resources, such as virtual machines, storage accounts, and Azure Machine Learning workspaces. Azure CLI is available for Windows, macOS, and Linux. You can install Azure CLI on your local machine or use the Azure Cloud Shell, which is a browser-based shell that comes pre-installed with Azure CLI. You can also login into Azure CLI using the standard terminal in VSCode using the command: `az login`. This will open a browser window where you can log in with your Azure account.
+
+To install Azure CLI on your local machine, follow the instructions in the Azure CLI installation guide: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest
 
 
 Reference: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-configure-cli?view=azureml-api-2&tabs=public
 
+### Azure APP service
+
+Azure App Service is a fully managed platform for building, deploying, and scaling web apps. It provides a range of features, including support for multiple programming languages, built-in authentication and authorization, and integration with Azure DevOps for continuous deployment. Azure App Service is a good choice for hosting web applications, RESTful APIs, and mobile backends. It allows you to focus on your application code while Azure manages the underlying infrastructure.
+
+You can use Azure App Service to host your machine learning models and APIs. This allows you to deploy your models as web services that can be accessed by other applications or users. Azure App Service provides built-in support for scaling, load balancing, and monitoring, making it easy to manage your deployed models.
+
+Reference: https://learn.microsoft.com/en-us/azure/app-service/overview?view=azure-app-service&tabs=python#overview
+
+### Azure ML Python SDKv2
+
+The Azure ML Python SDK is a set of Python libraries that provide a convenient way to interact with Azure Machine Learning services. The SDK allows you to create and manage Azure Machine Learning resources, such as workspaces, compute instances, and datasets, directly from your Python code. The SDK also provides tools for training and deploying machine learning models, as well as tracking experiments and managing model versions. We will mainly create and manage resources in the web interface, but training and deployment of models will be done using the Python SDK. The SDK is available for Python 3.6 and later versions.
+
 
 ### VSCode integrated with Azure ML
 
-coming...
+To seamlessly work with Azure ML, you can use Visual Studio Code (VSCode) with the `Azure Machine Learning` extension. This extension provides a rich set of features for managing Azure ML resources, running experiments, and deploying models directly from your development environment.
+
+Other handy extensions to install in VSCode are:
+
+- Azure Storage - This extension allows you to manage Azure Storage resources, including Blob Storage, File Shares, and Queues. It provides a user-friendly interface for uploading, downloading, and managing files in your Azure Storage account.
+- Azure Account - This extension provides a single sign-on experience for Azure services in VSCode. It allows you to log in to your Azure account and manage your Azure resources directly from the VSCode interface.
+- Azure CLI Tools - This extension provides a set of commands for managing Azure resources directly from the VSCode terminal. It allows you to run Azure CLI commands without leaving the VSCode environment.
+- Azure Resources - This extension provides a tree view of your Azure resources, allowing you to easily navigate and manage your Azure resources directly from the VSCode interface. It provides a user-friendly interface for creating, deleting, and managing Azure resources.
+- Azure tools - This extension provides a set of tools for managing Azure resources, including Azure Functions, Azure Logic Apps, and Azure App Service. It allows you to create, deploy, and manage Azure resources directly from the VSCode environment.
+
 
 
 ## Azure Assets and Resources
 
-Azure assets and resources are the fundamental components required to build, deploy, and manage machine learning models in Azure ML. These include:
+Azure `assets` and `resources` are fundamental components required to build, deploy, and manage machine learning models in Azure ML. These include:
 
 **Resources**: setup or infrastructural resources needed to run a machine learning workflow. Resources include:
 
-- **Workspace**: A centralized place to store and manage machine learning assets and resources.
-- **Compute Resources**: Virtual machines or clusters used to run training jobs, experiments, and deployments. Examples include Azure ML Compute Instances and Compute Clusters.
-- **Datastore**: A centralized place to store the training data. Collections of data used for training and evaluating machine learning models. They can be stored in various formats and locations, such as Azure Blob Storage or Azure Data Lake.
+- **[Workspace](#workspace)**: A centralized place to store and manage machine learning assets and resources.
+- **[Compute Resources](#compute-instance)**: Virtual machines or clusters used to run training jobs, experiments, and deployments. Examples include Azure ML Compute Instances and Compute Clusters.
+- **[Datastore](#datastore---including-how-to-reference-data-in-a-datastore)**: A centralized place to store the training data. Collections of data used for training and evaluating machine learning models. Data can be stored in various formats and locations, such as Azure Blob Storage, Azure Data Lake, or Azure SQL Database.
+
+Resources need to be created within a `Resource group`. A resource group is a logical container that holds related Azure resources. It allows you to manage and organize your resources based on your project or application needs. You can create a resource group in the Azure portal or using Azure CLI. When creating a resource group, you need to specify a name and a region where the resources will be located. The region determines the physical location of the resources and can affect performance and cost. For the `RockJointDetection` project we have created a resource group called `rg-rock-joint-detection` in the `Norway East` region. You can check your resource groups in the Azure portal by clicking on `Resource groups` in the top menu.
 
 **Assets**: created using Azure Machine Learning commands or as part of a training/scoring run. Assets are versioned and can be registered in the Azure Machine Learning workspace. They include:
 
-- **Models**: Serialized versions of trained machine learning models that can be registered, versioned, and deployed to endpoints.
-- **Environments**: Configurations that define the software dependencies and runtime environment for training and inference. They ensure consistency and reproducibility of experiments.
-- **Data**: For most usecases you refer to the data in the datastore in the form of a uri_folder or a uri_file. This is the data that is used for training and evaluation of the model.
-- **Experiments**: Collections of related training runs used to track and compare the performance of different models and configurations.
+- **[Models](#models)**: Serialized versions of trained machine learning models that can be registered, versioned, and deployed to endpoints.
+- **[Environments](#environment)**: Configurations that define the software dependencies and runtime environment for training and inference. They ensure consistency and reproducibility of experiments.
+- **[Data](#datastore---including-how-to-reference-data-in-a-datastore)**: For most use cases you refer to the data in the datastore in the form of a uri_folder or a uri_file. This is the data that is used for training and evaluation of the model.
+- **[Experiments](#experiment-tracking-in-azure-ml)**: Collections of related training runs used to track and compare the performance of different models and configurations.
 
 The steps below are not strictly necessary to train a model in Azure ML, but they are good practices to follow to ensure that your machine learning projects are well-organized, reproducible, and scalable. They are especially useful when working in a team or when managing multiple machine learning projects.
 
-- **Pipelines**: Workflows that automate the process of training, evaluating, and deploying machine learning models. They can include multiple steps, such as data preprocessing, model training, and model evaluation. The pipelines includes a number of Components that are executed in a sequence.
-- **Components**: Reusable building blocks that define a step in a pipeline. Components can be used to encapsulate code, data, and dependencies for a specific task, such as data preprocessing or model training. Think of them like functions.
-- **Endpoints**: RESTful services that host deployed models for real-time scoring and batch inference. They provide a way to integrate machine learning models into applications.
+- **[Pipelines](#pipelines)**: Workflows that automate the process of training, evaluating, and deploying machine learning models. They can include multiple steps, such as data preprocessing, model training, and model evaluation. The pipelines include a number of Components that are executed in a sequence.
+- **[Components](#component)**: Reusable building blocks that define a step in a pipeline. Components can be used to encapsulate code, data, and dependencies for a specific task, such as data preprocessing or model training. Think of them like functions.
+- **[Endpoints](#endpoints)**: RESTful services that host deployed models for real-time scoring and batch inference. They provide a way to integrate machine learning models into applications.
 
 These assets and resources are managed within the Azure ML workspace, providing a centralized platform for collaboration and management of machine learning projects.
 
+## ML project lifecycle in Azure ML
+
+A `workspace` organizes a project and allows for collaboration for many users all working toward a common objective. Users in a workspace can easily share the results of their runs from `experimentation` in the studio user interface. Or they can use versioned assets for jobs like `environments` and `storage` references.
+
+When a project is ready for operationalization, users' work can be automated in an ML `pipeline` and triggered on a schedule or `HTTPS request`.
+
+You can `deploy models` to the managed inferencing solution, for both real-time and batch deployments, abstracting away the infrastructure management typically required for deploying models.
+
+The following diagram illustrates the ML project lifecycle in Azure ML:
+![ML project lifecycle](images_documentation/overview-ml-development-lifecycle.png)
+
+The ML model lifecycle is defined in the graphic below:
+![ML model lifecycle](images_documentation/model-lifecycle.png)
 
 ### Workspace
 
@@ -122,8 +236,8 @@ For machine learning teams, the workspace is a place to organize their work. Her
 #### Setting up a workspace:
 
 1. Make sure you have a [Microsoft Azure account/subscription](#azure-accountsubscription)
-2. Log into Azure and choose workspaces
-2. Create a new workspace by clicking
+2. Log into Azure ML (http://ml.azure.com) and choose workspaces
+3. Create a new workspace by clicking: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-manage-workspace?view=azureml-api-2&tabs=azure-portal
 
 #### Content stored in a workspace:
 
@@ -166,33 +280,35 @@ Azure ML compute instances are virtual machines that you can use to run your tra
 
 To create a new GPU cluster in Azure ML follow these steps:
 
-1. Log into Azure and choose workspaces
+1. Log into Azure ML and choose workspaces
 2. Choose the workspace you want to create the cluster in
 3. Click on `Compute` in the left menu
 4. Click on `Create` and choose `Compute cluster` tab
-5. Fill in the details for the cluster, such as name, type, and size. Ensure the cluster is GPU-enabled (e.g., Standard_NC6, Standard_NC12, or similar VM types).
+5. Fill in the details for the cluster, such as name, type, and size.
 6. Click `Create` to create the cluster
 
 
-Here is an overview of available compute types in Azure ML:
+Here is an overview of available compute types in Azure ML relevant for ML training:
 
+| **GPU Type**       | **Compute Series**  | **Use Case**                  | **Performance Notes**                          | **GPU Count** | **Recommendation**                   |
+|--------------------|---------------------|-------------------------------|------------------------------------------------|---------------|--------------------------------------|
+| **NVIDIA T4**      | NCas_T4_v3          | Inference, lightweight training | Cost-effective, low power, supports mixed precision | 1             | ✅ *Best for inference* and testing  |
+| **NVIDIA V100**    | NCv3                | Training mid-size models       | Strong FP32/FP16 performance, good memory      | 1–4           | ✅ *Best balance of speed and cost*  |
+| **NVIDIA A100**    | NDv5                | Large-scale model training     | Very high performance, high memory and bandwidth | 1–8           | 🔥 *For large models and fast training* |
 
-| **GPU Type**       | **Compute Instance Series** | **Ideal For**                      | **Key Features**                          | **GPU Count** |
-|---------------------|-----------------------------|-------------------------------------|-------------------------------------------|---------------|
-| NVIDIA T4          | NCas_T4_v3                 | Inference, lightweight training     | Cost-effective, FP32, INT8                | 1             |
-| NVIDIA V100        | NCv3                       | Deep learning training              | High memory, FP32, FP16                   | 1-4           |
-| NVIDIA A100        | NDv5                       | Large-scale distributed training    | Tensor cores, FP64, FP16                  | 1-8           |
-| NVIDIA K80         | NCv2                       | Budget training                     | Older architecture                        | 1-2           |
-| NVIDIA P40         | NCv1                       | Training, inferencing (mid-range)   | Moderate memory and speed                 | 1-2           |
-| NVIDIA A40         | NCas_A40_v4                | Advanced rendering and AI workloads | High performance, flexibility             | 1-2           |
-| NVIDIA A100        | NDv4                       | Deep learning, HPC workloads        | High GPU interconnect (NVLink), FP16, FP64 | 1-8           |
-| No GPU (D16_v5)    | Dv5                        | General-purpose compute workloads   | CPU-based, scalable, cost-efficient       | N/A           |
+---
 
+Choosing the Right Node:
 
-GPU nodes are NC and ND series. NC series are optimized for training deep learning models, while ND series are optimized for large-scale distributed training. The number of GPUs per node can vary from 1 to 8, depending on the series and size of the VM. D series are CPU-based nodes that are cost-effective and scalable for general-purpose compute workloads.
+- **🟢 Training U-Net or similar deep learning models on medium datasets (e.g. ~1000 images, 800×800):**
+  Use **V100 (NCv3)** – it offers a good balance between training speed, memory, and cost. Suitable for most research and development tasks. Typical training cost: €2.50–€3.50 per hour
 
-For inference workloads, you can use the NCas_T4_v3 series, which is optimized for cost-effective inference and lightweight training.
+- **🔵 When cost is a concern, or for early experimentation:**
+  Use **T4 (NCas_T4_v3)** – lower cost, less memory, slower training, but great for early-stage experiments or smaller batch sizes. Cost-effective at ~€0.30–€0.45 per hour.
+  → **Also the best choice for deploying models for inference.**
 
+- **🔴 For high-end training needs (large datasets, large models, or faster results):**
+  Use **A100 (NDv5)** – more expensive but excellent for resource-intensive training. Ideal when training time matters or for very large models. Costs from €4.50+ per hour per GPU
 
 ### Datastore - including how to reference data in a datastore
 
@@ -496,10 +612,12 @@ Once the training job is running or completed you can view the TensorBoard logs 
 
 Azure ML provides robust support for dataset versioning to ensure that the datasets used for machine learning experiments are version-controlled.
 
-### 1. Register a Dataset in Azure ML
+### Register a Dataset in Azure ML
+
 When you register a dataset in Azure ML, it is automatically versioned. Each time you register a dataset with the same name but with different content, a new version is created.
 
 #### Example: Register a Dataset
+
 ```python
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import Data
@@ -527,7 +645,7 @@ ml_client.data.create_or_update(dataset)
 
 ---
 
-### 2. View Dataset Versions
+### View Dataset Versions
 You can query and list all versions of a dataset.
 
 #### List All Versions of a Dataset
@@ -541,7 +659,7 @@ This helps you track changes and identify the dataset version used in an experim
 
 ---
 
-### 3. Use a Specific Dataset Version in an Experiment
+### Use a Specific Dataset Version in an Experiment
 When defining an experiment, you can specify the dataset version explicitly. This ensures that the experiment always uses the intended version of the dataset.
 
 #### Example: Use a Specific Dataset Version
@@ -563,7 +681,7 @@ The `@1` in `azureml:/data/rock-segmentation-dataset@1` specifies the version of
 
 ---
 
-### 4. Dataset Versioning in the Experiment Log
+### Dataset Versioning in the Experiment Log
 Azure ML automatically logs the dataset version used in each experiment. You can view this in Azure ML Studio or programmatically.
 
 #### Retrieve Dataset Information from a Job
@@ -610,7 +728,9 @@ You can also manage dataset versions via the Azure ML Studio:
 ---
 
 ### 8. Integrating with Git and CI/CD
+
 For comprehensive version control:
+
 - Store dataset definitions (e.g., metadata, paths) in Git.
 - Use CI/CD pipelines to register datasets programmatically.
 - Reference dataset versions in model deployment pipelines.
@@ -623,6 +743,28 @@ By leveraging Azure ML’s dataset versioning, you create a reproducible, tracea
 ## AutoML
 
 A step in the prototyping phase. More...
+
+## Example tutorials
+
+We have included one beginners tutorial and two example projects from NGI where we demonstrate the functionality in Azure ML.
+
+### Predicting Titanic survival
+
+TODO: make a repo for this tutorial. Adapt the code to tools and principles used in NGI.
+
+The tutorial handles Azure ML concepts like compute, environment, data asset, tracking, model storage. Functionality is mainly demonstrated in a jupyter notebook.
+
+https://medium.com/henkel-data-and-analytics/how-to-use-azure-ml-studio-an-eye-opening-model-training-tutorial-for-beginners-from-henkels-data-5035ee10a6d2
+
+![Titanic example](example_tutorial_titanic.webp)
+
+### Rock joint detection
+
+coming...
+
+### LabOAI
+
+coming...
 
 ## Learning resources
 

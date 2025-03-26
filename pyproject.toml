@@ -34,6 +34,8 @@ torchinfo = "^1.8.0"
 pillow = "^11.0.0"
 pytest = "^8.3.5"
 pytest-cov = "^6.0.0"
+azure-ai-ml = "^1.26.0"
+azure-identity = "^1.21.0"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"

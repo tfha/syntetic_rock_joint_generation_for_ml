@@ -130,8 +130,12 @@ def train_one_epoch(
             loss = criterion(outputs, masks)
 
         # Backward pass and optimization
+        ######################################################################
+        # The standard way to run backward propagation is to call loss.backward(). When you call .backward() on scaler.scale(loss), you are still running backward propagation on the loss object, but with the gradient values scaled up by a dynamic factor managed by the GradScaler. This means that the optimizer will apply the gradients scaled by the same factor. The net effect is that the optimizer sees gradients that are of the right scale, and the optimizer’s internal heuristics can be used as intended. This will typically improve the numerical stability of training.
         scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
+        scaler.unscale_(
+            optimizer
+        )  # unscale the gradients of optimizer's assigned params in-place before the optimizer's step
         scaler.step(optimizer)
         scaler.update()
 
@@ -380,6 +384,7 @@ def save_image_predictions(
             ax.axis("off")
 
         # Save the figure
+        save_dir.mkdir(parents=True, exist_ok=True)
         save_path = save_dir / f"sample_{idx}.png"
         plt.savefig(save_path)
         plt.close(fig)
