@@ -21,6 +21,12 @@ __pycache__/
 
 .coverage
 
+# Environment variables and secrets
+#######################################
+.env
+.env.local
+*.env
+
 # Data and experiments
 #######################################
 experiments/

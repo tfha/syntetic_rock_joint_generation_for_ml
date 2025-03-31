@@ -21,6 +21,7 @@ Usage:
 """
 
 import os
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -87,10 +88,25 @@ def main(cfg: DictConfig) -> None:
         style="info",
     )
     # Create a unique log directory for each run
-    log_dir = os.path.join(
-        pcfg.tensorboard.path, datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = os.path.join(pcfg.tensorboard.path, timestamp)
     writer = SummaryWriter(log_dir=log_dir)
+
+    # Create directory for example images and clear any existing images
+    example_images_dir = Path(f"{pcfg.experiment.path_example_images}/{timestamp}")
+
+    # Clear any existing example images from previous runs
+    if Path(pcfg.experiment.path_example_images).exists():
+        console.print("Cleaning up existing example images...", style="info")
+        try:
+            shutil.rmtree(pcfg.experiment.path_example_images)
+            console.print("Removed existing example images directory", style="info")
+        except Exception as e:
+            console.print(f"Error removing example images: {e}", style="warning")
+
+    # Create fresh directory for new example images
+    example_images_dir.mkdir(parents=True, exist_ok=True)
+
     seed_everything(pcfg.experiment.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
@@ -252,7 +268,9 @@ def main(cfg: DictConfig) -> None:
         )
     )
     early_stopping = EarlyStopping(
-        patience=pcfg.experiment.early_stopping_patience, verbose=True
+        patience=pcfg.experiment.early_stopping_patience,
+        verbose=True,
+        delta=pcfg.experiment.early_stopping_delta,
     )
 
     # ALTERNATIVE RUNS FOR DEBUG AND CHECKS
@@ -318,6 +336,16 @@ def main(cfg: DictConfig) -> None:
                 epoch=epoch,
             )
 
+            # Save example predictions every 3rd epoch
+            if (epoch + 1) % 3 == 0:
+                save_image_predictions(
+                    model,
+                    test_loader,
+                    device,
+                    num_samples=3,
+                    save_dir=example_images_dir / f"epoch_{epoch + 1}",
+                )
+
             # Step the scheduler
             scheduler.step(metrics_validation["loss"])
 
@@ -343,37 +371,37 @@ def main(cfg: DictConfig) -> None:
         writer.close()
         console.print("Training complete.", style="info")
 
-    # LOG RESULTS AND CONFIG TO MLFLOW
-    ###############################################################
-    console.print("Logging results to mlflow...", style="info")
+        # LOG RESULTS AND CONFIG TO MLFLOW
+        ###############################################################
+        console.print("Logging results to mlflow...", style="info")
 
-    if early_stopping.best_model is not None:
-        console.print("Saving best model...", style="info")
-        model.load_state_dict(early_stopping.best_model)
-        model_path = Path("models/best_model.pth")
-        torch.save(model.state_dict(), model_path)
+        if early_stopping.best_model is not None:
+            console.print("Saving best model...", style="info")
+            model.load_state_dict(early_stopping.best_model)
+            model_path = Path("models/best_model.pth")
+            torch.save(model.state_dict(), model_path)
 
-    if pcfg.experiment.log_mlflow:
-        save_image_predictions(
-            model,
-            test_loader,
-            device,
-            num_samples=3,
-            save_dir=Path("plots/predictions"),
-        )
-        experiment_name = "train_test"
-        log_metrics_to_mlflow(
-            best_metrics,
-            pcfg.model.name,
-            pcfg.model.params,
-            pcfg.experiment.experiment_strategy,
-            experiment_name,
-            tracking_uri=pcfg.mlflow.path,
-            hydra_cfg_dir=HydraConfig.get().run.dir,
-            save_best_metrics=True,
-            track_prediction_images=True,
-            save_model=pcfg.mlflow.save_model,
-        )
+        if pcfg.experiment.log_mlflow:
+            save_image_predictions(
+                model,
+                test_loader,
+                device,
+                num_samples=3,
+                save_dir=Path("plots/predictions"),
+            )
+            experiment_name = "train_test"
+            log_metrics_to_mlflow(
+                best_metrics,
+                pcfg.model.name,
+                pcfg.model.params,
+                pcfg.experiment.experiment_strategy,
+                experiment_name,
+                tracking_uri=pcfg.mlflow.path,
+                hydra_cfg_dir=HydraConfig.get().run.dir,
+                save_best_metrics=True,
+                track_prediction_images=True,
+                save_model=pcfg.mlflow.save_model,
+            )
 
 
 if __name__ == "__main__":

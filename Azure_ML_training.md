@@ -214,6 +214,117 @@ The following diagram illustrates the ML project lifecycle in Azure ML:
 The ML model lifecycle is defined in the graphic below:
 ![ML model lifecycle](images_documentation/model-lifecycle.png)
 
+### Organising and structuring the different resources across ML projects
+
+Recommended structure for most users:
+
+🔹 One resource group per environment or team
+Example: ml-dev, ml-prod, ml-research
+
+Easier to manage access, billing, and lifecycle.
+
+🔹 One Azure ML workspace per environment
+Example: ml-ws-dev, ml-ws-prod
+
+Helps keep things organised between development and production.
+
+🔹 Shared storage account and compute within workspace
+Reuse compute clusters and environments across projects.
+
+Use folder structures or naming conventions to separate projects in the storage.
+
+🔹 Separation by conventions rather than infrastructure
+Use naming conventions for:
+
+Models: project1_model_a
+
+Pipelines: proj2_data_cleaning_pipeline
+
+Experiments: proj3_experiment_xyz
+
+Tag assets by project using metadata or tags.
+
+### Naming conventions
+
+Use consistent, short, lowercase names with hyphens or underscores. Prefix names with the project identifier (`proj1`, `proj2`, etc.) to keep things organised across multiple projects.
+
+### 🔁 General Rules
+- Use only lowercase letters, numbers, hyphens (`-`), or underscores (`_`) where allowed.
+- Keep names short but clear.
+- Use version suffixes where needed (e.g. `_v1`, `_v2`).
+- Add tags to help with filtering, cost tracking, and management.
+
+---
+
+### 🔧 Azure Resources
+
+| Resource Type        | Naming Convention         | Example               |
+|----------------------|---------------------------|-----------------------|
+| Resource group       | `rg-ml-main`              | `rg-ml-main`          |
+| ML workspace         | `ml-ws-main`              | `ml-ws-main`          |
+| Storage account      | `st<project><suffix>`     | `stmlmain`            |
+| Key vault            | `kv-<project>-<env>`      | `kv-ml-main`          |
+| Container registry   | `acr<project>`            | `acrmlmain`           |
+
+> Note: Storage account names must be globally unique, ≤ 24 chars, no hyphens or underscores.
+
+---
+
+### 📁 Storage Containers (in Blob)
+
+| Type        | Naming Convention         | Example            |
+|-------------|---------------------------|--------------------|
+| Raw data    | `proj1-data`              | `proj1-data`       |
+| Processed   | `proj2-outputs`           | `proj2-outputs`    |
+| Models      | `proj2-models`            | `proj2-models`     |
+
+---
+
+### 🧠 ML Assets
+
+| Asset Type   | Naming Convention             | Example                     |
+|--------------|-------------------------------|-----------------------------|
+| Experiment   | `proj1_exp_<task>`            | `proj1_exp_training`        |
+| Dataset      | `proj1_dataset_<type>`        | `proj1_dataset_cleaned`     |
+| Model        | `proj2_model_<algo>_v<ver>`   | `proj2_model_rf_v1`         |
+| Pipeline     | `proj1_pipeline_<stage>`      | `proj1_pipeline_training`   |
+| Environment  | `env-<project>-<lib>`         | `env-proj1-torch112`        |
+
+---
+
+### 🖥️ Compute
+
+| Type            | Naming Convention           | Example              |
+|-----------------|-----------------------------|----------------------|
+| CPU cluster     | `cpu-cluster-<scope>`       | `cpu-cluster-general`|
+| GPU cluster     | `gpu-cluster-<project>`     | `gpu-cluster-proj2`  |
+| Inference       | `infer-cluster-<project>`   | `infer-cluster-proj1`|
+
+---
+
+### 🔐 Secrets (in Key Vault)
+
+| Secret         | Naming Convention              | Example                   |
+|----------------|--------------------------------|---------------------------|
+| API keys       | `proj2-api-key`                | `proj2-api-key`           |
+| DB connection  | `proj1-database-conn`          | `proj1-database-conn`     |
+
+---
+
+### 🏷️ Recommended Tags
+
+Apply these tags across all resources:
+
+```json
+{
+  "project": "proj1",
+  "env": "dev",
+  "owner": "yourname",
+  "purpose": "training"
+}
+```
+
+
 ### Workspace
 
 For machine learning teams, the workspace is a place to organize their work. Here are some of the tasks you can start from a workspace:
@@ -223,7 +334,6 @@ For machine learning teams, the workspace is a place to organize their work. Her
 - Register data assets - Data assets aid in management of the data you use for model training and pipeline creation.
 - Register models - Once you have a model you want to deploy, you create a registered model.
 - Create online endpoints - Use a registered model and a scoring script to create an online endpoint.
-
 
 #### Organising workspaces:
 
@@ -281,11 +391,19 @@ Azure ML compute instances are virtual machines that you can use to run your tra
 To create a new GPU cluster in Azure ML follow these steps:
 
 1. Log into Azure ML and choose workspaces
-2. Choose the workspace you want to create the cluster in
+2. Choose the workspace you want to create the cluster in. Note: the workspace need to be in a region that supports the GPU clusters you want. For example, `North Europe` does not support GPU clusters. Europe North support several clusters.
 3. Click on `Compute` in the left menu
-4. Click on `Create` and choose `Compute cluster` tab
+4. Click on `Compute instances` tab and choose `+ New` to create a new compute instance
 5. Fill in the details for the cluster, such as name, type, and size.
 6. Click `Create` to create the cluster
+
+
+Using azure CLI
+
+```bash
+az ml compute create --name gpu-cluster-ncas8lowcost --type AmlCompute --size Standard_NC8as_T4_v3 --min-instances 0 --max-instances 2 --idle-time-before-scale-down 300 --resource-group rg-rock-joint-detection --workspace-name ws-rock-joint-det
+```
+
 
 
 Here is an overview of available compute types in Azure ML relevant for ML training:
@@ -301,10 +419,10 @@ Here is an overview of available compute types in Azure ML relevant for ML train
 Choosing the Right Node:
 
 - **🟢 Training U-Net or similar deep learning models on medium datasets (e.g. ~1000 images, 800×800):**
-  Use **V100 (NCv3)** – it offers a good balance between training speed, memory, and cost. Suitable for most research and development tasks. Typical training cost: €2.50–€3.50 per hour
+  Use **V100 (NCv3)** – it offers a good balance between training speed, memory, and cost. Suitable for most research and development tasks. Typical training cost: €2.50–€3.50 per hour. Example: 10 hours of training with NC6s_v3 (110 GB RAM) will cost ~ 36$ in North Europe. This is pricing in the "Pay-as-you-go" model. The cost may vary depending on the region and the type of subscription you have.
 
 - **🔵 When cost is a concern, or for early experimentation:**
-  Use **T4 (NCas_T4_v3)** – lower cost, less memory, slower training, but great for early-stage experiments or smaller batch sizes. Cost-effective at ~€0.30–€0.45 per hour.
+  Use **T4 (NCas_T4_v3)** – lower cost, less memory, slower training, but great for early-stage experiments or smaller batch sizes. Cost-effective at ~€0.30–€0.45 per hour. Example: 10 hours of training with NC8as_T4_v3 (56 GB RAM) will cost ~ 11$ in North Europe.
   → **Also the best choice for deploying models for inference.**
 
 - **🔴 For high-end training needs (large datasets, large models, or faster results):**
@@ -337,11 +455,27 @@ Ensure your dataset is structured and ready for machine learning. For example, y
 Azure Blob Storage is a cost-effective, scalable storage solution. Use the Azure CLI or Python SDK to upload your dataset.
 
 ```bash
+# Install Azure CLI if not already installed
+az account set --subscription "your-subscription-name-or-id"
+```
+
+
+```bash
 az storage blob upload-batch \
     --account-name <your-storage-account-name> \
     --container-name <your-container-name> \
     --source <local-folder-path>
 ```
+
+```bash
+az storage blob upload-batch \
+    --account-name <your-storage-account-name> \
+    --container-name azureml-blobstore-d3360a09-af14-4d39-8db4-b77f3097eaf3 \
+    --source <local-folder-path>
+```
+
+
+
 or with Python SDK
 
 ```python

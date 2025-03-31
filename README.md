@@ -9,6 +9,7 @@
 - [Metrics for evaluation](#metrics-for-evaluation)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Hyperparameter Optimization](#hyperparameter-optimization)
 - [Contact](#contact)
 
 ## Introduction
@@ -205,6 +206,26 @@ We illustrate the prediction mask images qualitatively in `fiftyone`, where the 
 
 ## Usage
 
+### Preprocessing the Dataset
+
+If you have mask images with RGB values in the range 0-255 (grayscale or colored masks), you need to preprocess them to a binary format for training. The preprocessing step converts mask images to pure black and white (binary) format, where black pixels (0) represent rock joints and white pixels (255) represent background.
+
+To preprocess your dataset, run:
+
+```sh
+python scripts/preprocess_dataset.py
+```
+
+This script reads mask images from the raw directory specified in your configuration, applies a threshold to convert them to binary format, and saves the processed masks to a binary directory. By default, any pixel with a value less than the threshold (default: 128) will be converted to black (0) to represent rock joints, and all other pixels will be converted to white (255) for the background.
+
+You can customize the threshold value and specify different input/output directories by modifying the configuration file or using command-line arguments:
+
+```sh
+python scripts/preprocess_dataset.py dataset.path_raw_mask_labels=path/to/raw/masks dataset.path_processed_mask_labels=path/to/binary/masks
+```
+
+This preprocessing step is essential for ensuring consistent training inputs and is a prerequisite for running the training script.
+
 ### Train and Evaluate the Model
 
 ```sh
@@ -226,27 +247,211 @@ Some flags are included for quality control and debugging:
 See all options with:
 
 ```sh
-python scripts/train.py --help
+python scripts/train_eval.py --help
 ```
 
 You can stop the training process at any time by pressing `Ctrl + C`. The training process will then be stopped but all the tracking information will be saved in mlflow.
 
-
 ### Training a model in Azure ML
 
-When you run the script locally, Azure ML SDK connects your local machine to the Azure Machine Learning workspace. The script will then upload the training script and the training data to the Azure ML workspace and run the training job on the Azure ML compute instance.
+This project supports training rock joint segmentation models in Azure Machine Learning (Azure ML), providing more computational power, better experiment tracking, and improved dataset management compared to local training.
 
-1. Set up the Azure ML workspace
+#### Key Benefits of Azure ML Training
 
-more will come here ....
+- **Powerful GPU resources**: Access to high-performance GPUs for faster model training
+- **Scalable infrastructure**: Train multiple models in parallel without taxing your local machine
+- **Centralized experiment tracking**: All training runs are automatically logged with MLflow
+- **Dataset versioning**: Proper tracking of dataset versions for reproducibility
+- **Managed compute environments**: Consistent training environments across runs
 
+#### Prerequisites for Azure ML Training
 
+1. An Azure account with an Azure ML workspace
+2. Azure CLI installed and configured
+3. Required environment variables in a `.env` file:
+   ```
+   AZURE_SUBSCRIPTION_ID=your-subscription-id
+   AZURE_RESOURCE_GROUP=rg-rock-joint-detection
+   AZURE_ML_WORKSPACE=ws-rock-joint-det
+   AZURE_BLOB_DATASTORE=rock_data
+   ```
+
+#### Managing Data Assets in Azure ML
+
+The project includes tools for managing datasets as versioned data assets in Azure ML. This approach provides better tracking, versioning, and metadata management for your datasets.
+
+First, register your base datasets in Azure ML:
+
+```sh
+# Register images and masks datasets from blob storage
+python scripts/manage_azure_data_assets.py register-base-datasets
+```
+
+Next, register your train/val/test splits:
+
+```sh
+# Register dataset splits for training
+python scripts/manage_azure_data_assets.py register-splits
+```
+
+You can list and inspect registered datasets:
+
+```sh
+# List all data assets
+python scripts/manage_azure_data_assets.py list-assets
+
+# List all versions of a specific dataset
+python scripts/manage_azure_data_assets.py list-assets --asset-name rock_images
+
+# Compare two versions of a dataset
+python scripts/manage_azure_data_assets.py compare-assets rock_images 1 2
+```
+
+#### Submitting Training Jobs to Azure ML
+
+To submit a job to Azure ML, use the `submit_job_azure.py` script:
+
+```sh
+# Submit a training job with default settings
+python scripts/submit_job_azure.py
+
+# Submit with custom configuration
+python scripts/submit_job_azure.py model=deeplabv3 experiment.experiment_strategy=synthetic_to_real
+```
+
+The script will:
+
+1. Connect to your Azure ML workspace
+2. Retrieve the latest versions of your data assets
+3. Create or update the training environment
+4. Submit a pipeline with training and model registration components
+5. Stream the logs from the remote job
+6. Download results when the job completes
+
+#### Understanding the Azure ML Training Pipeline
+
+The training pipeline consists of the following steps:
+
+1. **Data asset retrieval**: Latest versions of rock joint images and masks are loaded
+2. **Training step**: The model is trained on Azure ML compute using the mounted datasets
+3. **Model registration**: The best model is automatically registered in the Azure ML model registry
+4. **Output collection**: Model files, visualizations, and metrics are stored and downloaded
+
+#### Comparing Local vs Azure ML Training
+
+| Feature | Local Training | Azure ML Training |
+|---------|---------------|-------------------|
+| Compute | Limited to local hardware | Access to powerful GPU clusters |
+| Data handling | Local files | Versioned data assets in blob storage |
+| Environment | Local Poetry environment | Reproducible containerized environment |
+| Tracking | MLflow running locally | MLflow integrated with Azure ML |
+| Scalability | Single training run at a time | Multiple parallel experiments |
+| Cost | Free (but limited) | Pay for cloud resources used |
+| Setup complexity | Simple | Requires Azure account and setup |
+
+#### Example Workflow
+
+A typical workflow for training in Azure ML:
+
+1. **Prepare environment**: Set up Azure ML workspace and environment variables
+2. **Register datasets**: Upload images and masks to blob storage and register as data assets
+3. **Create splits**: Generate and register train/val/test splits
+4. **Configure training**: Adjust hyperparameters and model architecture in configuration
+5. **Submit job**: Run the submission script to launch training in Azure ML
+6. **Monitor progress**: Track metrics in Azure ML Studio or through streaming logs
+7. **Evaluate results**: Analyze downloaded outputs and registered models
+8. **Iterate**: Refine model and dataset versions based on results
+
+For more advanced usage and hyperparameter tuning in Azure ML, refer to the Azure ML documentation or consult with the project maintainers.
 
 ### Hyperparameter Optimization
 
+This project provides tools for hyperparameter optimization both locally and in Azure ML, helping you find the optimal model configuration for rock joint segmentation.
+
+#### Local Hyperparameter Optimization
+
+For local hyperparameter tuning, you can use:
+
 ```sh
-python scripts/optimize.py model=deeplabv3
+python scripts/optimise_hyperparameters.py model=deeplabv3
 ```
+
+This uses Optuna to search for optimal hyperparameters and logs results to MLflow.
+
+#### Azure ML Hyperparameter Optimization
+
+For more powerful and parallelized hyperparameter tuning in Azure ML, we provide a specialized implementation that leverages Azure ML's sweep capabilities with Bayesian optimization.
+
+##### Prerequisites
+
+Make sure you have:
+- Registered your datasets using the data asset management tools
+- Set up your Azure ML environment variables in a `.env` file
+- A GPU compute cluster configured in Azure ML
+
+##### Running Hyperparameter Optimization in Azure ML
+
+To start a hyperparameter optimization job for UNet or DeepLabV3+:
+
+```sh
+# Optimize UNet architecture with Bayesian optimization
+python scripts/optimise_azure_hyperparameters.py --model unet --experiment-strategy synthetic_to_real --max-trials 30
+
+# Optimize DeepLabV3+ architecture
+python scripts/optimise_azure_hyperparameters.py --model deeplabv3plus --experiment-strategy synthetic_to_real --max-trials 30
+```
+
+Available options include:
+- `--model`: Choose between "unet" or "deeplabv3plus"
+- `--experiment-strategy`: The experiment strategy (e.g., "synthetic_to_real")
+- `--epochs`: Maximum number of epochs for each trial
+- `--max-trials`: Maximum number of hyperparameter combinations to try
+- `--concurrent-trials`: Number of trials to run in parallel
+- `--compute-cluster`: Name of the Azure ML compute cluster to use
+
+The script will:
+1. Connect to your Azure ML workspace
+2. Retrieve the latest versions of your datasets
+3. Define model-specific search spaces for the chosen model
+4. Submit a sweep job using Bayesian optimization
+5. Save job tracking information locally for later analysis
+
+##### Search Space
+
+The optimization covers:
+- **Architecture parameters**: Encoder backbones, decoder channels, etc.
+- **Training parameters**: Learning rate, batch size, optimizer settings
+- **Data augmentation**: Random flips, crops, and other transformations
+
+##### Analyzing Results
+
+After your hyperparameter optimization job completes (or while it's running), you can analyze the results:
+
+```sh
+# Analyze using the job info file (recommended)
+python scripts/analyze_hyperparameter_results.py --job-info-file experiments/hyperparameters/job_info_unet_20250328-1234.json
+
+# Or analyze directly with the job name
+python scripts/analyze_hyperparameter_results.py --job-name azureml_job_name_123
+```
+
+This will generate a detailed Markdown report with:
+
+- The best hyperparameter configuration found
+- Top configurations ranked by performance
+- Parameter importance analysis
+- Ready-to-use Hydra configuration for the best parameters
+
+##### Using the Best Hyperparameters
+
+After finding the optimal hyperparameters, you can use them to train your final model:
+
+```sh
+# Train with the best hyperparameters from the report
+python scripts/submit_job_azure.py model=unet model.params.encoder_name=resnet50 model.batch_size=32 model.learning_rate=0.0005
+```
+
+The Bayesian optimization approach efficiently explores the hyperparameter space, requiring far fewer trials than grid search to find optimal settings for your rock joint segmentation models.
 
 ### Inspect the experiment results in MLflow
 
@@ -265,13 +470,13 @@ Open the web interface at `http://localhost:5000` to view and inspect the result
 To run a script without saving hydra configuration files (i.e. for testing purposes), use the following command:
 
 ```sh
-python scripts/train.py hydra.run.dir=NUL hydra.output_subdir=null
+python scripts/train_eval.py hydra.run.dir=NUL hydra.output_subdir=null
 ```
 
 To run a script in debug mode, use the following command:
 
 ```sh
-HYDRA_FULL_ERROR=1 python scripts/train.py
+HYDRA_FULL_ERROR=1 python scripts/train_eval.py
 ```
 
 ### Running Tests

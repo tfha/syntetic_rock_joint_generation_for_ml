@@ -1,4 +1,6 @@
 import random
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
@@ -114,6 +116,13 @@ def log_metrics_to_mlflow(
                 # Log as MLflow artifact
                 mlflow.log_artifact(str(best_metrics_path))
 
+        # Log JSON files from data/model_ready directory as artifacts
+        model_ready_dir = Path("data/model_ready")
+        if model_ready_dir.exists():
+            json_files = [f for f in model_ready_dir.glob("*.json")]
+            for json_file in json_files:
+                mlflow.log_artifact(str(json_file), artifact_path="dataset_files")
+
         # Log Hydra config files as artifacts if provided
         if hydra_cfg_dir:
             hydra_cfg_dir = Path(hydra_cfg_dir)
@@ -152,7 +161,12 @@ def get_custom_console() -> Console:
 
     """
     custom_theme = Theme(
-        {"info": "bold green", "warning": "yellow", "danger": "bold red"}
+        {
+            "info": "bold green",
+            "warning": "yellow",
+            "danger": "bold red",
+            "error": "bold magenta",
+        }
     )
     return Console(theme=custom_theme)
 
@@ -204,3 +218,223 @@ def track_sample_num(func: Callable) -> Callable:
         return res
 
     return df_processing
+
+
+def export_poetry_to_environment_yml(
+    output_file: str = "environment.yml", default_python_version: str = "3.11"
+) -> str:
+    """
+    Export Poetry dependencies to environment.yml format for Azure ML,
+    prioritizing conda packages over pip packages where possible.
+
+    Args:
+        output_file (str): The path where the environment.yml file will be saved.
+        default_python_version (str): Default Python version to use if detection fails.
+
+    Returns:
+        str: The path to the created environment.yml file.
+    """
+    print("Exporting Poetry environment to environment.yml...")
+
+    # Run poetry export to get dependencies in requirements format
+    try:
+        result = subprocess.run(
+            ["poetry", "export", "--format", "requirements.txt", "--without-hashes"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        requirements_raw = result.stdout.strip().split("\n")
+    except subprocess.CalledProcessError as e:
+        print(f"Error exporting Poetry environment: {e}")
+        print(f"Output: {e.stdout}")
+        print(f"Error: {e.stderr}")
+        sys.exit(1)
+
+    # Clean up and parse requirements
+    requirements = []
+    for req in requirements_raw:
+        if req and not req.startswith("#"):
+            # Extract package name without version constraints
+            if ";" in req:  # Handle environment markers
+                req = req.split(";")[0].strip()
+
+            if "==" in req:
+                pkg_name = req.split("==")[0].strip()
+                version = req.split("==")[1].strip()
+                requirements.append((pkg_name, version, req))
+            elif ">=" in req:
+                pkg_name = req.split(">=")[0].strip()
+                requirements.append((pkg_name, None, req))
+            else:
+                pkg_name = req.split("[")[0].strip() if "[" in req else req.strip()
+                requirements.append((pkg_name, None, req))
+
+    # Get Python version from Poetry
+    try:
+        result = subprocess.run(
+            ["python", "--version"], capture_output=True, text=True, check=True
+        )
+        python_version = result.stdout.strip().split(" ")[1]
+    except subprocess.CalledProcessError:
+        python_version = default_python_version
+        print(f"Could not determine Python version, defaulting to {python_version}")
+
+    # Define common packages that should be installed via conda
+    # This list can be expanded based on project needs
+    conda_preferred_packages = {
+        "numpy",
+        "pandas",
+        "matplotlib",
+        "scipy",
+        "scikit-learn",
+        "pytorch",
+        "torch",
+        "torchvision",
+        "pillow",
+        "pyyaml",
+        "requests",
+        "tqdm",
+        "jupyter",
+        "ipython",
+        "notebook",
+        "seaborn",
+        "plotly",
+        "pytest",
+        "flake8",
+        "black",
+        "isort",
+        "mypy",
+        "tensorboard",
+        "mlflow",
+        "opencv",
+        "hydra-core",
+        "rich",
+    }
+
+    # Separate conda and pip packages
+    conda_packages = [f"python={python_version}", "pip"]
+    pip_only_packages = []
+
+    for pkg_name, version, req_str in requirements:
+        pkg_lower = pkg_name.lower()
+
+        # Check if this is a package we prefer to install via conda
+        if pkg_lower in conda_preferred_packages:
+            if version:
+                conda_packages.append(f"{pkg_name}={version}")
+            else:
+                conda_packages.append(pkg_name)
+        else:
+            # Add to pip_only_packages if not in conda preferred list
+            pip_only_packages.append(req_str)
+
+    # Create environment.yml content
+    env_yaml = {
+        "name": "rock-segmentation",
+        "channels": ["conda-forge", "defaults"],
+        "dependencies": conda_packages,
+    }
+
+    # Add pip packages if there are any
+    if pip_only_packages:
+        env_yaml["dependencies"].append({"pip": pip_only_packages})
+
+    # Write to environment.yml
+    with open(output_file, "w") as f:
+        yaml.dump(env_yaml, f, default_flow_style=False, sort_keys=False)
+
+    print(f"Successfully exported Poetry environment to {output_file}")
+    print(f"- Conda packages: {len(conda_packages) - 2}")  # Subtract python and pip
+    print(f"- Pip-only packages: {len(pip_only_packages)}")
+    return output_file
+
+
+if __name__ == "__main__":
+    # Test the export_poetry_to_environment_yml function
+    output_file = "environment.yml"
+    try:
+        result_path = export_poetry_to_environment_yml(output_file=output_file)
+        print(f"Environment file created successfully at: {result_path}")
+    except Exception as e:
+        print(f"An error occurred during the test: {e}")
+
+    # Demonstrate create_results_table and get_custom_console functions
+    console = get_custom_console()
+    console.print("\n=== Custom Console Style Demonstration ===\n")
+
+    # Demonstrate both ways to apply styles: using markup syntax and style parameter
+    console.print("\n=== Method 1: Using markup syntax ===\n")
+    console.print("[info]This is styled with 'info' (bold green)[/info]")
+    console.print("[warning]This is styled with 'warning' (yellow)[/warning]")
+    console.print("[danger]This is styled with 'danger' (bold red)[/danger]")
+    console.print("[error]This is styled with 'error' (bold magenta)[/error]")
+
+    console.print("\n=== Method 2: Using style parameter ===\n")
+    console.print("This is styled with 'info' (bold green)", style="info")
+    console.print("This is styled with 'warning' (yellow)", style="warning")
+    console.print("This is styled with 'danger' (bold red)", style="danger")
+    console.print("This is styled with 'error' (bold magenta)", style="error")
+
+    # Show examples of styles in different contexts using style parameter
+    console.print("\n=== Practical Examples Using Style Parameter ===\n")
+    console.print("INFO: Model training complete. Accuracy: 92.5%", style="info")
+    console.print(
+        "WARNING: Learning rate may be too high. Consider reducing it.", style="warning"
+    )
+    console.print(
+        "DANGER: Out of memory error detected. Process will be terminated.",
+        style="danger",
+    )
+    console.print(
+        "ERROR: Failed to load dataset from path: /data/train.csv", style="error"
+    )
+
+    # Example metrics for demonstration
+    example_metrics = {
+        "loss": 0.2345,
+        "accuracy": 0.9123,
+        "precision": 0.8978,
+        "recall": 0.8765,
+    }
+
+    console.print("\n=== Results Tables ===\n")
+    # Create and display training results table
+    training_table = create_results_table(
+        epoch=0, metrics=example_metrics, session="Training"
+    )
+    console.print(training_table)
+
+    # Create and display validation results table
+    validation_table = create_results_table(
+        epoch=0, metrics=example_metrics, session="Validation"
+    )
+    console.print(validation_table)
+
+    # Demonstrate combining style parameter with other formatting
+    console.print("\n=== Mixing Style Parameter with Other Formatting ===\n")
+    console.print("Starting data preprocessing...", style="info")
+    console.print("Loading training dataset: ", end="")
+    console.print("100% complete", style="bold")
+    console.print("Processing images: ", end="")
+    console.print("100% complete", style="bold")
+    console.print("Data preprocessing complete!", style="info")
+
+    # Simulate training progress with style parameter
+    console.print("\n=== Training Progress Using Style Parameter ===\n")
+    console.print(
+        "Epoch 1/10: Training accuracy: 85.2%, Validation accuracy: 83.7%", style="info"
+    )
+    console.print(
+        "Epoch 2/10: Training accuracy: 87.9%, Validation accuracy: 86.1%", style="info"
+    )
+    console.print("Epoch 3/10: Learning rate reduced due to plateau", style="warning")
+    console.print(
+        "Epoch 3/10: Training accuracy: 88.5%, Validation accuracy: 87.2%", style="info"
+    )
+    console.print("Epoch 4/10: CUDA out of memory. Batch size reduced.", style="error")
+    console.print(
+        "Epoch 4/10: Training accuracy: 89.7%, Validation accuracy: 88.3%", style="info"
+    )
+    console.print("Training stopped: Early stopping triggered", style="danger")
+    console.print("Best model saved with validation accuracy: 88.3%", style="info")

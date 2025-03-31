@@ -10,6 +10,7 @@ Classes:
     MlflowConfig: Configuration for MLflow logging.
     TensorboardConfig: Configuration for Tensorboard logging.
     OptunaConfig: Configuration for Optuna hyperparameter optimization.
+    AzureMLConfig: Configuration for Azure Machine Learning.
     ConfigSchema: The main configuration schema that includes all other configurations.
 Functions:
     testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
@@ -82,6 +83,10 @@ class ExperimentConfig(BaseModel):
     early_stopping_patience: int = Field(
         ..., description="Patience for early stopping in training."
     )
+    early_stopping_delta: float = Field(
+        ...,
+        description="Minimum change in the monitored metric to qualify as an improvement for early stopping.",
+    )
     optional_transforms: bool = Field(
         ..., description="Whether optional image transforms are used."
     )
@@ -93,6 +98,9 @@ class ExperimentConfig(BaseModel):
         ..., description="Whether quality control data is used."
     )
     crossvalidation: bool = Field(..., description="Whether cross-validation is used.")
+    path_example_images: Path = Field(
+        ..., description="Path where example images are saved during training."
+    )
 
 
 class DatasetConfig(BaseModel):
@@ -128,6 +136,16 @@ class OptunaConfig(BaseModel):
     )
 
 
+class AzureMLConfig(BaseModel):
+    compute_name: str = Field(
+        ..., description="Name of the compute cluster to use for Azure ML training."
+    )
+    blob_datastore: str = Field(
+        ..., description="ID of the Azure blob storage datastore."
+    )
+    experiment_name: str = Field(..., description="Name of the experiment in Azure ML.")
+
+
 class ConfigSchema(BaseModel):
     path_project: Path = Field(..., description="Path to the project directory.")
     matplotlib_config_path: Path = Field(
@@ -139,6 +157,7 @@ class ConfigSchema(BaseModel):
     tensorboard: TensorboardConfig
     optuna: OptunaConfig
     dataset: DatasetConfig
+    azure_ml: AzureMLConfig
 
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")

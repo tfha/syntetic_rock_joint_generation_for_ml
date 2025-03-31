@@ -5,9 +5,16 @@
 ### Structure and principles in this repo
 
 - The repo is structured with running scripts in the `scripts` directory which use functionality implemented in a python package in `src/ml_segmentation`.
-- Config values for use in running scripts are mainly defined using the hydra configuration system, seen by adding a hydra decorator to the main functions in the running scripts
+- Config values for use in running scripts are mainly defined using the hydra configuration system, seen by adding a hydra decorator to the main functions in the running scripts.
+- Use hydra config functionality for CLI argument parsing and for loading configuration values from YAML files, not argparse or other libraries.
 - Config values are given in yaml files in a `config`directory in the `scripts` directory
 - Since I have defined the `ml_segmentation` package as include from `src` in the `pyproject.toml` file you can import functionality from the package using only `ml_segmentation`.
+- Configuration management follows a strict pattern:
+  - Hydra is used ONLY in the running scripts (in `scripts` directory) to load configuration values from YAML files
+  - Configuration values are validated using Pydantic models defined in `schema_config.py`
+  - The validated Pydantic model (`pcfg`) should be used throughout the code, NOT the raw Hydra config (`cfg`)
+  - No Hydra imports or usage should appear in the package functionality (in `ml_segmentation` package)
+  - This approach provides: 1) Type safety with IDE completion, 2) Validation of required fields, 3) Centralized configuration management, and 4) Clear separation between configuration and functionality
 
 ### General principles for code formatting and design
 
@@ -17,6 +24,11 @@
 - Functions that are only used by other functions should have an underscore as the first character in the name
 - Constants names should use capital letters
 - Write code with a maximum of 88 characters on each line.
+
+### General principles for machine learning development
+
+- Use sound principles for MLOps, such as reproducibility, versioning, and modularity
+- The main principle should be to develop code that is easy to protoype and run locally, but is then easy to run in a cloud environment, predominantly using Azure ML
 
 ### Python code - special principles
 
@@ -60,6 +72,12 @@ Organising and running tests:
 
 ## Code review instructions
 
+Use the principles defined in the code-generation instructions to review the code.
+
 ## Commit message generation instructions
 
+Include a main message at the top, and bullet list of changes made in the commit.
+
 ## Pull request title and description generation instructions
+
+Use informative titles and descriptions for the pull request. The title should be a short summary of the changes made, and the description should provide more detail about the changes, including any relevant context or background information. The description should also include any relevant links to issues or discussions related to the changes made in the pull request.

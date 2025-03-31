@@ -343,7 +343,22 @@ def save_image_predictions(
     num_samples: int = 3,
     threshold: float = 0.5,
     save_dir: Path = Path("plots/predictions"),
+    epoch: int = None,
+    exp_tag: str = None,
 ) -> None:
+    """
+    Save predictions from the model as images.
+
+    Args:
+        model (nn.Module): The model to use for predictions.
+        dataloader (torch.utils.data.DataLoader): DataLoader for the data.
+        device (torch.device): Device to run the inference on (CPU or GPU).
+        num_samples (int, optional): Number of samples to visualize. Defaults to 3.
+        threshold (float, optional): Threshold for binary predictions. Defaults to 0.5.
+        save_dir (Path, optional): Directory to save the images. Defaults to Path("plots/predictions").
+        epoch (int, optional): Current epoch number for filename. Defaults to None.
+        exp_tag (str, optional): Experiment tag/timestamp for filename. Defaults to None.
+    """
     model.eval()
     samples = random.sample(list(dataloader), num_samples)
 
@@ -383,8 +398,15 @@ def save_image_predictions(
         for ax in axes:
             ax.axis("off")
 
+        # Create a unique filename
+        filename = f"sample_{idx}"
+        if epoch is not None:
+            filename = f"{filename}_epoch_{epoch}"
+        if exp_tag is not None:
+            filename = f"{filename}_{exp_tag}"
+
         # Save the figure
         save_dir.mkdir(parents=True, exist_ok=True)
-        save_path = save_dir / f"sample_{idx}.png"
+        save_path = save_dir / f"{filename}.png"
         plt.savefig(save_path)
         plt.close(fig)
