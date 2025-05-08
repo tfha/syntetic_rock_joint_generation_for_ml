@@ -11,7 +11,7 @@
 - Since I have defined the `ml_segmentation` package as include from `src` in the `pyproject.toml` file you can import functionality from the package using only `ml_segmentation`.
 - Configuration management follows a strict pattern:
   - Hydra is used ONLY in the running scripts (in `scripts` directory) to load configuration values from YAML files
-  - Configuration values are validated using Pydantic models defined in `schema_config.py`
+  - Configuration values are validated using Pydantic models defined in `schema_config.py`. When you add a new config value you should also add it to the Pydantic model in `schema_config.py`.
   - The validated Pydantic model (`pcfg`) should be used throughout the code, NOT the raw Hydra config (`cfg`)
   - No Hydra imports or usage should appear in the package functionality (in `ml_segmentation` package)
   - This approach provides: 1) Type safety with IDE completion, 2) Validation of required fields, 3) Centralized configuration management, and 4) Clear separation between configuration and functionality
@@ -36,7 +36,7 @@
 - Use type annotated code with the newest syntax
 - For type annotation, use for example: tuple instead of Tuple, list instead of List, str | int instead of Union[str, int], int | None instead of Optional[int, None]
 - For type annotating numpy arrays, use NDarray from numpy.typing
-- For Python packages with near similar functionality, choose the Python libraries: pathlib instead of os, opencv instead of PIL, httpx instead of request,  click instead of argparse, pytest instead of unittest
+- For Python packages with near similar functionality, choose the Python libraries: pathlib instead of os, opencv instead of PIL, httpx instead of request,  click instead of argparse, pytest instead of unittest, Azure ML Python SDK v2 instead of v1, and hydra instead of other libraries for configuration management, rich progress bar instead of tqdm, and matplotlib instead of seaborn.
 - Use the object-oriented way of coding in matplotlib, ie. ax.plot() instead of plt.plot()
 - When inputting a path in a function, use Path from pathlib, not a string
 - Use the google docstring format for documenting.

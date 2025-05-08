@@ -73,26 +73,42 @@ def create_azure_datasets(
 
 
 def setup_azure_dataloader(
-    pcfg,
     images_path: Path,
     labels_path: Path,
     train_prefixes_list: list[str],
     test_prefixes_list: list[str],
+    batch_size: int,
+    num_workers: int,
+    train_fraction: float,
+    val_fraction: float,
+    test_fraction: float,
+    optional_transforms: bool = False,
+    splits_path: Path = None,
+    use_registered_splits: bool = False,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
     Uses Azure ML mounted paths for dataset inputs.
 
     Args:
-        pcfg: Project configuration
         images_path: Path to the images directory
         labels_path: Path to the labels directory
         train_prefixes_list: List of prefixes for training files
         test_prefixes_list: List of prefixes for test files
+        batch_size: Batch size for the dataloaders
+        num_workers: Number of workers for data loading
+        train_fraction: Fraction of data to use for training
+        val_fraction: Fraction of data to use for validation
+        test_fraction: Fraction of data to use for testing
+        optional_transforms: Whether to use optional data augmentation
+        splits_path: Optional path to the directory containing registered splits
+        use_registered_splits: Whether to use registered splits from Azure ML
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
     """
+    import json
+
     # Check if directories exist
     if not images_path.exists():
         raise ValueError(f"Images directory does not exist: {images_path}")
@@ -108,23 +124,70 @@ def setup_azure_dataloader(
     print(f"Sample mask files: {[f.name for f in mask_files[:5]]}")
 
     # Get transformations
-    transforms_dict = get_transforms(
-        optional_transforms=pcfg.experiment.optional_transforms
-    )
+    transforms_dict = get_transforms(optional_transforms=optional_transforms)
 
-    # Get data files
-    train_files, test_files = get_data_files(
-        images_path, labels_path, train_prefixes_list, test_prefixes_list
-    )
+    # Check if using registered splits
+    if splits_path is not None and splits_path.exists() and use_registered_splits:
+        print(f"Using registered splits from: {splits_path}")
 
-    # Split data
-    train_list, val_list, test_list = split_data(
-        train_files,
-        test_files,
-        train_frac=pcfg.experiment.train_fraction,
-        val_frac=pcfg.experiment.val_fraction,
-        test_frac=pcfg.experiment.test_fraction,
-    )
+        # Look for train/val/test split files
+        train_file = splits_path / "train_files.json"
+        val_file = splits_path / "val_files.json"
+        test_file = splits_path / "test_files.json"
+
+        # Load splits if available
+        if train_file.exists() and test_file.exists():
+            with open(train_file, "r") as f:
+                train_list = json.load(f)
+
+            val_list = []
+            if val_file.exists():
+                with open(val_file, "r") as f:
+                    val_list = json.load(f)
+
+            with open(test_file, "r") as f:
+                test_list = json.load(f)
+
+            print(
+                f"Loaded splits from registered files: train={len(train_list)}, val={len(val_list)}, test={len(test_list)}"
+            )
+
+            # Log to MLflow if in Azure ML environment
+            if os.environ.get("AZUREML_RUN_ID"):
+                mlflow.log_param("registered_train_samples", len(train_list))
+                mlflow.log_param("registered_val_samples", len(val_list))
+                mlflow.log_param("registered_test_samples", len(test_list))
+        else:
+            print(
+                "Registered splits files not found, falling back to strategy-based filtering"
+            )
+            # Fall back to strategy-based filtering
+            train_files, test_files = get_data_files(
+                images_path, labels_path, train_prefixes_list, test_prefixes_list
+            )
+
+            # Split data
+            train_list, val_list, test_list = split_data(
+                train_files,
+                test_files,
+                train_frac=train_fraction,
+                val_frac=val_fraction,
+                test_frac=test_fraction,
+            )
+    else:
+        # Get data files using strategy-based filtering
+        train_files, test_files = get_data_files(
+            images_path, labels_path, train_prefixes_list, test_prefixes_list
+        )
+
+        # Split data
+        train_list, val_list, test_list = split_data(
+            train_files,
+            test_files,
+            train_frac=train_fraction,
+            val_frac=val_fraction,
+            test_frac=test_fraction,
+        )
 
     # Log dataset splits
     print(
@@ -151,23 +214,23 @@ def setup_azure_dataloader(
     # Create data loaders
     train_loader = DataLoader(
         train_dataset,
-        batch_size=pcfg.model.batch_size,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=pcfg.experiment.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=pcfg.model.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=pcfg.experiment.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
     )
     test_loader = DataLoader(
         test_dataset,
-        batch_size=pcfg.model.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=pcfg.experiment.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
     )
 

@@ -7,6 +7,7 @@ including versioning, metadata management, and data lineage tracking.
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -15,8 +16,57 @@ from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
 from azure.identity import DefaultAzureCredential
+from dotenv import load_dotenv
 
 from ml_segmentation.utility import get_custom_console
+
+
+def setup_azure_environment(console=None):
+    """Set up the Azure environment and return a console for pretty printing.
+
+    This function loads environment variables from .env file,
+    validates Azure credentials, and returns a console object.
+
+    Args:
+        console: Optional console object for pretty printing. If None, a new console is created.
+
+    Returns:
+        tuple: (console, subscription_id, resource_group, workspace_name)
+    """
+    # Load environment variables from .env file
+    load_dotenv()
+
+    # Create a console for pretty printing if not provided
+    if console is None:
+        console = get_custom_console()
+
+    # Check if Azure environment variables are set
+    subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
+    resource_group = os.environ.get("AZURE_RESOURCE_GROUP")
+    workspace_name = os.environ.get("AZURE_ML_WORKSPACE")
+
+    if not subscription_id:
+        console.print(
+            "Error: AZURE_SUBSCRIPTION_ID environment variable not set", style="error"
+        )
+        console.print(
+            "Please set it in your .env file: AZURE_SUBSCRIPTION_ID='your-subscription-id'",
+            style="error",
+        )
+        sys.exit(1)
+
+    if not resource_group:
+        console.print(
+            "Warning: AZURE_RESOURCE_GROUP environment variable not set",
+            style="warning",
+        )
+
+    if not workspace_name:
+        console.print(
+            "Warning: AZURE_ML_WORKSPACE environment variable not set", style="warning"
+        )
+
+    return console, subscription_id, resource_group, workspace_name
 
 
 def connect_to_azure_ml(
@@ -48,7 +98,7 @@ def connect_to_azure_ml(
 
     try:
         ml_client = MLClient(
-            DefaultAzureCredential(),
+            credential=DefaultAzureCredential(),
             subscription_id=subscription_id,
             resource_group_name=resource_group,
             workspace_name=workspace_name,
@@ -79,7 +129,7 @@ def register_data_asset(
     create_new_version: bool = True,
 ) -> Data:
     """
-    Register a data asset with Azure ML with proper versioning and metadata.
+    Uploads and register a data asset with Azure ML with proper versioning and metadata.
 
     Args:
         ml_client: Azure ML client
@@ -127,44 +177,36 @@ def register_data_asset(
             )
 
     try:
-        # Check if the dataset already exists with this version
-        try:
-            existing_data = (
-                ml_client.data.get(name=name, version=version) if version else None
-            )
-            if existing_data and not create_new_version:
-                console.print(
-                    f"Data asset '{name}:{version}' already exists, updating",
-                    style="info",
-                )
-                # Update the existing data asset
-                data_asset = Data(
-                    name=name,
-                    description=description,
-                    path=path,
-                    type=asset_type,
-                    tags=tags,
-                    metadata=metadata,
-                    version=version,
-                )
-                return ml_client.data.create_or_update(data_asset)
-
-        except Exception:
-            # Data doesn't exist with this version, or we're creating a new version
-            pass
-
-        # Create new data asset
-        data_asset = Data(
+        # Create the data asset directly with all required parameters
+        # This follows the exact pattern from the Azure ML SDK v2 documentation
+        my_data = Data(
             name=name,
+            version=version,
             description=description,
             path=path,
             type=asset_type,
-            tags=tags,
-            metadata=metadata,
-            version=version if version else None,
         )
 
-        result = ml_client.data.create_or_update(data_asset)
+        # Set optional properties if provided
+        if tags:
+            my_data.tags = tags
+        if metadata:
+            my_data.metadata = metadata
+
+        # Check if dataset already exists with this version
+        try:
+            existing_data = ml_client.data.get(name=name, version=version)
+            console.print(
+                f"Data asset already exists. Name: {name}, version: {version}",
+                style="info",
+            )
+            if not create_new_version:
+                return existing_data
+        except Exception:
+            pass  # Data doesn't exist with this version, continue with creation
+
+        # Register/update the data asset
+        result = ml_client.data.create_or_update(my_data)
         console.print(
             f"Successfully registered data asset '{name}' with version {result.version}",
             style="success",

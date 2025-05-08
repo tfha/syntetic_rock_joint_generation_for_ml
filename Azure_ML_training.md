@@ -1,57 +1,76 @@
 # Azure ML documentation
 
-TODO: Move this tutorial to a new repo in NGI, including the Titanic example.
+<!-- TODO: Implement the Titanic example (standard ML) and a computer vision task, with a "geotechnical" open access database. More about the titanic example here: https://medium.com/henkel-data-and-analytics/how-to-use-azure-ml-studio-an-eye-opening-model-training-tutorial-for-beginners-from-henkels-data-5035ee10a6d2 -->
 
+Azure ML is a powerful tool for machine learning and data science. It provides a comprehensive set of features for building, training, and deploying machine learning models. In this document, we will cover the basics of Azure ML, including how to set up your environment, create and manage resources, and train and deploy models. We will exemplify the use of Azure ML with two examples:
+
+- Conventional ML: Titanic survival prediction
+- Computer vision: Classification of rock type in images
 
 ## Table of Contents
-- [Azure ML](#azure-ml)
+
+- [Azure ML Documentation](#azure-ml-documentation)
   - [Table of Contents](#table-of-contents)
-  - [Tools- and system setup](#tools--and-system-setup)
-    - [Azure account](#azure-account)
-    - [Azure subscription](#azure-subscription)
+  - [Related Azure Concepts](#related-azure-concepts)
+    - [Azure Portal](#azure-portal)
+    - [Azure ML](#azure-ml)
+      - [Batch vs Real-Time Inference](#batch-vs-real-time-inference)
+    - [Azure AI Foundry Portal](#azure-ai-foundry-portal)
+    - [Azure DevOps](#azure-devops)
+  - [Tools and System Setup](#tools-and-system-setup)
+    - [Azure Account](#azure-account)
+    - [Azure Subscription](#azure-subscription)
     - [Azure CLI](#azure-cli)
-    - [VSCode integrated with Azure ML](#vscode-integrated-with-azure-ml)
-  - [Azure Assets and Resources](#azure-assets-and-resources)
-    - [Workspace](#workspace)
-      - [Organising workspaces:](#organising-workspaces)
-      - [Setting up a workspace:](#setting-up-a-workspace)
-      - [Content stored in a workspace:](#content-stored-in-a-workspace)
-      - [Connect to a workspace:](#connect-to-a-workspace)
-    - [Compute instance](#compute-instance)
-    - [Datastore - including how to reference data in a datastore](#datastore---including-how-to-reference-data-in-a-datastore)
-      - [1. Prepare and upload your dataset to Azure blob storage](#1-prepare-and-upload-your-dataset-to-azure-blob-storage)
-      - [2. Register the dataset](#2-register-the-dataset)
+    - [Azure App Service](#azure-app-service)
+    - [Azure ML Python SDKv2](#azure-ml-python-sdkv2)
+    - [VSCode Integrated with Azure ML](#vscode-integrated-with-azure-ml)
+  - [Azure ML Resources and Assets](#azure-ml-resources-and-assets)
+    - [Resources vs Assets](#resources-vs-assets)
+    - [Hierarchy Overview](#hierarchy-overview)
+    - [What Belongs Where?](#what-belongs-where)
+    - [Recommended Project Structure](#recommended-project-structure)
+    - [Naming Conventions](#naming-conventions)
+    - [Tagging](#tagging)
+    - [Inside the Workspace](#inside-the-workspace)
+    - [Workspace Administration](#workspace-administration)
+    - [Deployment and Pipelines](#deployment-and-pipelines)
+    - [General Best Practices](#general-best-practices)
+    - [Visual Summary](#visual-summary)
+    - [Billing and Lifecycle Management](#billing-and-lifecycle-management)
+  - [Resources - Setting Things Up](#resources---setting-things-up)
+    - [Setting Up and Connecting to a Workspace](#setting-up-and-connecting-to-a-workspace)
+      - [Setting Up a Workspace](#setting-up-a-workspace)
+      - [Content Stored in a Workspace](#content-stored-in-a-workspace)
+      - [Connect to a Workspace](#connect-to-a-workspace)
+    - [Compute Instance](#compute-instance)
+    - [Datastore - Including How to Reference Data in a Datastore](#datastore---including-how-to-reference-data-in-a-datastore)
+      - [Prepare and Upload Your Dataset to Azure Blob Storage](#prepare-and-upload-your-dataset-to-azure-blob-storage)
+      - [Register the Dataset](#register-the-dataset)
+  - [Assets - Setup, Creating and Managing](#assets---setup-creating-and-managing)
     - [Environment](#environment)
     - [Models](#models)
     - [Pipelines](#pipelines)
     - [Component](#component)
-  - [Training a model in Azure ML](#training-a-model-in-azure-ml)
-    - [Typical workflow for training a model in Azure ML](#typical-workflow-for-training-a-model-in-azure-ml)
-    - [Complete script for training a model in Azure ML](#complete-script-for-training-a-model-in-azure-ml)
-  - [Experiment tracking in Azure ML](#experiment-tracking-in-azure-ml)
+  - [Training a Model in Azure ML](#training-a-model-in-azure-ml)
+    - [Typical Workflow for Training a Model in Azure ML](#typical-workflow-for-training-a-model-in-azure-ml)
+    - [Complete Script for Training a Model in Azure ML](#complete-script-for-training-a-model-in-azure-ml)
+  - [Experiment Tracking in Azure ML](#experiment-tracking-in-azure-ml)
     - [MLflow](#mlflow)
     - [Tensorboard](#tensorboard)
-  - [Dataset versioning in Azure ML](#dataset-versioning-in-azure-ml)
+  - [Dataset Versioning in Azure ML](#dataset-versioning-in-azure-ml)
     - [Register a Dataset in Azure ML](#register-a-dataset-in-azure-ml)
-      - [Example: Register a Dataset](#example-register-a-dataset)
     - [View Dataset Versions](#view-dataset-versions)
-      - [List All Versions of a Dataset](#list-all-versions-of-a-dataset)
     - [Use a Specific Dataset Version in an Experiment](#use-a-specific-dataset-version-in-an-experiment)
-      - [Example: Use a Specific Dataset Version](#example-use-a-specific-dataset-version)
     - [Dataset Versioning in the Experiment Log](#dataset-versioning-in-the-experiment-log)
-      - [Retrieve Dataset Information from a Job](#retrieve-dataset-information-from-a-job)
-    - [5. Benefits of Dataset Versioning](#5-benefits-of-dataset-versioning)
-    - [6. Updating Datasets](#6-updating-datasets)
-      - [Register a New Version](#register-a-new-version)
-    - [7. Data Asset Management in Azure ML Studio](#7-data-asset-management-in-azure-ml-studio)
-    - [8. Integrating with Git and CI/CD](#8-integrating-with-git-and-cicd)
-  - [AutoML](#automl)
-  - [Example tutorials](#example-tutorials)
-    - [Predicting Titanic survival](#predicting-titanic-survival)
-    - [Rock joint detection](#rock-joint-detection)
+    - [Benefits of Dataset Versioning](#benefits-of-dataset-versioning)
+    - [Updating Datasets](#updating-datasets)
+    - [Data Asset Management in Azure ML Studio](#data-asset-management-in-azure-ml-studio)
+    - [Integrating with Git and CI/CD](#integrating-with-git-and-cicd)
+  - [Example Tutorials](#example-tutorials)
+    - [Predicting Titanic Survival](#predicting-titanic-survival)
+    - [Rock Joint Detection](#rock-joint-detection)
     - [LabOAI](#laboai)
-  - [Learning resources](#learning-resources)
-
+  - [Learning Resources](#learning-resources)
 
 ---
 
@@ -65,11 +84,33 @@ Azure Portal is the web-based interface for managing Azure resources. It provide
 
 ### Azure ML
 
-Azure ML is a cloud-based service for creating, managing, and deploying machine learning models. It provides a centralized place for data scientists and developers to work with all the artifacts for machine learning, including datasets, training scripts, and trained models. You can create a model in Azure ML or use a model built from an open-source platform, such as PyTorch, TensorFlow, or scikit-learn. Azure ML make it easy to scale your ML training by harnessing powerful cloud compute resources, such as nodes with several GPU's with lots of memory. Azure ML is for individuals and teams implementing `MLOps` within their organization to bring ML models into production in a secure and auditable production environment. You reach Azure ML through http://ml.azure.com.
+Azure ML is a cloud-based service for creating, managing, and deploying machine learning models. It provides a centralized place for data scientists and developers to work with all the artifacts for machine learning, including datasets, training scripts, and trained models.
+
+Azure ML make it easy to scale your ML training by harnessing powerful cloud compute resources, such as nodes with several GPU's with lots of memory. Azure ML is for individuals and teams implementing `MLOps` within their organization to bring ML models into production in a secure and auditable production environment. You reach Azure ML through http://ml.azure.com.
+
+Azure ML provides multiple ways to submit ML training jobs.
+
+- Azure CLI extension for machine learning: The ml extension, also referred to as CLI v2.
+- Python SDK v2 for Azure Machine Learning.
+- REST API: The API that the CLI and SDK are built on.
+
+To train and create an ML model you can also use [Azure ML Designer](https://learn.microsoft.com/en-us/azure/machine-learning/concept-designer?view=azureml-api-2). We will focus on using the Python SDK v2 for Azure Machine Learning in this document. The Python SDK provides a rich set of features for managing Azure ML resources, running experiments, and deploying models directly from your development environment.
+
+To manage the Azure ML resources, we will use the Azure ML Studio. The studio provides a user-friendly way to create and manage machine learning resources, including datasets, compute instances, and models. You can access the [Azure ML Studio](http://ml.azure.com). We will mainly use the Azure ML Studio for managing resources, but will use the Python SDK for training and deploying models.
+
+When a model is trained and registered, it can be deployed to an API endpoint for real-time inferencing or batch inferencing. Azure ML provides a set of tools and services to manage the entire machine learning lifecycle, including data preparation, model training, deployment, and monitoring.
+
+> **ℹ️ Batch vs Real-Time Inference**
+>
+> - **Batch Inference**: Making predictions on many data points at once, usually on a schedule or triggered manually. It’s typical in offline settings where speed per prediction is not critical.
+>   **Examples**: Predicting credit scores for all customers overnight, analyzing sensor logs once per day.
+>
+> - **Real-Time Inference (Online Inference)**: Making predictions immediately as data arrives, with low latency. It’s used when decisions must be made quickly.
+>   **Examples**: Fraud detection during a credit card transaction, personalized recommendations when you visit a website.
 
 Azure ML has a comprehensive documentation. In this documentation for a `code academy course` in MLOps and professional ML development in Azure ML we have tried to simplify the most important parts of Azure ML and to extract the parts which currently are most relevant for NGI.
 
-In this tutorial we have listed the parts in a typical MLOps workflow that is facilitated by Azure ML. We will describe and run these operations mainly in the form of Python scripts, but the experiments, the models and other artifacts will be visualised in `Azure ML studio`: http://ml.azure.com.
+In this tutorial we have listed the parts in a typical MLOps workflow that is facilitated by Azure ML. We will describe and run these operations mainly in the form of Python scripts, but the experiments, the models and other artifacts will be visualised in the Azure ML Studio.
 
 The main operations carried out in Azure ML Studio are:
 
@@ -80,11 +121,12 @@ The main operations carried out in Azure ML Studio are:
 - Experiment tracking to mlflow and/or tensorboard
 - Dataset versioning
 - Model versioning
-- Model packaging, registration and deployment
+- Model packaging, registration and deployment, mainly using an API endpoint
 - Monitoring of deployed models
 - Retraining of deployed models
+- Hosting GUI/application for model inferencing using the API endpoint. For this we will mainly use `Azure App Service`, but other options are available, such as `Azure Functions` and `Azure Kubernetes Service (AKS)`.
 
-MLOps steps not covered by Azure ML can be found in the [MLOps](MLOps.md) document.
+MLOps steps not covered by Azure ML can be found in the [MLOps](MLOps.md) document in this repo. These steps include: coming...
 
 There are a few other tools which can be accessed through Azure ML Studio, such as `AutoML`, `Data labeling`, and `Azure ML designer`. These tools are not covered in detail in this document, but they can be useful for specific use cases.
 
@@ -104,17 +146,19 @@ Reference: https://learn.microsoft.com/en-us/azure/machine-learning/concept-auto
 
 Azure ML Data Labeling is a feature that helps users annotate and label data for machine learning tasks. It provides a user-friendly interface for creating and managing labeling projects, allowing users to upload datasets, define labeling tasks, and collaborate with labelers. Data Labeling supports various types of data, including images, text, and audio. Users can create custom labeling tasks, such as object detection, image classification, and text classification. The labeled data can then be used to train machine learning models in Azure ML. Data Labeling is particularly useful for users who need to prepare large datasets for supervised learning tasks.
 
+Some of you have perhaps heard about `Labelstudio`, which is a popular open-source tool for data labeling. Azure data labelling is a similar tool, but it is integrated into Azure ML and provides a more streamlined experience for users working within the Azure ecosystem.
+
 Reference: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-label-data?view=azureml-api-2
 
 #### References:
 
 - https://learn.microsoft.com/en-us/azure/machine-learning/concept-model-management-and-deployment?view=azureml-api-2
-https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
+- https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
 - https://medium.com/henkel-data-and-analytics/how-to-use-azure-ml-studio-an-eye-opening-model-training-tutorial-for-beginners-from-henkels-data-5035ee10a6d2
 
 ### Azure AI Foundry portal
 
- Azure AI Foundry portal is a unified platform for developing and deploying `generative AI apps` and Azure AI APIs responsibly. It includes a rich set of AI capabilities, simplified user interface and code-first experiences, offering a one-stop shop to build, test, deploy, and manage intelligent solutions. Generative AI development is not the main topic of this document, but it is worth mentioning that Azure AI Foundry portal is a powerful tool for building and deploying generative AI applications. It provides a set of pre-built models and APIs for common tasks, such as text generation, image generation, and speech synthesis. The portal also includes tools for managing and monitoring the performance of your applications. Azure AI Foundry portal is a good choice for users who want to quickly build and deploy generative AI applications without having to worry about the underlying infrastructure.
+ Azure AI Foundry portal is a unified platform for developing and deploying `generative AI apps` and Azure AI APIs responsibly. It includes a rich set of AI capabilities, simplified user interface and code-first experiences, offering a one-stop shop to build, test, deploy, and manage intelligent solutions. Generative AI development is not the main topic of this document, but it is worth mentioning that Azure AI Foundry portal is a powerful tool for building and deploying generative AI applications. It provides a set of pre-built models and APIs for common tasks, such as text generation, image generation, and speech synthesis. The portal also includes tools for managing and monitoring the performance of your applications. Azure AI Foundry portal is a good choice for users who want to quickly build and deploy generative AI applications in a safe and secure way without having to worry about the underlying infrastructure.
 
  Reference: https://learn.microsoft.com/en-us/azure/ai-foundry/?view=azure-ai-foundry-portal&tabs=python-sdk#overview
 ### Azure DevOps
@@ -171,25 +215,31 @@ Other handy extensions to install in VSCode are:
 - Azure Resources - This extension provides a tree view of your Azure resources, allowing you to easily navigate and manage your Azure resources directly from the VSCode interface. It provides a user-friendly interface for creating, deleting, and managing Azure resources.
 - Azure tools - This extension provides a set of tools for managing Azure resources, including Azure Functions, Azure Logic Apps, and Azure App Service. It allows you to create, deploy, and manage Azure resources directly from the VSCode environment.
 
+## Azure ML Resources and Assets
 
+This document describes how to organize, structure, and name Azure `resources` and `assets` to support machine learning projects in our company, including research and commercial projects.
 
-## Azure Assets and Resources
+### Resources vs Assets
 
 Azure `assets` and `resources` are fundamental components required to build, deploy, and manage machine learning models in Azure ML. These include:
 
-**Resources**: setup or infrastructural resources needed to run a machine learning workflow. Resources include:
+**Resources**: setup or infrastructural resources needed to run a machine learning workflow. Some important resources are:
 
 - **[Workspace](#workspace)**: A centralized place to store and manage machine learning assets and resources.
 - **[Compute Resources](#compute-instance)**: Virtual machines or clusters used to run training jobs, experiments, and deployments. Examples include Azure ML Compute Instances and Compute Clusters.
 - **[Datastore](#datastore---including-how-to-reference-data-in-a-datastore)**: A centralized place to store the training data. Collections of data used for training and evaluating machine learning models. Data can be stored in various formats and locations, such as Azure Blob Storage, Azure Data Lake, or Azure SQL Database.
+- **[Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/basic-concepts)**: A secure storage solution for sensitive information, such as API keys, connection strings, and certificates. Key Vault helps manage secrets and access control for Azure resources.
+- **[Application Insights](https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview)**: A monitoring service that provides insights into the performance and usage of your applications. It helps track application health, diagnose issues, and analyze user behavior.
+- **[Container Registry](https://learn.microsoft.com/en-us/azure/container-registry/)**: A managed Docker container registry service that allows you to store and manage Docker images for your applications. It provides a secure and scalable solution for managing container images.
+- **[API Management](https://learn.microsoft.com/en-us/azure/api-management/api-management-key-concepts)**: A service that helps manage and secure APIs. It provides features such as authentication, rate limiting, and monitoring for APIs, making it easier to expose and manage APIs securely.
 
 Resources need to be created within a `Resource group`. A resource group is a logical container that holds related Azure resources. It allows you to manage and organize your resources based on your project or application needs. You can create a resource group in the Azure portal or using Azure CLI. When creating a resource group, you need to specify a name and a region where the resources will be located. The region determines the physical location of the resources and can affect performance and cost. For the `RockJointDetection` project we have created a resource group called `rg-rock-joint-detection` in the `Norway East` region. You can check your resource groups in the Azure portal by clicking on `Resource groups` in the top menu.
 
-**Assets**: created using Azure Machine Learning commands or as part of a training/scoring run. Assets are versioned and can be registered in the Azure Machine Learning workspace. They include:
+**Assets**: created using Azure Machine Learning commands or as part of a training/scoring run. Assets are versioned and can be registered in the Azure Machine Learning workspace. Some important assets are:
 
 - **[Models](#models)**: Serialized versions of trained machine learning models that can be registered, versioned, and deployed to endpoints.
 - **[Environments](#environment)**: Configurations that define the software dependencies and runtime environment for training and inference. They ensure consistency and reproducibility of experiments.
-- **[Data](#datastore---including-how-to-reference-data-in-a-datastore)**: For most use cases you refer to the data in the datastore in the form of a uri_folder or a uri_file. This is the data that is used for training and evaluation of the model.
+- **[Dataset](#datastore---including-how-to-reference-data-in-a-datastore)**: For most use cases you refer to the data in the datastore in the form of a uri_folder or a uri_file. This is the data that is used for training and evaluation of the model.
 - **[Experiments](#experiment-tracking-in-azure-ml)**: Collections of related training runs used to track and compare the performance of different models and configurations.
 
 The steps below are not strictly necessary to train a model in Azure ML, but they are good practices to follow to ensure that your machine learning projects are well-organized, reproducible, and scalable. They are especially useful when working in a team or when managing multiple machine learning projects.
@@ -200,148 +250,205 @@ The steps below are not strictly necessary to train a model in Azure ML, but the
 
 These assets and resources are managed within the Azure ML workspace, providing a centralized platform for collaboration and management of machine learning projects.
 
-## ML project lifecycle in Azure ML
+---
 
-A `workspace` organizes a project and allows for collaboration for many users all working toward a common objective. Users in a workspace can easily share the results of their runs from `experimentation` in the studio user interface. Or they can use versioned assets for jobs like `environments` and `storage` references.
+### 🏗️ Hierarchy overview
 
-When a project is ready for operationalization, users' work can be automated in an ML `pipeline` and triggered on a schedule or `HTTPS request`.
+```mermaid
+graph TB
+    sub["Azure Subscription"]
 
-You can `deploy models` to the managed inferencing solution, for both real-time and batch deployments, abstracting away the infrastructure management typically required for deploying models.
+    sub --> rg1["Resource Group: rg-ml-rocktype-prod"]
+    rg1 --> infra1["Infra: Storage, Key Vault, Compute, Container Registry"]
+    rg1 --> ws1["ML Workspace: mlw-rocktype-prod"]
+
+    ws1 --> exp1["Experiment"]
+    ws1 --> model1["Model"]
+    ws1 --> dataset1["Dataset"]
+    ws1 --> env1["Environment"]
+    ws1 --> pipe1["Pipeline"]
+    ws1 --> endpoint1["Endpoint"]
+
+    ws1 -->|Uses| infra1
+```
+
+Azure Machine Learning projects involve two main scopes:
+
+| Level              | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| **Resource Group** | Azure-wide container for all infrastructure & services    |
+| **ML Workspace**   | Machine learning-specific container for ML assets & tasks |
+
+A **resource group** holds all Azure resources (workspace, compute, storage, etc.) for a project.
+An **ML workspace** manages machine learning-specific assets (models, data, experiments, endpoints).
+
+✅ Each project typically has **its own resource group and workspace** to ensure clear ownership, access control, and cost tracking.
+
+---
+
+### 🗂️ What belongs where?
+
+| Scope              | Includes                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **Resource Group** | ML Workspace, Compute Clusters, Storage Account, Key Vault, App Insights, Container Registry, API Management |
+| **ML Workspace**   | Experiments, Models, Datasets, Environments, Pipelines, Endpoints                                            |
+
+👉 Deleting a **resource group** removes everything inside (including the workspace).
+👉 Deleting a **workspace** only affects ML assets, not underlying Azure resources like compute.
+
+---
+
+### 📝 Recommended Project Structure
+
+For each machine learning project:
+
+✅ **One resource group per project**
+✅ **One workspace per project**
+✅ All Azure resources for the project created inside the resource group.
+
+Example for a project called `rocktype` in production:
+
+| Resource Type     | Name                     |
+| ----------------- | ------------------------ |
+| Resource Group    | `rg-ml-rocktype-prod`    |
+| ML Workspace      | `mlw-rocktype-prod`      |
+| CPU Cluster       | `cpu-cluster-rocktype`   |
+| Inference Cluster | `infer-cluster-rocktype` |
+| Storage Account   | `strocktypeprod`         |
+| Key Vault         | `kv-rocktype-prod`       |
+
+✅ This structure keeps billing, monitoring, and access management **project-scoped**.
+
+---
+
+### 🏷️ Naming Conventions
+
+Use short, lowercase names with hyphens. Prefix names with project identifier.
+
+| Resource Type   | Naming Convention           | Example                   |
+| --------------- | --------------------------- | ------------------------- |
+| Resource Group  | `rg-ml-<project>-<env>`     | `rg-ml-rocktype-prod`     |
+| Workspace       | `mlw-<project>-<env>`       | `mlw-rocktype-prod`       |
+| Compute Cluster | `cpu-cluster-<project>`     | `cpu-cluster-rocktype`    |
+| Storage Account | `st<project><env>`          | `strocktypeprod`          |
+| Key Vault       | `kv-<project>-<env>`        | `kv-rocktype-prod`        |
+| Experiment      | `<project>_exp_<task>`      | `rocktype_exp_training`   |
+| Model           | `<project>_model_<algo>_v1` | `rocktype_model_rf_v1`    |
+| Pipeline        | `<project>_pipeline_<step>` | `rocktype_pipeline_train` |
+| Endpoint        | `<project>-endpoint`        | `rocktype-endpoint`       |
+
+✅ Storage account names: ≤ 24 chars, globally unique, no hyphens.
+
+---
+
+### 🏷️ Tagging
+
+Apply these tags to **all resources** for cost reporting and management:
+
+```json
+{
+  "project": "rocktype",
+  "env": "prod",
+  "owner": "username",
+  "purpose": "inference"
+}
+```
+
+Tags support filtering, reporting, and budgeting.
+
+---
+
+### 📂 Inside the Workspace
+
+Each workspace organizes:
+
+✅ **Experiments**: group training runs
+✅ **Models**: registered, versioned ML models
+✅ **Datasets**: registered data assets pointing to storage locations
+✅ **Environments**: Docker-based configurations for reproducibility
+✅ **Pipelines**: automated ML workflows
+✅ **Endpoints**: deployed REST endpoints for inference
+
+Workspaces enable:
+
+* Tracking runs and metrics
+* Sharing versioned assets across team members
+* Managing deployment endpoints
+
+---
+
+### 🏢 Workspace Administration
+
+Guidelines:
+
+* One IT admin user per workspace
+* One admin per project team responsible for managing workspace resources
+* RBAC (Role-Based Access Control) scoped at resource group or workspace level
+
+✅ **One workspace per project recommended** for cost tracking, access control, and isolation.
+✅ For very small/related projects → a shared workspace is possible with clear naming/tagging conventions.
+
+---
+
+### 🚀 Deployment and Pipelines
+
+Production deployments use **inference endpoints** hosted from the workspace.
+
+* Pipelines automate retraining and redeployment.
+* Pipelines may include steps: data ingestion → preprocessing → training → evaluation → registration → deployment.
+
+Example workflow:
+
+1. Fetch data from `datastore`
+2. Preprocess → output to `output` container
+3. Train → save model
+4. Evaluate → register model if better
+5. Deploy → create/update endpoint
+
+✅ Pipelines can run on schedule or trigger via API.
+
+---
+
+### 🎯 General Best Practices
+
+* Use **resource group per project** for isolation and billing.
+* Use **workspace per project** for clear asset management and reporting.
+* Use **tags** for project, environment, owner, and purpose on all resources.
+* Use **naming conventions** for clarity and automation compatibility.
+* Automate provisioning with templates (Bicep, ARM) to enforce standards.
+
+✅ **Key Benefits of This Structure**
+
+✔ Clear cost tracking per project
+✔ Easier governance & access control
+✔ Logical isolation of resources
+✔ Supports scaling to multiple projects
+✔ Avoids clutter and naming conflicts
+
+---
+
+### 🖼️ Visual Summary
 
 The following diagram illustrates the ML project lifecycle in Azure ML:
+
 ![ML project lifecycle](images_documentation/overview-ml-development-lifecycle.png)
 
 The ML model lifecycle is defined in the graphic below:
 ![ML model lifecycle](images_documentation/model-lifecycle.png)
 
-### Organising and structuring the different resources across ML projects
+---
 
-Recommended structure for most users:
+### Billing and Lifecycle Management
 
-🔹 One resource group per environment or team
-Example: ml-dev, ml-prod, ml-research
-
-Easier to manage access, billing, and lifecycle.
-
-🔹 One Azure ML workspace per environment
-Example: ml-ws-dev, ml-ws-prod
-
-Helps keep things organised between development and production.
-
-🔹 Shared storage account and compute within workspace
-Reuse compute clusters and environments across projects.
-
-Use folder structures or naming conventions to separate projects in the storage.
-
-🔹 Separation by conventions rather than infrastructure
-Use naming conventions for:
-
-Models: project1_model_a
-
-Pipelines: proj2_data_cleaning_pipeline
-
-Experiments: proj3_experiment_xyz
-
-Tag assets by project using metadata or tags.
-
-### Naming conventions
-
-Use consistent, short, lowercase names with hyphens or underscores. Prefix names with the project identifier (`proj1`, `proj2`, etc.) to keep things organised across multiple projects.
-
-### 🔁 General Rules
-- Use only lowercase letters, numbers, hyphens (`-`), or underscores (`_`) where allowed.
-- Keep names short but clear.
-- Use version suffixes where needed (e.g. `_v1`, `_v2`).
-- Add tags to help with filtering, cost tracking, and management.
+* Billing is by **subscription**, but can be broken down by **resource group and tags**.
+* Resource group is the boundary for deletion and lifecycle management.
+* Workspace is the boundary for ML asset management.
 
 ---
 
-### 🔧 Azure Resources
+## Resources - setting things up
 
-| Resource Type        | Naming Convention         | Example               |
-|----------------------|---------------------------|-----------------------|
-| Resource group       | `rg-ml-main`              | `rg-ml-main`          |
-| ML workspace         | `ml-ws-main`              | `ml-ws-main`          |
-| Storage account      | `st<project><suffix>`     | `stmlmain`            |
-| Key vault            | `kv-<project>-<env>`      | `kv-ml-main`          |
-| Container registry   | `acr<project>`            | `acrmlmain`           |
-
-> Note: Storage account names must be globally unique, ≤ 24 chars, no hyphens or underscores.
-
----
-
-### 📁 Storage Containers (in Blob)
-
-| Type        | Naming Convention         | Example            |
-|-------------|---------------------------|--------------------|
-| Raw data    | `proj1-data`              | `proj1-data`       |
-| Processed   | `proj2-outputs`           | `proj2-outputs`    |
-| Models      | `proj2-models`            | `proj2-models`     |
-
----
-
-### 🧠 ML Assets
-
-| Asset Type   | Naming Convention             | Example                     |
-|--------------|-------------------------------|-----------------------------|
-| Experiment   | `proj1_exp_<task>`            | `proj1_exp_training`        |
-| Dataset      | `proj1_dataset_<type>`        | `proj1_dataset_cleaned`     |
-| Model        | `proj2_model_<algo>_v<ver>`   | `proj2_model_rf_v1`         |
-| Pipeline     | `proj1_pipeline_<stage>`      | `proj1_pipeline_training`   |
-| Environment  | `env-<project>-<lib>`         | `env-proj1-torch112`        |
-
----
-
-### 🖥️ Compute
-
-| Type            | Naming Convention           | Example              |
-|-----------------|-----------------------------|----------------------|
-| CPU cluster     | `cpu-cluster-<scope>`       | `cpu-cluster-general`|
-| GPU cluster     | `gpu-cluster-<project>`     | `gpu-cluster-proj2`  |
-| Inference       | `infer-cluster-<project>`   | `infer-cluster-proj1`|
-
----
-
-### 🔐 Secrets (in Key Vault)
-
-| Secret         | Naming Convention              | Example                   |
-|----------------|--------------------------------|---------------------------|
-| API keys       | `proj2-api-key`                | `proj2-api-key`           |
-| DB connection  | `proj1-database-conn`          | `proj1-database-conn`     |
-
----
-
-### 🏷️ Recommended Tags
-
-Apply these tags across all resources:
-
-```json
-{
-  "project": "proj1",
-  "env": "dev",
-  "owner": "yourname",
-  "purpose": "training"
-}
-```
-
-
-### Workspace
-
-For machine learning teams, the workspace is a place to organize their work. Here are some of the tasks you can start from a workspace:
-
-- Create jobs - Jobs are training runs you use to build your models. You can group jobs into experiments to compare metrics. E.g. by harnessing the Mlflow integration.
-- Author pipelines - Pipelines are reusable workflows for training and retraining your model.
-- Register data assets - Data assets aid in management of the data you use for model training and pipeline creation.
-- Register models - Once you have a model you want to deploy, you create a registered model.
-- Create online endpoints - Use a registered model and a scoring script to create an online endpoint.
-
-#### Organising workspaces:
-
-- One IT-admin user for all workspaces
-- At least one admin role for each project. This role is responsible for managing the workspace, including creating compute instances, datastores, and managing access to the workspace.
-- Create one workspace for each project. While a workspace can be used for multiple projects, limiting it to one project per workspace allows for cost reporting accrued to a project level. It also allows you to manage configurations like datastores in the scope of each project.
-- Share Azure resources between workspaces, such as compute instances and datastores, to reduce costs.
-- Share assets between workspaces, such as datasets and models, to reduce duplication of work.
+### Setting up and connecting to a workspace
 
 #### Setting up a workspace:
 
@@ -474,8 +581,6 @@ az storage blob upload-batch \
     --source <local-folder-path>
 ```
 
-
-
 or with Python SDK
 
 ```python
@@ -502,6 +607,8 @@ dataset = Data(
 ml_client.data.create_or_update(dataset)
 
 ```
+
+## Assets - setup, creating and managing
 
 ### Environment
 
@@ -874,10 +981,6 @@ For comprehensive version control:
 By leveraging Azure ML’s dataset versioning, you create a reproducible, traceable, and scalable workflow for managing data assets in your machine learning projects.
 
 
-## AutoML
-
-A step in the prototyping phase. More...
-
 ## Example tutorials
 
 We have included one beginners tutorial and two example projects from NGI where we demonstrate the functionality in Azure ML.
@@ -894,11 +997,11 @@ https://medium.com/henkel-data-and-analytics/how-to-use-azure-ml-studio-an-eye-o
 
 ### Rock joint detection
 
-coming...
+coming... (link to repo)
 
 ### LabOAI
 
-coming...
+coming... (link to repo)
 
 ## Learning resources
 

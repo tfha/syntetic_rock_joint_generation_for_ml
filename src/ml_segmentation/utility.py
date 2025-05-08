@@ -16,16 +16,19 @@ from rich.theme import Theme
 from torch.utils.tensorboard import SummaryWriter
 
 
-def seed_everything(seed: int = 42) -> None:
+def seed_everything(seed: int | None = 42) -> None:
     """
     Function to set random seed for reproducibility, similar to PyTorch Lightning's seed_everything.
 
     Args:
-        seed (int): The seed value to use for random number generators.
+        seed (int | None): The seed value to use for random number generators. If None, no seeding is performed.
 
     Returns:
         None
     """
+    if seed is None:
+        return  # Skip seeding when None is provided
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -166,6 +169,7 @@ def get_custom_console() -> Console:
             "warning": "yellow",
             "danger": "bold red",
             "error": "bold magenta",
+            "success": "bold green",  # Adding missing 'success' style
         }
     )
     return Console(theme=custom_theme)

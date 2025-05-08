@@ -11,6 +11,8 @@ Classes:
     TensorboardConfig: Configuration for Tensorboard logging.
     OptunaConfig: Configuration for Optuna hyperparameter optimization.
     AzureMLConfig: Configuration for Azure Machine Learning.
+    AzureDataAssetsCommand: Enum class defining available commands for Azure data assets management.
+    AzureDataAssetsConfig: Configuration for Azure ML data assets management.
     ConfigSchema: The main configuration schema that includes all other configurations.
 Functions:
     testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
@@ -101,6 +103,10 @@ class ExperimentConfig(BaseModel):
     path_example_images: Path = Field(
         ..., description="Path where example images are saved during training."
     )
+    use_registered_splits: bool = Field(
+        False,
+        description="Whether to use registered splits from Azure ML Data Assets instead of strategy-based filtering.",
+    )
 
 
 class DatasetConfig(BaseModel):
@@ -140,10 +146,36 @@ class AzureMLConfig(BaseModel):
     compute_name: str = Field(
         ..., description="Name of the compute cluster to use for Azure ML training."
     )
-    blob_datastore: str = Field(
-        ..., description="ID of the Azure blob storage datastore."
-    )
     experiment_name: str = Field(..., description="Name of the experiment in Azure ML.")
+
+
+class AzureDataAssetsCommand(str, Enum):
+    """Available commands for Azure data assets management."""
+
+    REGISTER_BASE_DATASETS = "register-base-datasets"
+    REGISTER_SPLITS = "register-splits"
+    LIST_ASSETS = "list-assets"
+    COMPARE_ASSETS = "compare-assets"
+    UPLOAD_DATA = "upload-data"
+    GENERATE_SPLITS = "generate-splits"
+    UPLOAD_SPLITS = "upload-splits"
+
+
+class AzureDataAssetsConfig(BaseModel):
+    """Configuration for Azure ML data assets management."""
+
+    command: AzureDataAssetsCommand | None = Field(
+        None,
+        description="Command to execute (register-base-datasets, register-splits, list-assets, compare-assets, upload-data, generate-splits, upload-splits)",
+    )
+    asset_name: str | None = Field(
+        None, description="Name of the asset to list or compare"
+    )
+    version1: str | None = Field(None, description="First version for comparison")
+    version2: str | None = Field(None, description="Second version for comparison")
+    output_dir: str = Field(
+        "outputs/azure_data_assets", description="Output directory for logs"
+    )
 
 
 class ConfigSchema(BaseModel):
@@ -158,6 +190,10 @@ class ConfigSchema(BaseModel):
     optuna: OptunaConfig
     dataset: DatasetConfig
     azure_ml: AzureMLConfig
+    azure_data_assets: AzureDataAssetsConfig = Field(
+        default_factory=AzureDataAssetsConfig,
+        description="Configuration for Azure ML data assets management.",
+    )
 
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")

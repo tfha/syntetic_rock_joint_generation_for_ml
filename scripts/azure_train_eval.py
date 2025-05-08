@@ -5,6 +5,7 @@ This script is designed to work with Azure ML's native dataset handling,
 using registered datasets passed as job inputs.
 """
 
+import logging
 import os
 import time
 from datetime import datetime
@@ -20,8 +21,8 @@ from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 
+from ml_segmentation.azure_data_loading import setup_azure_dataloader
 from ml_segmentation.data_loading import get_datasets_prefixes
-from ml_segmentation.data_loading_azure import setup_azure_dataloader
 from ml_segmentation.debug_functionality import better_traceback
 from ml_segmentation.define_model import choose_model
 from ml_segmentation.schema_config import ConfigSchema
@@ -40,9 +41,16 @@ from ml_segmentation.utility import (
 )
 
 
-@hydra.main(
-    config_path="../scripts/config", config_name="main.yaml", version_base="1.3"
+# Configure logging to reduce verbose Azure client output
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+    logging.WARNING
 )
+logging.getLogger("azure.identity").setLevel(logging.WARNING)
+logging.getLogger("azure.storage").setLevel(logging.WARNING)
+logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
+
+
+@hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Start MLflow tracking
     mlflow.start_run()
@@ -100,12 +108,29 @@ def main(cfg: DictConfig) -> None:
     )
 
     # In Azure ML, input datasets are mounted to paths defined in environment variables
+    # AZUREML_RUN_ID environment variable is a standard environment variable set by Azure ML when a job is running
     if "AZUREML_RUN_ID" in os.environ:
         # Get the paths from environment variables set by Azure ML
         images_path = Path(os.environ.get("AZUREML_DATAREFERENCE_images_data", ""))
         masks_path = Path(os.environ.get("AZUREML_DATAREFERENCE_masks_data", ""))
         console.print(f"Azure ML mounted images path: {images_path}", style="info")
         console.print(f"Azure ML mounted masks path: {masks_path}", style="info")
+
+        # Check if splits dataset is mounted and should be used
+        splits_path = None
+        if pcfg.experiment.use_registered_splits:
+            splits_path = Path(os.environ.get("AZUREML_DATAREFERENCE_splits_data", ""))
+            if splits_path.exists():
+                console.print(
+                    f"Azure ML mounted splits path: {splits_path}", style="info"
+                )
+                mlflow.log_param("splits_path", str(splits_path))
+            else:
+                console.print(
+                    "Splits path not found, using strategy-based filtering",
+                    style="warning",
+                )
+                splits_path = None
 
         # Log dataset information in MLflow
         mlflow.log_param("images_path", str(images_path))
@@ -114,6 +139,7 @@ def main(cfg: DictConfig) -> None:
         # Fallback to configured paths for local testing
         images_path = Path(pcfg.dataset.path_images)
         masks_path = Path(pcfg.dataset.path_processed_mask_labels)
+        splits_path = None
         console.print("Running in local mode, using configured paths", style="warning")
 
     # Get prefixes for dataset filtering based on experiment strategy
@@ -133,7 +159,18 @@ def main(cfg: DictConfig) -> None:
 
     # Setup dataloaders
     train_loader, val_loader, test_loader = setup_azure_dataloader(
-        pcfg, images_path, masks_path, train_prefixes_list, test_prefixes_list
+        images_path=images_path,
+        labels_path=masks_path,
+        train_prefixes_list=train_prefixes_list,
+        test_prefixes_list=test_prefixes_list,
+        batch_size=pcfg.model.batch_size,
+        num_workers=pcfg.experiment.num_workers,
+        train_fraction=pcfg.experiment.train_fraction,
+        val_fraction=pcfg.experiment.val_fraction,
+        test_fraction=pcfg.experiment.test_fraction,
+        optional_transforms=pcfg.experiment.optional_transforms,
+        splits_path=splits_path,
+        use_registered_splits=pcfg.experiment.use_registered_splits,
     )
 
     # MODEL DEFINITION

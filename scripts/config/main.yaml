@@ -19,9 +19,25 @@ hydra:
 
 # Azure ML specific configuration
 azure_ml:
-  compute_name: "Standard_NC6s_v3"  # GPU VM size for training
-  blob_datastore: "azureml-blobstore-d3360a09-af14-4d39-8db4-b77f3097eaf3"
+  compute_name: "Standard-NC6s-v3"  # GPU VM size for training
   experiment_name: "rock-segmentation"
+
+# Azure Data Assets configuration
+# Note: Credentials are loaded from .env file at runtime
+azure_data_assets:
+  # Command to execute - available options:
+  # - register-base-datasets: Register base datasets in Azure ML
+  # - register-splits: Register dataset splits in Azure ML
+  # - list-assets: List data assets in Azure ML
+  # - compare-assets: Compare two versions of a data asset
+  # - help: Show detailed help and best practices
+  command: register-base-datasets  # Default command to register base datasets
+  # Parameters for asset commands
+  asset_name: null  # Name of the asset to list or compare
+  version1: null    # First version for comparison
+  version2: null    # Second version for comparison
+  # Output directory for logs
+  output_dir: outputs/azure_data_assets/${now:%Y-%m-%d_%H-%M-%S}
 
 experiment:
   seed: 42
@@ -39,7 +55,8 @@ experiment:
   quality_control_data: false
   crossvalidation: false
   path_example_images: ${path_project}/experiments/example_images
-  experiment_strategy: "verification_dfn" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
+  use_registered_splits: false  # Flag to use registered splits from Azure ML (added for Azure ML pipeline)
+  experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:
       train_datasets:

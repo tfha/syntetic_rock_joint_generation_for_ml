@@ -7,7 +7,6 @@ optimization to find the best hyperparameters for segmentation models.
 
 import argparse
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any  # Only import Any as it doesn't have a built-in equivalent
@@ -15,50 +14,17 @@ from typing import Any  # Only import Any as it doesn't have a built-in equivale
 from azure.ai.ml import Input, Output, command
 from azure.ai.ml.entities import BuildContext, Environment
 from azure.ai.ml.sweep import Choice, Uniform
-from dotenv import load_dotenv
 
-from ml_segmentation.azure_data_assets import connect_to_azure_ml, get_data_asset
+from ml_segmentation.azure_data_assets import (
+    connect_to_azure_ml,
+    get_data_asset,
+    setup_azure_environment,
+)
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
     get_model_search_space,
 )
-from ml_segmentation.schema_config import ConfigSchema
-from ml_segmentation.utility import export_poetry_to_environment_yml, get_custom_console
-
-
-def setup_environment() -> tuple[ConfigSchema, dict[str, Any]]:
-    """Setup environment and load configuration from Hydra."""
-    # Load environment variables from .env file
-    load_dotenv()
-
-    # Create a console for pretty printing
-    console = get_custom_console()
-
-    # Check if Azure environment variables are set
-    subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID")
-    if not subscription_id:
-        console.print(
-            "Error: AZURE_SUBSCRIPTION_ID environment variable not set", style="error"
-        )
-        console.print(
-            "Please set it with: export AZURE_SUBSCRIPTION_ID='your-subscription-id'",
-            style="error",
-        )
-        raise ValueError("Missing Azure subscription ID")
-
-    # Get Azure ML configuration from environment
-    azure_config = {
-        "subscription_id": subscription_id,
-        "resource_group": os.environ.get(
-            "AZURE_RESOURCE_GROUP", "rg-rock-joint-detection"
-        ),
-        "workspace_name": os.environ.get("AZURE_ML_WORKSPACE", "ws-rock-joint-det"),
-        "blob_datastore": os.environ.get("AZURE_BLOB_DATASTORE", "rock_data"),
-    }
-
-    console.print("Azure ML configuration loaded successfully", style="info")
-
-    return console, azure_config
+from ml_segmentation.utility import export_poetry_to_environment_yml
 
 
 def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
@@ -127,21 +93,35 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
 
 def main():
     """Main entry point for the script."""
-    # Set up environment and get configuration
-    console, azure_config = setup_environment()
+    # Setup environment and load configuration
+    console, subscription_id, resource_group, workspace_name = setup_azure_environment()
+
+    # Create config for the run
+    azure_config = {
+        "subscription_id": subscription_id,
+        "resource_group": resource_group or "rg-rock-joint-detection",
+        "workspace_name": workspace_name or "ws-rock-joint-det",
+    }
+
+    # Export Poetry environment to environment.yml
+    environment_file = export_poetry_to_environment_yml()
+
+    console.print("Starting Azure ML hyperparameter optimization", style="info")
+
+    # Connect to Azure ML
+    console.print("Connecting to Azure ML...", style="info")
+    ml_client = connect_to_azure_ml(
+        subscription_id=subscription_id,
+        resource_group=azure_config["resource_group"],
+        workspace_name=azure_config["workspace_name"],
+    )
+
     model_name, opt_config = get_model_config_from_args()
 
     console.print(
         f"Starting hyperparameter optimization for {model_name}", style="info"
     )
     console.print(f"Optimization configuration: {opt_config}", style="info")
-
-    # Connect to Azure ML workspace
-    ml_client = connect_to_azure_ml(
-        subscription_id=azure_config["subscription_id"],
-        resource_group=azure_config["resource_group"],
-        workspace_name=azure_config["workspace_name"],
-    )
 
     # Get the latest versions of our data assets
     try:
@@ -182,7 +162,6 @@ def main():
 
     # Create an environment from local dependencies
     console.print("Creating Azure ML environment...", style="info")
-    environment_file = export_poetry_to_environment_yml()
     env = Environment(
         name="rock-segmentation-env",
         description="Environment for rock segmentation model training",
