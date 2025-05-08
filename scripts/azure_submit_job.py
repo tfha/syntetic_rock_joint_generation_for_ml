@@ -33,6 +33,8 @@ logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     """Submit Azure ML job with managed data assets using Command approach."""
+    # 1. Initialize configuration
+    ###########################################
     # Convert the DictConfig to Python dictionary, then to Pydantic model
     cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
     pcfg = ConfigSchema(**cfg_dict)
@@ -49,7 +51,8 @@ def main(cfg: DictConfig) -> None:
         f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-{timestamp}"
     )
 
-    # Export Poetry environment to environment.yml
+    # 2. Export poetry environment to environment.yml
+    ###########################################
     try:
         environment_file = export_poetry_to_environment_yml()
         console.print(f"Environment exported to {environment_file}", style="info")
@@ -57,7 +60,8 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error exporting environment: {str(e)}", style="error")
         sys.exit(1)
 
-    # Connect to Azure ML workspace
+    # 3. Connect to Azure ML workspace
+    ###########################################
     try:
         ml_client = connect_to_azure_ml(
             subscription_id=subscription_id,
@@ -71,11 +75,13 @@ def main(cfg: DictConfig) -> None:
         )
         sys.exit(1)
 
-    # Get Azure ML configuration from config file
+    # 4. Get Azure ML configuration from config
+    ###########################################
     compute_cluster_name = pcfg.azure_ml.compute_name
     azure_experiment_name = pcfg.azure_ml.experiment_name
 
-    # Get the latest versions of our data assets
+    # 5. Retrieve data assets from Azure ML
+    ###########################################
     try:
         console.print("Retrieving latest data assets from Azure ML...", style="info")
 
@@ -122,7 +128,8 @@ def main(cfg: DictConfig) -> None:
         )
         sys.exit(1)
 
-    # Validate compute exists
+    # 6. Validate compute cluster exists
+    ###########################################
     try:
         ml_client.compute.get(compute_cluster_name)
         console.print(f"Using compute cluster: {compute_cluster_name}", style="info")
@@ -139,7 +146,8 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error accessing compute cluster: {str(e)}", style="error")
         sys.exit(1)
 
-    # Create an environment from local dependencies
+    # 7. Create or retrieve Azure ML environment
+    ###########################################
     console.print("Creating Azure ML environment...", style="info")
     env = Environment(
         name="rock-segmentation-env",
@@ -168,6 +176,8 @@ def main(cfg: DictConfig) -> None:
         )
         sys.exit(1)
 
+    # 8. Set up run metadata
+    ###########################################
     # Store run metadata for tracking
     run_metadata = {
         "model_name": pcfg.model.name,
@@ -179,6 +189,8 @@ def main(cfg: DictConfig) -> None:
     if has_splits:
         run_metadata["splits_dataset_version"] = splits_dataset.version
 
+    # 9. Define training command and parameters
+    ###########################################
     # Define the training command - fixed script name
     train_command = (
         f"python scripts/azure_train_eval.py "
@@ -194,6 +206,8 @@ def main(cfg: DictConfig) -> None:
     if has_splits:
         train_command += " experiment.use_registered_splits=True"
 
+    # 10. Configure job inputs and outputs
+    ###########################################
     # Define job inputs and outputs
     job_inputs = {
         "images_data": Input(type="uri_folder", path=images_dataset.id),
@@ -214,6 +228,8 @@ def main(cfg: DictConfig) -> None:
         "example_images": Output(type="uri_folder", path="./outputs/example_images"),
     }
 
+    # 11. Create and submit the job
+    ###########################################
     # Create a single Command job
     job = command(
         code="./",
@@ -252,6 +268,8 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error submitting job: {str(e)}", style="error")
         sys.exit(1)
 
+    # 12. Stream logs
+    ###########################################
     # Stream the logs
     console.print("Job submitted. Streaming logs...", style="info")
     try:
@@ -264,6 +282,8 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error streaming logs: {str(e)}", style="error")
         console.print("Job is still running in Azure ML.", style="warning")
 
+    # 13. Download job outputs
+    ###########################################
     # Create a directory for downloading outputs
     download_dir = Path(f"./downloaded_runs/{display_name}")
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -298,6 +318,8 @@ def main(cfg: DictConfig) -> None:
             style="warning",
         )
 
+    # 14. Print job output information
+    ###########################################
     # Print outputs information
     try:
         job_details = ml_client.jobs.get(job_run.name)

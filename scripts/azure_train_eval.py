@@ -52,6 +52,8 @@ logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
+    # 1. Initialize MLflow and configuration
+    ########################################################################
     # Start MLflow tracking
     mlflow.start_run()
 
@@ -71,7 +73,7 @@ def main(cfg: DictConfig) -> None:
         }
     )
 
-    # SETUP
+    # 2. Setup output directories
     ########################################################################
     console.print(
         f"Starting Azure ML training run with strategy: {pcfg.experiment.experiment_strategy}",
@@ -101,8 +103,8 @@ def main(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
 
-    # LOAD DATA FROM AZURE ML INPUTS
-    ###############################################################
+    # 3. Load data from Azure ML inputs
+    ########################################################################
     console.print(
         "Loading training and testing data from Azure ML inputs...", style="info"
     )
@@ -142,6 +144,8 @@ def main(cfg: DictConfig) -> None:
         splits_path = None
         console.print("Running in local mode, using configured paths", style="warning")
 
+    # 4. Prepare dataset prefixes and dataloaders
+    ########################################################################
     # Get prefixes for dataset filtering based on experiment strategy
     prefixes = get_datasets_prefixes(
         experiment_strategy=pcfg.experiment.experiment_strategy,
@@ -173,8 +177,8 @@ def main(cfg: DictConfig) -> None:
         use_registered_splits=pcfg.experiment.use_registered_splits,
     )
 
-    # MODEL DEFINITION
-    ###############################################################
+    # 5. Initialize model architecture
+    ########################################################################
     console.print("Initializing model architecture...", style="info")
     model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
 
@@ -196,7 +200,7 @@ def main(cfg: DictConfig) -> None:
             "torchinfo not available, skipping model summary", style="warning"
         )
 
-    # TRAINING SETUP
+    # 6. Setup training components
     ########################################################################
     console.print("Setting up training components...", style="info")
 
@@ -224,7 +228,7 @@ def main(cfg: DictConfig) -> None:
         delta=pcfg.experiment.early_stopping_delta,
     )
 
-    # TRAINING AND VALIDATION
+    # 7. Execute training and validation loop
     ########################################################################
     console.print("Beginning training and validation...", style="info")
     start_time = time.time()
@@ -321,7 +325,7 @@ def main(cfg: DictConfig) -> None:
         raise
 
     finally:
-        # FINALIZE AND SAVE RESULTS
+        # 8. Finalize and save model artifacts
         ########################################################################
         console.print("Finalizing training...", style="info")
 
@@ -352,6 +356,8 @@ def main(cfg: DictConfig) -> None:
                 f"Saved run ID {current_run_id} for model registration", style="info"
             )
 
+        # 9. Run final evaluation and generate results
+        ########################################################################
         # Final test evaluation
         console.print("Running final evaluation on test set...", style="info")
         final_test_metrics = validate_one_epoch(
