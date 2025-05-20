@@ -342,7 +342,32 @@ The upload process follows Azure best practices:
 - Providing progress tracking for large uploads
 - Efficient parallel uploads with proper error handling
 
-After uploading is complete, you can proceed to register your datasets as data assets.
+#### Generating and Uploading Dataset Splits
+
+Before training, you need to divide your dataset into training, validation, and test sets. The project provides tools to create these splits and upload them to Azure:
+
+1. First, generate the dataset splits:
+
+```sh
+# Generate train/val/test splits based on your configuration
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits
+```
+
+This command will:
+- Create train, validation, and test splits according to the proportions defined in your configuration
+- Save these splits as JSON files in the `data/model_ready` directory
+- Apply any dataset strategies or filtering options specified in your configuration
+
+2. Then, upload the generated splits to Azure Blob Storage:
+
+```sh
+# Upload the split files to Azure Blob Storage
+python scripts/azure_manage_data_assets.py azure_data_assets.command=upload-splits
+```
+
+This command uploads the JSON split files to Azure Blob Storage, making them available for use in your Azure ML training jobs.
+
+After uploading your data and splits, you can proceed to register your datasets as data assets.
 
 #### Managing Data Assets in Azure ML
 

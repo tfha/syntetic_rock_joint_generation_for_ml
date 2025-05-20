@@ -26,6 +26,7 @@ from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from omegaconf import DictConfig, OmegaConf
+from rich.console import Console
 from tqdm import tqdm
 
 from ml_segmentation.azure_data_assets import (
@@ -42,16 +43,7 @@ from ml_segmentation.data_loading import (
     split_data,
 )
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
-from ml_segmentation.utility import get_custom_console, seed_everything
-
-
-# Configure logging to reduce verbose Azure client output
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-    logging.WARNING
-)
-logging.getLogger("azure.identity").setLevel(logging.WARNING)
-logging.getLogger("azure.storage").setLevel(logging.WARNING)
-logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
+from ml_segmentation.utility import seed_everything
 
 
 def get_command_description(command: AzureDataAssetsCommand) -> str:
@@ -75,15 +67,13 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
     return descriptions.get(command, "Unknown command")
 
 
-def register_base_datasets(ml_client: MLClient, console=None):
+def register_base_datasets(ml_client: MLClient, console: Console):
     """Register base datasets in Azure ML.
 
     Args:
         ml_client: The Azure ML client
-        console: Optional console object for pretty printing. If None, a new console is created.
+        console: Console object for pretty printing
     """
-    if console is None:
-        console = get_custom_console()
 
     console.print("Registering base datasets in Azure ML", style="info")
 
@@ -193,15 +183,13 @@ def register_base_datasets(ml_client: MLClient, console=None):
     )
 
 
-def register_dataset_splits(ml_client: MLClient, console=None):
+def register_dataset_splits(ml_client: MLClient, console: Console):
     """Register train/val/test dataset splits in Azure ML.
 
     Args:
         ml_client: The Azure ML client
-        console: Optional console object for pretty printing. If None, a new console is created.
+        console: Console object for pretty printing
     """
-    if console is None:
-        console = get_custom_console()
 
     console.print("Registering dataset splits in Azure ML", style="info")
 
@@ -300,16 +288,14 @@ def register_dataset_splits(ml_client: MLClient, console=None):
         console.print(f"- {name}: {asset.name} (version {asset.version})", style="info")
 
 
-def list_data_assets(ml_client: MLClient, asset_name: str = None, console=None):
+def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = None):
     """List all data assets or versions of a specific data asset.
 
     Args:
         ml_client: The Azure ML client
+        console: Console object for pretty printing
         asset_name: Optional name of a specific asset to list versions for
-        console: Optional console object for pretty printing. If None, a new console is created.
     """
-    if console is None:
-        console = get_custom_console()
 
     if asset_name:
         # List versions of a specific asset
@@ -384,19 +370,17 @@ def list_data_assets(ml_client: MLClient, asset_name: str = None, console=None):
 
 
 def compare_assets(
-    ml_client: MLClient, asset_name: str, version1: str, version2: str, console=None
+    ml_client: MLClient, console: Console, asset_name: str, version1: str, version2: str
 ):
     """Compare two versions of a data asset.
 
     Args:
         ml_client: The Azure ML client
+        console: Console object for pretty printing
         asset_name: Name of the asset to compare
         version1: First version to compare
         version2: Second version to compare
-        console: Optional console object for pretty printing. If None, a new console is created.
     """
-    if console is None:
-        console = get_custom_console()
 
     if not all([asset_name, version1, version2]):
         console.print(
@@ -435,24 +419,16 @@ def compare_assets(
 
 
 def upload_data_to_azure_blob(
-    path_images: str, path_raw_masks: str, path_processed_masks: str, console=None
+    console: Console, path_images: str, path_raw_masks: str, path_processed_masks: str
 ):
     """Upload local data to Azure Blob storage.
 
     Args:
+        console: Console object for pretty printing
         path_images: Path to the images directory (may contain variables to replace)
         path_raw_masks: Path to the raw mask labels directory (may contain variables to replace)
         path_processed_masks: Path to the processed mask labels directory (may contain variables to replace)
-        console: Optional console object for pretty printing. If None, a new console is created.
     """
-    if console is None:
-        console = get_custom_console()
-
-    # Configure Azure logging to reduce HTTP client noise
-    azure_logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
-    azure_logger.setLevel(
-        logging.WARNING
-    )  # Change from INFO to WARNING to suppress request/response logs
 
     console.print("Preparing to upload data to Azure Blob storage...", style="info")
 
@@ -514,30 +490,28 @@ def upload_data_to_azure_blob(
         console.print(
             f"Error connecting to Azure Blob storage: {str(e)}", style="error"
         )
-        return
-
-    # Upload images
+        return  # Upload images
     upload_files(
         container_client=container_client,
+        console=console,
         local_folder_path=paths_to_check["images"],
         blob_folder="rockmass",
-        console=console,
     )
 
     # Upload processed masks
     upload_files(
         container_client=container_client,
+        console=console,
         local_folder_path=paths_to_check["processed_masks"],
         blob_folder="label/binary",
-        console=console,
     )
 
     # Upload raw masks
     upload_files(
         container_client=container_client,
+        console=console,
         local_folder_path=paths_to_check["raw_masks"],
         blob_folder="label/raw_data",
-        console=console,
     )
 
     console.print("\nUpload complete!", style="success")
@@ -548,17 +522,15 @@ def upload_data_to_azure_blob(
     )
 
 
-def upload_files(container_client, local_folder_path, blob_folder, console=None):
+def upload_files(container_client, console: Console, local_folder_path, blob_folder):
     """Upload files from a local folder to Azure Blob storage.
 
     Args:
         container_client: Azure Blob container client
+        console: Console object for pretty printing
         local_folder_path: Path to the local folder
         blob_folder: Folder path in the blob container
-        console: Optional console object for pretty printing
     """
-    if console is None:
-        console = get_custom_console()
 
     # Get list of files to upload
     files = list(local_folder_path.glob("**/*"))
@@ -602,21 +574,15 @@ def upload_files(container_client, local_folder_path, blob_folder, console=None)
             console.print(f"Error uploading {file}: {str(e)}", style="error")
 
 
-def upload_splits_to_azure_blob(console=None):
+def upload_splits_to_azure_blob(console: Console):
     """Upload the dataset split JSON files to Azure Blob storage.
 
     This function uploads the train/val/test split JSON files to Azure Blob storage
     to make them available for Azure ML experiments.
 
     Args:
-        console: Optional console object for pretty printing. If None, a new console is created.
+        console: Console object for pretty printing
     """
-    if console is None:
-        console = get_custom_console()
-
-    # Configure Azure logging to reduce HTTP client noise
-    azure_logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
-    azure_logger.setLevel(logging.WARNING)
 
     console.print(
         "Preparing to upload dataset split files to Azure Blob storage...", style="info"
@@ -706,6 +672,7 @@ def upload_splits_to_azure_blob(console=None):
 
 
 def generate_dataset_splits(
+    console: Console,
     images_directory: str | Path,
     labels_directory: str | Path,
     experiment_strategy: str,
@@ -715,7 +682,6 @@ def generate_dataset_splits(
     val_fraction: float,
     test_fraction: float,
     seed: int,
-    console=None,
 ):
     """Generate dataset splits for use in Azure ML.
 
@@ -726,6 +692,7 @@ def generate_dataset_splits(
     4. Saves the splits as JSON files in the data/model_ready directory
 
     Args:
+        console: Console object for pretty printing
         images_directory: Path to the images directory
         labels_directory: Path to the processed mask labels directory
         experiment_strategy: The experiment strategy to use
@@ -735,10 +702,7 @@ def generate_dataset_splits(
         val_fraction: Fraction of data used for validation
         test_fraction: Fraction of data used for testing
         seed: Random seed for reproducibility
-        console: Optional console object for pretty printing. If None, a new console is created.
     """
-    if console is None:
-        console = get_custom_console()
 
     console.print("Generating dataset splits for Azure ML", style="info")
 
@@ -840,6 +804,14 @@ def main(cfg: DictConfig) -> None:
         workspace_name=workspace_name,
     )
 
+    # Configure logging to reduce verbose Azure client output
+    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+        logging.WARNING
+    )
+    logging.getLogger("azure.identity").setLevel(logging.WARNING)
+    logging.getLogger("azure.storage").setLevel(logging.WARNING)
+    logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
+
     # Get command from validated config
     command = pcfg.azure_data_assets.command
 
@@ -850,22 +822,23 @@ def main(cfg: DictConfig) -> None:
 
     # Execute the appropriate command based on the enum value
     if command == AzureDataAssetsCommand.REGISTER_BASE_DATASETS:
-        register_base_datasets(ml_client, console=console)
+        register_base_datasets(ml_client, console)
     elif command == AzureDataAssetsCommand.REGISTER_SPLITS:
-        register_dataset_splits(ml_client, console=console)
+        register_dataset_splits(ml_client, console)
     elif command == AzureDataAssetsCommand.LIST_ASSETS:
-        list_data_assets(ml_client, asset_name, console=console)
+        list_data_assets(ml_client, console, asset_name)
     elif command == AzureDataAssetsCommand.COMPARE_ASSETS:
-        compare_assets(ml_client, asset_name, version1, version2, console=console)
+        compare_assets(ml_client, console, asset_name, version1, version2)
     elif command == AzureDataAssetsCommand.UPLOAD_DATA:
         upload_data_to_azure_blob(
+            console,
             pcfg.dataset.path_images,
             pcfg.dataset.path_raw_mask_labels,
             pcfg.dataset.path_processed_mask_labels,
-            console=console,
         )
     elif command == AzureDataAssetsCommand.GENERATE_SPLITS:
         generate_dataset_splits(
+            console,
             images_directory=pcfg.dataset.path_images,
             labels_directory=pcfg.dataset.path_processed_mask_labels,
             experiment_strategy=pcfg.experiment.experiment_strategy,
@@ -875,10 +848,9 @@ def main(cfg: DictConfig) -> None:
             val_fraction=pcfg.experiment.val_fraction,
             test_fraction=pcfg.experiment.test_fraction,
             seed=pcfg.experiment.seed,
-            console=console,
         )
     elif command == AzureDataAssetsCommand.UPLOAD_SPLITS:
-        upload_splits_to_azure_blob(console=console)
+        upload_splits_to_azure_blob(console)
     else:
         console.print("Available commands:", style="info")
         for cmd in AzureDataAssetsCommand:
