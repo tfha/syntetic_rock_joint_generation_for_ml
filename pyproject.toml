@@ -41,6 +41,7 @@ python-dotenv = "^1.1.0"
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
 pandas-stubs = "^2.2.3.241126"
+ruff = "^0.11.10"
 
 [build-system]
 requires = ["poetry-core"]
@@ -49,10 +50,34 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 force_single_line = false
-lines_after_imports = 2
 
 [tool.ruff]
 line-length = 88
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# Enable rules from pycodestyle (E), pyflakes (F), isort (I)
+select = ["E", "F", "I"]
+ignore = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ml_segmentation"]
 
 [tool.ipdb]
 context = 10

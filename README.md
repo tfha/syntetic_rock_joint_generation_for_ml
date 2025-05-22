@@ -342,32 +342,47 @@ The upload process follows Azure best practices:
 - Providing progress tracking for large uploads
 - Efficient parallel uploads with proper error handling
 
-#### Generating and Uploading Dataset Splits
+#### Generating and Registering Dataset Splits
 
-Before training, you need to divide your dataset into training, validation, and test sets. The project provides tools to create these splits and upload them to Azure:
+Before training, you need to divide your dataset into training, validation, and test sets. The project provides tools to create these splits and register them as Azure ML data assets:
 
 1. First, generate the dataset splits:
 
 ```sh
-# Generate train/val/test splits based on your configuration
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits
+# Generate train/val/test splits for a specific experiment strategy (e.g., verification_box)
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=verification_box
+
+# For other strategies, repeat with the appropriate value:
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=verification_dfn
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_dfn_rock_slope
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_dfn_box
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_box_rock_slope
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_box_box
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=dataset_size_test
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=semi_supervised_learning
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=one_shot_segmentation
 ```
+
+**Note:**
+- If you set `train_fraction: 1.0` and `test_fraction: 1.0` (and `val_fraction: 0.0`) in your config, all files from the specified training and testing datasets will be assigned to the train and test splits, with no validation set. This is useful for strategies like `main_objective_dfn_rock_slope` where you want to use the full synthetic DFN dataset for training and the full real-world rock slope dataset for testing.
+
+**Note:** You must set the `experiment.experiment_strategy` Hydra variable when generating splits. This needs to be done separately for each experiment strategy you intend to use. The splits will be saved in the corresponding subfolder under `data/model_ready/splits/<strategy>/`.
 
 This command will:
 - Create train, validation, and test splits according to the proportions defined in your configuration
-- Save these splits as JSON files in the `data/model_ready` directory
+- Save these splits as JSON files in the correct subfolder under `data/model_ready/splits/<strategy>/`
 - Apply any dataset strategies or filtering options specified in your configuration
 
-2. Then, upload the generated splits to Azure Blob Storage:
+2. Then, register the generated splits as a data asset in Azure ML:
 
 ```sh
-# Upload the split files to Azure Blob Storage
-python scripts/azure_manage_data_assets.py azure_data_assets.command=upload-splits
+# Register the split folder as a data asset for your experiment strategy
+python scripts/azure_manage_data_assets.py azure_data_assets.command=register-splits
 ```
 
-This command uploads the JSON split files to Azure Blob Storage, making them available for use in your Azure ML training jobs.
+This will register the folder (e.g. `data/model_ready/splits/verification_box/`) as a versioned Azure ML data asset, following the naming convention `split_<strategy>`. The training pipeline will automatically select the correct split asset based on your experiment strategy.
 
-After uploading your data and splits, you can proceed to register your datasets as data assets.
+After uploading your data and registering splits, you can proceed to register your base datasets as data assets if not already done.
 
 #### Managing Data Assets in Azure ML
 

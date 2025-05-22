@@ -1,21 +1,30 @@
 """
-This module defines the configuration schema for a machine learning segmentation project using Pydantic models.
-It includes configurations for the model, experiment, dataset, logging, and hyperparameter optimization.
+This module defines the configuration schema for a machine learning segmentation
+project using Pydantic models. It includes configurations for the model,
+experiment, dataset, logging, and hyperparameter optimization.
+
 Classes:
     Scheduler: Configuration for the learning rate scheduler.
-    ModelConfig: Configuration for the model, including parameters like name, number of epochs, batch size, learning rate, and scheduler.
+    ModelConfig: Configuration for the model, including parameters like name,
+        number of epochs, batch size, learning rate, and scheduler.
     ExperimentStrategy: Enum class defining various experiment strategies.
-    ExperimentConfig: Configuration for the experiment, including strategies, dataset configurations, and other training parameters.
+    ExperimentConfig: Configuration for the experiment, including strategies,
+        dataset configurations, and other training parameters.
     DatasetConfig: Configuration for the dataset paths and prefixes.
     MlflowConfig: Configuration for MLflow logging.
     TensorboardConfig: Configuration for Tensorboard logging.
     OptunaConfig: Configuration for Optuna hyperparameter optimization.
     AzureMLConfig: Configuration for Azure Machine Learning.
-    AzureDataAssetsCommand: Enum class defining available commands for Azure data assets management.
+    AzureDataAssetsCommand: Enum class defining available commands for Azure
+        data assets management.
     AzureDataAssetsConfig: Configuration for Azure ML data assets management.
-    ConfigSchema: The main configuration schema that includes all other configurations.
+    ConfigSchema: The main configuration schema that includes all other
+        configurations.
+
 Functions:
-    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
+    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that
+        tests the schema functionality by converting the Hydra config to a
+        Pydantic model and printing it using Rich console.
 """
 
 from enum import Enum
@@ -24,7 +33,7 @@ from typing import Any
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from rich.console import Console
 
 
@@ -36,7 +45,10 @@ class Scheduler(BaseModel):
 class ModelConfig(BaseModel):
     name: str = Field(
         ...,
-        description="Name of the model configuration to use, e.g., deeplabv3plus, unet, unetplusplus",
+        description=(
+            "Name of the model configuration to use, e.g., deeplabv3plus, "
+            "unet, unetplusplus"
+        ),
     )
     num_epochs: int = Field(..., description="Number of epochs for training.")
     batch_size: int = Field(..., description="Batch size for training.")
@@ -64,9 +76,10 @@ class ExperimentConfig(BaseModel):
     dataset_strategies: dict[str, dict[str, list[str]]] = Field(
         ...,
         description=(
-            "Mapping of experiment strategies to their corresponding dataset configurations. "
-            "Each strategy includes 'train_datasets' and 'test_datasets', "
-            "which are lists of dataset names used for training and testing respectively."
+            "Mapping of experiment strategies to their corresponding dataset "
+            "configurations. Each strategy includes 'train_datasets' and "
+            "'test_datasets', which are lists of dataset names used for "
+            "training and testing respectively."
         ),
     )
     seed: int = Field(..., description="Random seed for reproducibility.")
@@ -87,7 +100,10 @@ class ExperimentConfig(BaseModel):
     )
     early_stopping_delta: float = Field(
         ...,
-        description="Minimum change in the monitored metric to qualify as an improvement for early stopping.",
+        description=(
+            "Minimum change in the monitored metric to qualify as an "
+            "improvement for early stopping."
+        ),
     )
     optional_transforms: bool = Field(
         ..., description="Whether optional image transforms are used."
@@ -105,7 +121,10 @@ class ExperimentConfig(BaseModel):
     )
     use_registered_splits: bool = Field(
         False,
-        description="Whether to use registered splits from Azure ML Data Assets instead of strategy-based filtering.",
+        description=(
+            "Whether to use registered splits from Azure ML Data Assets "
+            "instead of strategy-based filtering."
+        ),
     )
 
 
@@ -117,7 +136,10 @@ class DatasetConfig(BaseModel):
     )
     prefixes: dict[str, list[str]] = Field(
         ...,
-        description="Mapping of dataset names to lists of prefixes used to filter files for that dataset.",
+        description=(
+            "Mapping of dataset names to lists of prefixes used to filter "
+            "files for that dataset."
+        ),
     )
 
 
@@ -166,7 +188,10 @@ class AzureDataAssetsConfig(BaseModel):
 
     command: AzureDataAssetsCommand | None = Field(
         None,
-        description="Command to execute (register-base-datasets, register-splits, list-assets, compare-assets, upload-data, generate-splits, upload-splits)",
+        description=(
+            "Command to execute (register-base-datasets, register-splits, "
+            "list-assets, compare-assets, upload-data, generate-splits)"
+        ),
     )
     asset_name: str | None = Field(
         None, description="Name of the asset to list or compare"
@@ -194,6 +219,21 @@ class ConfigSchema(BaseModel):
         default_factory=AzureDataAssetsConfig,
         description="Configuration for Azure ML data assets management.",
     )
+
+    @field_validator("azure_data_assets")
+    @classmethod
+    def validate_command(cls, v):
+        # Check if command is valid
+        if hasattr(v, "command"):
+            try:
+                AzureDataAssetsCommand(v.command)
+            except ValueError:
+                available_commands = [cmd.value for cmd in AzureDataAssetsCommand]
+                raise ValueError(
+                    f"'{v.command}' is not a valid command. "
+                    f"Available commands: {', '.join(available_commands)}"
+                )
+        return v
 
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")

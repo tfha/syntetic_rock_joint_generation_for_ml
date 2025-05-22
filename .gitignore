@@ -30,8 +30,13 @@ __pycache__/
 # Data and experiments
 #######################################
 experiments/
+# Ignore data directory
 data/
 
+# But don't ignore the model_ready/splits directory and its contents
+!data/model_ready/
+!data/model_ready/splits/
+!data/model_ready/splits/**
 models/
 
 plots/

@@ -4,14 +4,13 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
-    hooks:
-    # list of supported hooks: https://pre-commit.com/hooks.html
+    hooks:    # list of supported hooks: https://pre-commit.com/hooks.html
     - id: trailing-whitespace
     - id: end-of-file-fixer
     - id: check-yaml
     - id: check-json
     - id: check-added-large-files
-      args: ['--maxkb=1000']
+      args: ['--maxkb=2000']
     - id: debug-statements
     - id: detect-private-key
     - id: check-toml

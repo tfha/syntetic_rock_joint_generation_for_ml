@@ -28,7 +28,8 @@ def setup_azure_environment(console=None):
     validates Azure credentials, and returns a console object.
 
     Args:
-        console: Optional console object for pretty printing. If None, a new console is created.
+        console: Optional console object for pretty printing. If None, a new
+        console is created.
 
     Returns:
         tuple: (console, subscription_id, resource_group, workspace_name)
@@ -50,7 +51,8 @@ def setup_azure_environment(console=None):
             "Error: AZURE_SUBSCRIPTION_ID environment variable not set", style="error"
         )
         console.print(
-            "Please set it in your .env file: AZURE_SUBSCRIPTION_ID='your-subscription-id'",
+            "Please set it in your .env file:"
+            "AZURE_SUBSCRIPTION_ID='your-subscription-id'",
             style="error",
         )
         sys.exit(1)
@@ -178,7 +180,6 @@ def register_data_asset(
 
     try:
         # Create the data asset directly with all required parameters
-        # This follows the exact pattern from the Azure ML SDK v2 documentation
         my_data = Data(
             name=name,
             version=version,
@@ -205,10 +206,11 @@ def register_data_asset(
         except Exception:
             pass  # Data doesn't exist with this version, continue with creation
 
-        # Register/update the data asset
+        # Register the data asset
         result = ml_client.data.create_or_update(my_data)
         console.print(
-            f"Successfully registered data asset '{name}' with version {result.version}",
+            f"Successfully registered data asset '{name}'"
+            " with version {result.version}",
             style="success",
         )
         return result

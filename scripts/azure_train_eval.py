@@ -40,7 +40,6 @@ from ml_segmentation.utility import (
     seed_everything,
 )
 
-
 # Configure logging to reduce verbose Azure client output
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
     logging.WARNING
@@ -76,7 +75,8 @@ def main(cfg: DictConfig) -> None:
     # 2. Setup output directories
     ########################################################################
     console.print(
-        f"Starting Azure ML training run with strategy: {pcfg.experiment.experiment_strategy}",
+        "Starting Azure ML training run with strategy:"
+        f"{pcfg.experiment.experiment_strategy}",
         style="info",
     )
 
@@ -110,7 +110,8 @@ def main(cfg: DictConfig) -> None:
     )
 
     # In Azure ML, input datasets are mounted to paths defined in environment variables
-    # AZUREML_RUN_ID environment variable is a standard environment variable set by Azure ML when a job is running
+    # AZUREML_RUN_ID environment variable is a standard environment variable set by
+    # Azure ML when a job is running
     if "AZUREML_RUN_ID" in os.environ:
         # Get the paths from environment variables set by Azure ML
         images_path = Path(os.environ.get("AZUREML_DATAREFERENCE_images_data", ""))

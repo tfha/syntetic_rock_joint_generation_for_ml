@@ -5,21 +5,26 @@ This script performs the following steps:
 2. Load Data: Loads and preprocesses training, validation, and test datasets.
 3. Validate Data: Optionally validates data before and after transformations.
 4. Define Model: Initializes the model based on the configuration.
-5. Define Loss, Optimizer, Scheduler: Sets up the loss function, optimizer, learning rate scheduler, and early stopping.
-6. Training and Validation: Trains the model for a specified number of epochs, performs validation, and logs metrics.
-7. Logging: Logs results and configuration to MLflow. Results during training are logged to TensorBoard.
+5. Define Loss, Optimizer, Scheduler: Sets up the loss function, optimizer, learning
+   rate scheduler, and early stopping.
+6. Training and Validation: Trains the model for a specified number of epochs, performs
+   validation, and logs metrics.
+7. Logging: Logs results and configuration to MLflow. Results during training are
+   logged to TensorBoard.
 
 Functions:
     main(cfg: DictConfig) -> None
         Main function to run the training session.
 Args:
-    cfg (DictConfig): Configuration object containing all the parameters for the training session.
+    cfg (DictConfig): Configuration object containing all the parameters for the
+    training session.
 Usage:
     Run this script with the appropriate configuration file to start a training session.
     Example:
         python scripts/train_eval.py model=unet
 """
 
+import json
 import os
 import shutil
 import time
@@ -84,7 +89,8 @@ def main(cfg: DictConfig) -> None:
     ########################################################################
     # Create a rich console with custom theme
     console.print(
-        f"Kicking off an experiment using the experiment strategy: {pcfg.experiment.experiment_strategy}",
+        "Kicking off an experiment using the experiment strategy:"
+        f" {pcfg.experiment.experiment_strategy}",
         style="info",
     )
     # Create a unique log directory for each run
@@ -115,39 +121,86 @@ def main(cfg: DictConfig) -> None:
     # LOAD DATA
     ###############################################################
     console.print("Loading training and testing data..", style="info")
-    images_directory = pcfg.dataset.path_images
-    labels_directory = pcfg.dataset.path_processed_mask_labels
+    images_directory = Path(pcfg.dataset.path_images)
+    labels_directory = Path(pcfg.dataset.path_processed_mask_labels)
 
-    # Get transformations
+    # Get transformations (must be defined before splits for later use)
     transforms_dict = get_transforms(
         optional_transforms=pcfg.experiment.optional_transforms
     )
 
-    # Get prefixes for files in the dataset to use for training and testing
-    prefixes = get_datasets_prefixes(
-        experiment_strategy=pcfg.experiment.experiment_strategy,
-        dataset_strategies=pcfg.experiment.dataset_strategies,
-        dataset_prefixes=pcfg.dataset.prefixes,
+    # Determine split subfolder based on experiment_strategy
+    split_subfolder = (
+        pcfg.experiment.experiment_strategy.lower().replace(".", "_").replace(" ", "_")
     )
+    split_dir = Path("data/model_ready/splits") / split_subfolder
+    split_dir.mkdir(parents=True, exist_ok=True)
 
-    train_prefixes_list, test_prefixes_list = (
-        prefixes["train_prefixes"],
-        prefixes["test_prefixes"],
-    )
+    # Check if split JSONs exist
+    train_json = split_dir / "train.json"
+    val_json = split_dir / "val.json"
+    test_json = split_dir / "test.json"
 
-    # Get data files
-    train_files, test_files = get_data_files(
-        images_directory, labels_directory, train_prefixes_list, test_prefixes_list
-    )
-
-    # Split data
-    train_list, val_list, test_list = split_data(
-        train_files,
-        test_files,
-        train_frac=pcfg.experiment.train_fraction,
-        val_frac=pcfg.experiment.val_fraction,
-        test_frac=pcfg.experiment.test_fraction,
-    )
+    if train_json.exists() and val_json.exists() and test_json.exists():
+        console.print(f"Loading dataset splits from {split_dir}", style="info")
+        with open(train_json, "r") as f:
+            train_list = json.load(f)
+        with open(val_json, "r") as f:
+            val_list = json.load(f)
+        with open(test_json, "r") as f:
+            test_list = json.load(f)
+    else:
+        console.print(
+            f"Generating dataset splits for local training (not found in {split_dir})",
+            style="info",
+        )
+        # Get prefixes for files in the dataset to use for training and testing
+        prefixes = get_datasets_prefixes(
+            experiment_strategy=pcfg.experiment.experiment_strategy,
+            dataset_strategies=pcfg.experiment.dataset_strategies,
+            dataset_prefixes=pcfg.dataset.prefixes,
+        )
+        train_prefixes_list, test_prefixes_list = (
+            prefixes["train_prefixes"],
+            prefixes["test_prefixes"],
+        )
+        # Get data files
+        train_files, test_files = get_data_files(
+            images_directory, labels_directory, train_prefixes_list, test_prefixes_list
+        )
+        train_set = set(train_files)
+        test_set = set(test_files)
+        if train_set.isdisjoint(test_set):
+            console.print(
+                "Train and test sets are disjoint. No splitting will be performed;"
+                "using all train and test files as provided.",
+                style="info",
+            )
+            train_list = list(train_files)
+            val_list = []
+            test_list = list(test_files)
+        else:
+            console.print(
+                f"Splitting data with train frac.: {pcfg.experiment.train_fraction}, "
+                f"val frac.: {pcfg.experiment.val_fraction}, "
+                f"test frac.: {pcfg.experiment.test_fraction}...",
+                style="info",
+            )
+            train_list, val_list, test_list = split_data(
+                train_files,
+                test_files,
+                train_frac=pcfg.experiment.train_fraction,
+                val_frac=pcfg.experiment.val_fraction,
+                test_frac=pcfg.experiment.test_fraction,
+            )
+        # Save splits
+        with open(train_json, "w") as f:
+            json.dump(train_list, f)
+        with open(val_json, "w") as f:
+            json.dump(val_list, f)
+        with open(test_json, "w") as f:
+            json.dump(test_list, f)
+        console.print(f"Saved splits to {split_dir}", style="success")
 
     # Print the number of samples in train, validation, and test sets
     console.print(f"Number of training samples: {len(train_list)}")

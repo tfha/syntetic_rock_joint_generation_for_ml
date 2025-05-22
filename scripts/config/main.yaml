@@ -45,8 +45,8 @@ experiment:
   compare_metric: loss # metric for comparison in chosing new best model
   num_workers: 2 # number of workers for data loading
   train_fraction: 0.8
-  val_fraction: 0.0
-  test_fraction: 0.2
+  val_fraction: 0.1
+  test_fraction: 0.1
   early_stopping_patience: 3
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
   optional_transforms: false
@@ -117,7 +117,7 @@ dataset:
       - "Box"
     real_world_rock_slope:
       - "Larvik"
-      - "RV4"
+      - "Rv4"
 
 tensorboard:
   path: ./experiments/tensorboard_logs

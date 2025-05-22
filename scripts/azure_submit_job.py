@@ -23,7 +23,6 @@ from ml_segmentation.azure_data_assets import (
 from ml_segmentation.schema_config import ConfigSchema
 from ml_segmentation.utility import export_poetry_to_environment_yml
 
-
 # Configure logging to reduce verbose Azure client output
 logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
     logging.WARNING
@@ -39,7 +38,7 @@ def main(cfg: DictConfig) -> None:
     cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
     pcfg = ConfigSchema(**cfg_dict)
 
-    # Setup environment and get Azure credentials
+    # Setup print-console, environment and get Azure credentials
     console, subscription_id, resource_group, workspace_name = setup_azure_environment()
 
     console.print("Starting Azure ML job submission with config:", style="info")
@@ -89,23 +88,15 @@ def main(cfg: DictConfig) -> None:
         images_dataset = get_data_asset(ml_client, "rock_images")
         masks_dataset = get_data_asset(ml_client, "rock_masks")
 
-        # Get data splits if available
-        try:
-            splits_dataset = get_data_asset(ml_client, "rock_segmentation_splits")
-            console.print(
-                f"Using dataset splits version: {splits_dataset.version}", style="info"
-            )
-            has_splits = True
-        except ResourceNotFoundError:
-            console.print(
-                "No dataset splits found, will use strategy-based splitting",
-                style="warning",
-            )
-            has_splits = False
-        except Exception as e:
-            console.print(f"Error retrieving splits dataset: {str(e)}", style="error")
-            has_splits = False
+        # Select the correct split asset based on experiment strategy
+        strategy = pcfg.experiment.experiment_strategy.lower()
+        split_asset_name = f"split_{strategy.replace('.', '_').replace(' ', '_')}"
+        splits_dataset = get_data_asset(ml_client, split_asset_name)
 
+        console.print(
+            f"Using split asset: {split_asset_name} (version {splits_dataset.version})",
+            style="info",
+        )
         console.print(
             f"Using images dataset version: {images_dataset.version}", style="info"
         )
@@ -115,17 +106,23 @@ def main(cfg: DictConfig) -> None:
 
     except ResourceNotFoundError as e:
         console.print(f"Data asset not found: {str(e)}", style="error")
-        console.print(
-            "Make sure you have registered data assets using scripts/manage_azure_data_assets.py azure_data_assets.command=register-base-datasets",
-            style="warning",
+        msg = (
+            "Make sure you have registered data assets using "
+            "scripts/manage_azure_data_assets.py "
+            "azure_data_assets.command=register-base-datasets or "
+            "azure_data_assets.command=register-splits"
         )
+        console.print(msg, style="warning")
         sys.exit(1)
     except Exception as e:
         console.print(f"Error retrieving data assets: {str(e)}", style="error")
-        console.print(
-            "Make sure you have registered data assets using scripts/manage_azure_data_assets.py azure_data_assets.command=register-base-datasets",
-            style="warning",
+        msg = (
+            "Make sure you have registered data assets using "
+            "scripts/manage_azure_data_assets.py "
+            "azure_data_assets.command=register-base-datasets or "
+            "azure_data_assets.command=register-splits"
         )
+        console.print(msg, style="warning")
         sys.exit(1)
 
     # 6. Validate compute cluster exists
@@ -137,10 +134,11 @@ def main(cfg: DictConfig) -> None:
         console.print(
             f"Compute cluster '{compute_cluster_name}' not found", style="error"
         )
-        console.print(
-            "Please create the compute cluster in the Azure ML workspace or update the configuration.",
-            style="warning",
+        msg = (
+            "Please create the compute cluster in the Azure ML workspace "
+            "or update the configuration."
         )
+        console.print(msg, style="warning")
         sys.exit(1)
     except Exception as e:
         console.print(f"Error accessing compute cluster: {str(e)}", style="error")
@@ -184,10 +182,8 @@ def main(cfg: DictConfig) -> None:
         "strategy": pcfg.experiment.experiment_strategy,
         "images_dataset_version": images_dataset.version,
         "masks_dataset_version": masks_dataset.version,
+        "splits_dataset_version": splits_dataset.version,
     }
-
-    if has_splits:
-        run_metadata["splits_dataset_version"] = splits_dataset.version
 
     # 9. Define training command and parameters
     ###########################################
@@ -199,12 +195,9 @@ def main(cfg: DictConfig) -> None:
         f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
         f"model.num_epochs={pcfg.model.num_epochs} "
         f"model.batch_size={pcfg.model.batch_size} "
-        f"model.learning_rate={pcfg.model.learning_rate}"
+        f"model.learning_rate={pcfg.model.learning_rate} "
+        f"experiment.use_registered_splits=True"
     )
-
-    # Add data split info if available
-    if has_splits:
-        train_command += " experiment.use_registered_splits=True"
 
     # 10. Configure job inputs and outputs
     ###########################################
@@ -212,11 +205,8 @@ def main(cfg: DictConfig) -> None:
     job_inputs = {
         "images_data": Input(type="uri_folder", path=images_dataset.id),
         "masks_data": Input(type="uri_folder", path=masks_dataset.id),
+        "splits_data": Input(type="uri_folder", path=splits_dataset.id),
     }
-
-    # Add splits dataset if available
-    if has_splits:
-        job_inputs["splits_data"] = Input(type="uri_folder", path=splits_dataset.id)
 
     job_outputs = {
         "model_output": Output(type="uri_folder", path="./outputs/models"),
@@ -313,10 +303,11 @@ def main(cfg: DictConfig) -> None:
         )
     except Exception as e:
         console.print(f"Error downloading job outputs: {str(e)}", style="error")
-        console.print(
-            f"You can download the outputs manually from the Azure ML portal: {job_run.services.get('Studio').endpoint}",
-            style="warning",
+        msg = (
+            "You can download the outputs manually from the Azure ML portal: "
+            f"{job_run.services.get('Studio').endpoint}"
         )
+        console.print(msg, style="warning")
 
     # 14. Print job output information
     ###########################################

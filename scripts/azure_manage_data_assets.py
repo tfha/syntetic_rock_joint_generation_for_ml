@@ -5,12 +5,31 @@ This script demonstrates how to use the Azure ML data asset management functiona
 to handle your rock mass segmentation datasets properly.
 
 Usage:
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=register-base-datasets
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=register-splits
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=list-assets asset_name=rock_images
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=compare-assets asset_name=rock_images version1=1 version2=2
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=upload-data
-    python scripts/manage_azure_data_assets.py azure_data_assets.command=generate-splits
+    # Register base datasets
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=register-base-datasets
+
+    # Register dataset splits
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=register-splits
+
+    # List assets with specific name
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=list-assets \
+        asset_name=rock_images
+
+    # Compare two versions of an asset
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=compare-assets \
+        asset_name=rock_images version1=1 version2=2
+
+    # Upload new data
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=upload-data
+
+    # Generate new dataset splits
+    python scripts/manage_azure_data_assets.py \
+        azure_data_assets.command=generate-splits
 """
 
 import json
@@ -49,6 +68,11 @@ from ml_segmentation.utility import seed_everything
 def get_command_description(command: AzureDataAssetsCommand) -> str:
     """Get a descriptive text for an Azure Data Assets command.
 
+    This function provides human-readable descriptions of each command beyond
+    the kebab-case identifiers in the enum. These descriptions are used for
+    UI presentation and help text to improve usability, while maintaining
+    separation between command identifiers and their presentation layer.
+
     Args:
         command: The AzureDataAssetsCommand enum value
 
@@ -56,15 +80,77 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
         A description of what the command does
     """
     descriptions = {
-        AzureDataAssetsCommand.REGISTER_BASE_DATASETS: "Register base datasets in Azure ML",
+        AzureDataAssetsCommand.REGISTER_BASE_DATASETS: (
+            "Register base datasets in Azure ML"
+        ),
         AzureDataAssetsCommand.REGISTER_SPLITS: "Register dataset splits in Azure ML",
+        AzureDataAssetsCommand.UPLOAD_SPLITS: (
+            "Upload dataset splits to Azure Blob Storage"
+        ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",
         AzureDataAssetsCommand.COMPARE_ASSETS: "Compare two versions of a data asset",
         AzureDataAssetsCommand.UPLOAD_DATA: "Upload local data to Azure Blob storage",
         AzureDataAssetsCommand.GENERATE_SPLITS: "Generate dataset splits locally",
-        AzureDataAssetsCommand.UPLOAD_SPLITS: "Upload dataset split JSON files to Azure Blob storage",
     }
     return descriptions.get(command, "Unknown command")
+
+
+def get_and_validate_azure_storage_config(
+    console: Console, require_key: bool = False
+) -> tuple[str, str, str, str | None]:
+    """Get and validate Azure storage configuration from environment variables.
+
+    Args:
+        console: Console object for pretty printing
+        require_key: Whether to require the storage key (default: False)
+
+    Returns:
+        tuple: (storage_account, container_name, connection_string, storage_key)
+        where storage_key is None if require_key is False
+
+    Raises:
+        SystemExit: If required configuration is missing
+    """
+    storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
+    container_name = os.environ.get("AZURE_BLOB_DATASTORE")
+    storage_key = os.environ.get("AZURE_STORAGE_KEY") if require_key else None
+
+    required_vars = [storage_account, container_name]
+    if require_key:
+        required_vars.append(storage_key)
+
+    if not all(required_vars):
+        console.print(
+            "Error: Missing Azure storage configuration in .env file.", style="error"
+        )
+        missing_vars = []
+        if not storage_account:
+            missing_vars.append("AZURE_STORAGE_ACCOUNT")
+        if not container_name:
+            missing_vars.append("AZURE_BLOB_DATASTORE")
+        if require_key and not storage_key:
+            missing_vars.append("AZURE_STORAGE_KEY")
+
+        missing_vars_str = ", ".join(missing_vars)
+        console.print(
+            f"Please set the following environment variables: {missing_vars_str}",
+            style="error",
+        )
+        sys.exit(1)
+
+        # Build connection string for Azure storage account
+    endpoint_protocol = "DefaultEndpointsProtocol=https"
+    account_name = f"AccountName={storage_account}"
+    account_key = f"AccountKey={storage_key}"
+    endpoint_suffix = "EndpointSuffix=core.windows.net"
+
+    connection_string = (
+        f"{endpoint_protocol};{account_name};{account_key};{endpoint_suffix}"
+        if storage_key
+        else None
+    )
+
+    return storage_account, container_name, connection_string, storage_key
 
 
 def register_base_datasets(ml_client: MLClient, console: Console):
@@ -77,25 +163,16 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 
     console.print("Registering base datasets in Azure ML", style="info")
 
-    # Get blob datastore name directly from environment variables
-    storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
-    container_name = os.environ.get("AZURE_BLOB_DATASTORE")
-
-    if not all([storage_account, container_name]):
-        console.print(
-            "Error: Missing Azure storage configuration in .env file.", style="error"
-        )
-        console.print(
-            "Please set AZURE_STORAGE_ACCOUNT and AZURE_BLOB_DATASTORE environment variables.",
-            style="error",
-        )
-        return
+    # Validate storage configuration
+    storage_account, container_name, _, _ = get_and_validate_azure_storage_config(
+        console
+    )
 
     # Define the dataset paths using proper Azure Blob storage URL format
     console.print("Reading dataset paths...", style="info")
 
-    # Format paths using proper schema (abfss://) for Azure Data Lake Storage Gen2
-    # Or wasbs:// for Azure Blob Storage
+    # wasbs is a protocol identifier for Azure Blob Storage secure connection
+    # (with SSL/TLS)
     dataset_paths = {
         "images": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/rockmass",
         "masks": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/binary",
@@ -183,109 +260,107 @@ def register_base_datasets(ml_client: MLClient, console: Console):
     )
 
 
-def register_dataset_splits(ml_client: MLClient, console: Console):
-    """Register train/val/test dataset splits in Azure ML.
+def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
+    """Upload split files (train/val/test) to Azure Blob Storage under
+    splits/<strategy>/"""
+    # Get storage config
+    (
+        storage_account,
+        container_name,
+        connection_string,
+        _,
+    ) = get_and_validate_azure_storage_config(console)
 
-    Args:
-        ml_client: The Azure ML client
-        console: Console object for pretty printing
-    """
-
-    console.print("Registering dataset splits in Azure ML", style="info")
-
-    base_path = Path("data/model_ready")
-    split_files = {
-        "train": base_path / "train_files.json",
-        "val": base_path / "val_files.json",
-        "test": base_path / "test_files.json",
-    }
-
-    # Check if files exist
-    for name, path in split_files.items():
-        if not path.exists():
-            console.print(f"Error: Split file '{path}' not found", style="error")
-            sys.exit(1)
-
-    # Get the latest version of the base datasets
-    try:
-        images_dataset = get_data_asset(ml_client, "rock_images")
-        masks_dataset = get_data_asset(ml_client, "rock_masks")
+    # Comment split into multiple lines for better readability
+    # wasbs is a protocol identifier for Azure Blob Storage secure connection
+    # (with SSL/TLS)
+    split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
+    split_dir = Path("data/model_ready/splits") / split_subfolder
+    if not split_dir.exists():
         console.print(
-            f"Using images dataset version: {images_dataset.version}", style="info"
+            f"Error: Split directory '{split_dir}' not found. Generate splits first.",
+            style="error",
         )
-        console.print(
-            f"Using masks dataset version: {masks_dataset.version}", style="info"
-        )
-    except Exception as e:
-        console.print(f"Error retrieving base datasets: {e}", style="error")
         sys.exit(1)
 
-    # Generate a version based on current timestamp
-    version = datetime.now().strftime("%Y%m%d.%H%M")
+    # Validate files exist
+    for fname in ["train.json", "val.json", "test.json"]:
+        if not (split_dir / fname).exists():
+            console.print(
+                f"Error: Missing split file: {split_dir / fname}", style="error"
+            )
+            sys.exit(1)
 
-    # Register individual split files
-    registered_assets = {}
+    # Validate storage configuration and get connection string
+    _, container_name, connection_string, _ = get_and_validate_azure_storage_config(
+        console, require_key=True
+    )
 
-    for split_name, split_path in split_files.items():
-        console.print(f"Registering {split_name} split...", style="info")
-
-        # Load split file to get sample count
-        with open(split_path) as f:
-            split_data = json.load(f)
-
-        # Create metadata with references to base datasets
-        metadata = {
-            "base_images_dataset": f"rock_images:{images_dataset.version}",
-            "base_masks_dataset": f"rock_masks:{masks_dataset.version}",
-            "num_samples": str(len(split_data)),
-            "split_type": split_name,
-        }
-
-        # Register the split file as a data asset
-        asset = register_data_asset(
-            ml_client=ml_client,
-            name=f"rock_segmentation_{split_name}_split",
-            version=version,
-            description=f"Rock segmentation {split_name} split",
-            path=str(split_path.absolute()),
-            asset_type=AssetTypes.URI_FILE,
-            tags={"domain": "geology", "type": "data_split", "split": split_name},
-            metadata=metadata,
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            connection_string
         )
+        container_client = blob_service_client.get_container_client(container_name)
+        blob_folder = f"splits/{split_subfolder}"
+        upload_files(
+            container_client=container_client,
+            console=console,
+            local_folder_path=split_dir,
+            blob_folder=blob_folder,
+        )
+        console.print(
+            f"Uploaded split files to Azure Blob Storage: {blob_folder}",
+            style="success",
+        )
+    except Exception as e:
+        console.print(f"Error uploading split files: {str(e)}", style="error")
+        sys.exit(1)
 
-        registered_assets[split_name] = asset
 
-    # Create a combined asset referencing all splits
-    combined_metadata = {
-        "train_split": f"rock_segmentation_train_split:{version}",
-        "val_split": f"rock_segmentation_val_split:{version}",
-        "test_split": f"rock_segmentation_test_split:{version}",
-        "base_images_dataset": f"rock_images:{images_dataset.version}",
-        "base_masks_dataset": f"rock_masks:{masks_dataset.version}",
+def register_split_data_asset(
+    ml_client: MLClient, console: Console, experiment_strategy: str
+):
+    """Register the split folder in Azure Blob Storage as a data asset in Azure ML."""
+    split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
+
+    # Validate storage configuration
+    storage_account, container_name, _, _ = get_and_validate_azure_storage_config(
+        console
+    )
+
+    version = datetime.now().strftime("%Y%m%d.%H%M")
+    asset_name = f"split_{split_subfolder}"
+    description = f"Train/val/test split for {split_subfolder.replace('_', ' ')}"
+
+    # Get base dataset versions
+    rock_images = get_data_asset(ml_client, "rock_images")
+    rock_masks = get_data_asset(ml_client, "rock_masks")
+
+    metadata = {
+        "base_images_dataset": f"rock_images:{rock_images.version}",
+        "base_masks_dataset": f"rock_masks:{rock_masks.version}",
+        "split_strategy": experiment_strategy,
     }
-
-    # Register the combined split reference
-    combined_asset = register_data_asset(
+    splits_blob_uri = (
+        f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/"
+        f"splits/{split_subfolder}"
+    )
+    asset = register_data_asset(
         ml_client=ml_client,
-        name="rock_segmentation_splits",
+        name=asset_name,
         version=version,
-        description="Combined rock segmentation dataset splits",
-        path=str(
-            base_path.absolute()
-        ),  # Path to the directory containing the split files
+        description=description,
+        path=splits_blob_uri,
         asset_type=AssetTypes.URI_FOLDER,
-        tags={"domain": "geology", "type": "data_split", "split": "combined"},
-        metadata=combined_metadata,
+        tags={"domain": "geology", "type": "data_split", "split": split_subfolder},
+        metadata=metadata,
     )
-
-    registered_assets["combined"] = combined_asset
-
-    # Print summary
     console.print(
-        "\nSuccessfully registered the following dataset splits:", style="success"
+        "\nSuccessfully registered split asset: "
+        f"{asset.name} (version {asset.version})",
+        style="success",
     )
-    for name, asset in registered_assets.items():
-        console.print(f"- {name}: {asset.name} (version {asset.version})", style="info")
+    console.print(f"Asset path: {splits_blob_uri}", style="info")
 
 
 def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = None):
@@ -364,7 +439,8 @@ def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = No
         except Exception as e:
             console.print(f"Error listing data assets: {str(e)}", style="error")
             console.print(
-                "This could be due to permission issues or invalid Azure ML configuration.",
+                "This could be due to permission issues or "
+                "invalid Azure ML configuration.",
                 style="warning",
             )
 
@@ -383,10 +459,11 @@ def compare_assets(
     """
 
     if not all([asset_name, version1, version2]):
-        console.print(
-            "Error: Missing required parameters. Please provide asset_name, version1, and version2.",
-            style="error",
+        err_msg = (
+            "Error: Missing required parameters. Please provide asset_name, "
+            "version1, and version2."
         )
+        console.print(err_msg, style="error")
         return
 
     console.print(
@@ -418,34 +495,26 @@ def compare_assets(
         console.print("\nNo metadata differences found", style="success")
 
 
-def upload_data_to_azure_blob(
+def upload_base_data_to_azure_blob(
     console: Console, path_images: str, path_raw_masks: str, path_processed_masks: str
 ):
     """Upload local data to Azure Blob storage.
 
     Args:
         console: Console object for pretty printing
-        path_images: Path to the images directory (may contain variables to replace)
-        path_raw_masks: Path to the raw mask labels directory (may contain variables to replace)
-        path_processed_masks: Path to the processed mask labels directory (may contain variables to replace)
+        path_images: Path to the images directory (may contain config variables)
+        path_raw_masks: Path to the raw mask labels directory
+            (may contain config variables)
+        path_processed_masks: Path to the processed mask labels directory
+            (may contain config variables)
     """
 
     console.print("Preparing to upload data to Azure Blob storage...", style="info")
 
-    # Get storage account connection info from environment variables
-    storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
-    storage_key = os.environ.get("AZURE_STORAGE_KEY")
-    container_name = os.environ.get("AZURE_BLOB_DATASTORE")
-
-    if not all([storage_account, storage_key, container_name]):
-        console.print(
-            "Error: Missing Azure storage configuration in .env file.", style="error"
-        )
-        console.print(
-            "Please set AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, and AZURE_BLOB_DATASTORE.",
-            style="error",
-        )
-        return
+    # Validate storage configuration and get connection string
+    storage_account, container_name, connection_string, storage_key = (
+        get_and_validate_azure_storage_config(console, require_key=True)
+    )
 
     # Check if paths exist - paths have already been resolved by Hydra
     paths_to_check = {
@@ -469,16 +538,15 @@ def upload_data_to_azure_blob(
     console.print(
         "This may take a while depending on the size of your data.", style="warning"
     )
-    confirmation = input("Do you want to continue? (y/n): ").strip().lower()
+    confirmation = input("Do you want to continue? (y/n): ")
 
-    if confirmation != "y":
+    if confirmation.strip().lower() != "y":
         console.print("Upload canceled.", style="warning")
         return
 
     # Connect to Azure Blob storage
     console.print("Connecting to Azure Blob storage...", style="info")
     try:
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={storage_account};AccountKey={storage_key};EndpointSuffix=core.windows.net"
         blob_service_client = BlobServiceClient.from_connection_string(
             connection_string
         )
@@ -490,7 +558,9 @@ def upload_data_to_azure_blob(
         console.print(
             f"Error connecting to Azure Blob storage: {str(e)}", style="error"
         )
-        return  # Upload images
+        return
+
+    # Upload images
     upload_files(
         container_client=container_client,
         console=console,
@@ -517,7 +587,8 @@ def upload_data_to_azure_blob(
     console.print("\nUpload complete!", style="success")
     console.print("You can now register the data assets using:", style="info")
     console.print(
-        "python manage_azure_data_assets.py azure_data_assets.command=register-base-datasets",
+        "python manage_azure_data_assets.py"
+        "azure_data_assets.command=register-base-datasets",
         style="info",
     )
 
@@ -574,104 +645,7 @@ def upload_files(container_client, console: Console, local_folder_path, blob_fol
             console.print(f"Error uploading {file}: {str(e)}", style="error")
 
 
-def upload_splits_to_azure_blob(console: Console):
-    """Upload the dataset split JSON files to Azure Blob storage.
-
-    This function uploads the train/val/test split JSON files to Azure Blob storage
-    to make them available for Azure ML experiments.
-
-    Args:
-        console: Console object for pretty printing
-    """
-
-    console.print(
-        "Preparing to upload dataset split files to Azure Blob storage...", style="info"
-    )
-
-    # Get storage account connection info from environment variables
-    storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
-    storage_key = os.environ.get("AZURE_STORAGE_KEY")
-    container_name = os.environ.get("AZURE_BLOB_DATASTORE")
-
-    if not all([storage_account, storage_key, container_name]):
-        console.print(
-            "Error: Missing Azure storage configuration in .env file.", style="error"
-        )
-        console.print(
-            "Please set AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, and AZURE_BLOB_DATASTORE.",
-            style="error",
-        )
-        return
-
-    # Check if split files exist
-    split_files_dir = Path("data/model_ready")
-    split_files = [
-        split_files_dir / "train_files.json",
-        split_files_dir / "val_files.json",
-        split_files_dir / "test_files.json",
-    ]
-
-    for file_path in split_files:
-        if not file_path.exists():
-            console.print(f"Error: Split file '{file_path}' not found", style="error")
-            console.print(
-                "Please generate splits first using:\n  python scripts/manage_azure_data_assets.py azure_data_assets.command=generate-splits",
-                style="info",
-            )
-            return
-
-    # Connect to Azure Blob storage
-    console.print("Connecting to Azure Blob storage...", style="info")
-    try:
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={storage_account};AccountKey={storage_key};EndpointSuffix=core.windows.net"
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
-        )
-        container_client = blob_service_client.get_container_client(container_name)
-        console.print(
-            f"Successfully connected to container: {container_name}", style="success"
-        )
-    except Exception as e:
-        console.print(
-            f"Error connecting to Azure Blob storage: {str(e)}", style="error"
-        )
-        return
-
-    # Upload files to Azure Blob Storage
-    blob_folder = "dataset_splits"
-    console.print(f"Uploading split files to {blob_folder}/...", style="info")
-
-    for file_path in split_files:
-        blob_path = f"{blob_folder}/{file_path.name}".replace("\\", "/")
-
-        try:
-            # Upload with proper content type
-            blob_client = container_client.get_blob_client(blob_path)
-            content_settings = ContentSettings(content_type="application/json")
-
-            with open(file_path, "rb") as data:
-                blob_client.upload_blob(
-                    data, overwrite=True, content_settings=content_settings
-                )
-
-            console.print(f"Successfully uploaded: {file_path.name}", style="success")
-        except Exception as e:
-            console.print(f"Error uploading {file_path.name}: {str(e)}", style="error")
-
-    console.print(
-        "\nSplit files have been uploaded to Azure Blob Storage!", style="success"
-    )
-    console.print(f"Location: {blob_folder}/", style="info")
-    console.print(
-        "\nYou can now register these splits in Azure ML using:", style="info"
-    )
-    console.print(
-        "  python scripts/manage_azure_data_assets.py azure_data_assets.command=register-splits",
-        style="info",
-    )
-
-
-def generate_dataset_splits(
+def prepare_and_save_dataset_splits(
     console: Console,
     images_directory: str | Path,
     labels_directory: str | Path,
@@ -681,36 +655,38 @@ def generate_dataset_splits(
     train_fraction: float,
     val_fraction: float,
     test_fraction: float,
-    seed: int,
 ):
-    """Generate dataset splits for use in Azure ML.
+    """
+    Prepare and save dataset splits for use in Azure ML.
 
     This function:
-    1. Uses the dataset prefixes from the config
-    2. Gets the data files based on those prefixes
-    3. Splits the data into train/val/test sets
-    4. Saves the splits as JSON files in the data/model_ready directory
+    1. Uses the dataset prefixes from the config to filter files.
+    2. Gets the data files based on those prefixes.
+    3. If the train and test sets are disjoint, no splitting is performed
+       and all train and test files are used as provided, regardless of
+       the fraction values.
+    4. Otherwise, splits the data into train/val/test sets according to
+       the provided fractions.
+    5. Saves the resulting splits as JSON files in the correct subfolder
+       under data/model_ready/splits/<strategy>/<subtype>/.
 
     Args:
-        console: Console object for pretty printing
-        images_directory: Path to the images directory
-        labels_directory: Path to the processed mask labels directory
-        experiment_strategy: The experiment strategy to use
-        dataset_strategies: Mapping of experiment strategies to their dataset configurations
-        dataset_prefixes: Mapping of dataset names to lists of prefixes
-        train_fraction: Fraction of data used for training
-        val_fraction: Fraction of data used for validation
-        test_fraction: Fraction of data used for testing
-        seed: Random seed for reproducibility
+        console: Console object for pretty printing.
+        images_directory: Path to the images directory.
+        labels_directory: Path to the labels directory.
+        experiment_strategy: The experiment strategy (used for split folder).
+        dataset_strategies: Dictionary of dataset strategies.
+        dataset_prefixes: Dictionary of dataset prefixes.
+        train_fraction: Fraction of data to use for training.
+        val_fraction: Fraction of data to use for validation.
+        test_fraction: Fraction of data to use for testing.
     """
 
     console.print("Generating dataset splits for Azure ML", style="info")
 
-    # Convert to Path objects if they're strings
     images_directory = Path(images_directory)
     labels_directory = Path(labels_directory)
 
-    # Check if directories exist
     if not images_directory.exists():
         console.print(
             f"Error: Images directory '{images_directory}' not found", style="error"
@@ -723,61 +699,100 @@ def generate_dataset_splits(
         )
         sys.exit(1)
 
-    # Get prefixes for files in the dataset to use for training and testing
-    console.print("Getting dataset prefixes...", style="info")
+    # Determine split subfolder based on experiment_strategy
+    # Example: verification_box, dfn_to_slope, etc.
+    # User should set experiment_strategy to e.g. 'verification_box',
+    # 'dfn_to_slope', etc.
+    split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
+    split_dir = Path("data/model_ready/splits") / split_subfolder
+
+    # Break long info message into multiple lines
+    disjoint_msg = (
+        "Train and test sets are disjoint. No splitting will be performed; "
+        "using all train and test files as provided."
+    )
+    console.print(disjoint_msg, style="info")
+
+    # Break example command into multiple lines
+    cmd = (
+        "python scripts/manage_azure_data_assets.py "
+        "azure_data_assets.command=register-splits"
+    )
+    console.print(cmd, style="info")
+
+    console.print(f"Split files will be saved to: {split_dir}", style="info")
+
+    # returns the prefixes for train and test datasets
     prefixes = get_datasets_prefixes(
         experiment_strategy=experiment_strategy,
         dataset_strategies=dataset_strategies,
         dataset_prefixes=dataset_prefixes,
     )
 
+    # Example: train_prefixes: ['FracMan'], test_prefixes: ['Larvik', 'RV4]
     train_prefixes_list, test_prefixes_list = (
         prefixes["train_prefixes"],
         prefixes["test_prefixes"],
     )
 
-    # Get data files
-    console.print("Getting data files...", style="info")
+    # Show which dataset prefixes are used for training and testing
+    console.print(f"Train prefixes: {train_prefixes_list}", style="info")
+    console.print(f"Test prefixes: {test_prefixes_list}", style="info")
+
+    console.print("Getting data files for given prefixes...", style="info")
     train_files, test_files = get_data_files(
         images_directory, labels_directory, train_prefixes_list, test_prefixes_list
     )
 
-    # Split data - this also saves the splits to data/model_ready/*.json files
-    console.print(
-        f"Splitting data with train fraction: {train_fraction}, "
-        f"val fraction: {val_fraction}, "
-        f"test fraction: {test_fraction}...",
-        style="info",
-    )
+    train_set = set(train_files)
+    test_set = set(test_files)
+    if train_set.isdisjoint(test_set):
+        console.print(
+            "Train and test sets are disjoint. No splitting will be performed; "
+            "using all train and test files as provided.",
+            style="info",
+        )
 
-    # Set a fixed random seed for reproducibility using the utility function
-    seed_everything(seed)
+        train_list = list(train_files)
+        val_list = []
+        test_list = list(test_files)
+    else:
+        console.print(
+            f"Splitting data with train fraction: {train_fraction}, "
+            f"val fraction: {val_fraction}, "
+            f"test fraction: {test_fraction}...",
+            style="info",
+        )
+        train_list, val_list, test_list = split_data(
+            train_files,
+            test_files,
+            train_frac=train_fraction,
+            val_frac=val_fraction,
+            test_frac=test_fraction,
+        )
 
-    train_list, val_list, test_list = split_data(
-        train_files,
-        test_files,
-        train_frac=train_fraction,
-        val_frac=val_fraction,
-        test_frac=test_fraction,
-    )
+    # Save splits in the correct subfolder
+    with open(split_dir / "train.json", "w") as f:
+        json.dump(train_list, f)
+    with open(split_dir / "val.json", "w") as f:
+        json.dump(val_list, f)
+    with open(split_dir / "test.json", "w") as f:
+        json.dump(test_list, f)
 
-    # Reset random seed (but retaining deterministic PyTorch behavior)
-    seed_everything(None)
-
-    # Print the number of samples in each split
     console.print(f"Number of training samples: {len(train_list)}", style="success")
     console.print(f"Number of validation samples: {len(val_list)}", style="success")
     console.print(f"Number of test samples: {len(test_list)}", style="success")
 
     console.print("\nSplit files have been saved to:", style="success")
-    console.print("  - data/model_ready/train_files.json", style="info")
-    console.print("  - data/model_ready/val_files.json", style="info")
-    console.print("  - data/model_ready/test_files.json", style="info")
+    console.print(f"  - {split_dir / 'train.json'}", style="info")
+    console.print(f"  - {split_dir / 'val.json'}", style="info")
+    console.print(f"  - {split_dir / 'test.json'}", style="info")
     console.print(
         "\nYou can now register these splits in Azure ML using:", style="info"
     )
     console.print(
-        "  python scripts/manage_azure_data_assets.py azure_data_assets.command=register-splits",
+        "  python scripts/manage_azure_data_assets.py "
+        "azure_data_assets.command=register-splits",
         style="info",
     )
 
@@ -789,21 +804,6 @@ def main(cfg: DictConfig) -> None:
     Args:
         cfg: The Hydra configuration object
     """
-    # Convert OmegaConf to a Python dictionary and validate with Pydantic
-    cfg_dict = OmegaConf.to_object(cfg)  # to dict
-    pcfg = ConfigSchema(**cfg_dict)
-
-    # Initialize environment and get Azure credentials
-    console, subscription_id, resource_group, workspace_name = setup_azure_environment()
-    console.print(f"Using configuration: {pcfg.azure_data_assets}", style="info")
-
-    # Connect to Azure ML - do this once and pass the client to functions
-    ml_client = connect_to_azure_ml(
-        subscription_id=subscription_id,
-        resource_group=resource_group,
-        workspace_name=workspace_name,
-    )
-
     # Configure logging to reduce verbose Azure client output
     logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
         logging.WARNING
@@ -812,67 +812,130 @@ def main(cfg: DictConfig) -> None:
     logging.getLogger("azure.storage").setLevel(logging.WARNING)
     logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
 
-    # Get command from validated config
-    command = pcfg.azure_data_assets.command
+    # Initialize environment and get Azure credentials
+    console, subscription_id, resource_group, workspace_name = setup_azure_environment()
 
-    # Get asset parameters from validated config
-    asset_name = pcfg.azure_data_assets.asset_name
-    version1 = pcfg.azure_data_assets.version1
-    version2 = pcfg.azure_data_assets.version2
+    try:
+        # Convert OmegaConf to a Python dictionary and validate with Pydantic
+        cfg_dict = OmegaConf.to_object(cfg)
+        pcfg = ConfigSchema(**cfg_dict)
 
-    # Execute the appropriate command based on the enum value
-    if command == AzureDataAssetsCommand.REGISTER_BASE_DATASETS:
-        register_base_datasets(ml_client, console)
-    elif command == AzureDataAssetsCommand.REGISTER_SPLITS:
-        register_dataset_splits(ml_client, console)
-    elif command == AzureDataAssetsCommand.LIST_ASSETS:
-        list_data_assets(ml_client, console, asset_name)
-    elif command == AzureDataAssetsCommand.COMPARE_ASSETS:
-        compare_assets(ml_client, console, asset_name, version1, version2)
-    elif command == AzureDataAssetsCommand.UPLOAD_DATA:
-        upload_data_to_azure_blob(
-            console,
-            pcfg.dataset.path_images,
-            pcfg.dataset.path_raw_mask_labels,
-            pcfg.dataset.path_processed_mask_labels,
-        )
-    elif command == AzureDataAssetsCommand.GENERATE_SPLITS:
-        generate_dataset_splits(
-            console,
-            images_directory=pcfg.dataset.path_images,
-            labels_directory=pcfg.dataset.path_processed_mask_labels,
-            experiment_strategy=pcfg.experiment.experiment_strategy,
-            dataset_strategies=pcfg.experiment.dataset_strategies,
-            dataset_prefixes=pcfg.dataset.prefixes,
-            train_fraction=pcfg.experiment.train_fraction,
-            val_fraction=pcfg.experiment.val_fraction,
-            test_fraction=pcfg.experiment.test_fraction,
-            seed=pcfg.experiment.seed,
-        )
-    elif command == AzureDataAssetsCommand.UPLOAD_SPLITS:
-        upload_splits_to_azure_blob(console)
-    else:
-        console.print("Available commands:", style="info")
-        for cmd in AzureDataAssetsCommand:
-            console.print(
-                f"  {cmd.value} - {get_command_description(cmd)}", style="info"
-            )
+        # Set random seed at the beginning to affect all operations
+        seed_everything(pcfg.experiment.seed)
 
-        console.print("\nFor more details, run:", style="info")
-        console.print(
-            "  python manage_azure_data_assets.py azure_data_assets.command=help",
-            style="info",
-        )
+        console.print(f"Using configuration: {pcfg.azure_data_assets}", style="info")
 
-        console.print("\nUsage examples:", style="info")
-        console.print(
-            f"  python manage_azure_data_assets.py azure_data_assets.command={AzureDataAssetsCommand.REGISTER_BASE_DATASETS.value}",
-            style="info",
-        )
-        console.print(
-            f"  python manage_azure_data_assets.py azure_data_assets.command={AzureDataAssetsCommand.UPLOAD_DATA.value}",
-            style="info",
-        )
+        # Get command from validated config
+        command = pcfg.azure_data_assets.command
+
+        # Only connect to Azure ML if the command requires it and is valid
+        ml_client = None
+        try:
+            valid_commands_requiring_connection = [
+                AzureDataAssetsCommand.REGISTER_BASE_DATASETS,
+                AzureDataAssetsCommand.REGISTER_SPLITS,
+                AzureDataAssetsCommand.LIST_ASSETS,
+                AzureDataAssetsCommand.COMPARE_ASSETS,
+            ]
+
+            if command in valid_commands_requiring_connection:
+                ml_client = connect_to_azure_ml(
+                    subscription_id=subscription_id,
+                    resource_group=resource_group,
+                    workspace_name=workspace_name,
+                )
+
+            # Get asset parameters from validated config
+            asset_name = pcfg.azure_data_assets.asset_name
+            version1 = pcfg.azure_data_assets.version1
+            version2 = pcfg.azure_data_assets.version2
+
+            # Execute the appropriate command based on the enum value
+            match command:
+                case AzureDataAssetsCommand.UPLOAD_DATA:
+                    upload_base_data_to_azure_blob(
+                        console,
+                        pcfg.dataset.path_images,
+                        pcfg.dataset.path_raw_mask_labels,
+                        pcfg.dataset.path_processed_mask_labels,
+                    )
+                case AzureDataAssetsCommand.REGISTER_BASE_DATASETS:
+                    register_base_datasets(ml_client, console)
+                case AzureDataAssetsCommand.GENERATE_SPLITS:
+                    prepare_and_save_dataset_splits(
+                        console,
+                        images_directory=pcfg.dataset.path_images,
+                        labels_directory=pcfg.dataset.path_processed_mask_labels,
+                        experiment_strategy=pcfg.experiment.experiment_strategy,
+                        dataset_strategies=pcfg.experiment.dataset_strategies,
+                        dataset_prefixes=pcfg.dataset.prefixes,
+                        train_fraction=pcfg.experiment.train_fraction,
+                        val_fraction=pcfg.experiment.val_fraction,
+                        test_fraction=pcfg.experiment.test_fraction,
+                    )
+                case AzureDataAssetsCommand.UPLOAD_SPLITS:
+                    upload_split_data_to_azure_blob(
+                        console,
+                        pcfg.experiment.experiment_strategy,
+                    )
+                case AzureDataAssetsCommand.REGISTER_SPLITS:
+                    register_split_data_asset(
+                        ml_client,
+                        console,
+                        pcfg.experiment.experiment_strategy,
+                    )
+                case AzureDataAssetsCommand.LIST_ASSETS:
+                    list_data_assets(ml_client, console, asset_name)
+                case AzureDataAssetsCommand.COMPARE_ASSETS:
+                    compare_assets(ml_client, console, asset_name, version1, version2)
+                case _:
+                    show_command_help(console)
+        except ValueError as e:
+            error_str = str(e)
+            # Check for specific types of errors and provide helpful messages
+            if "azure_data_assets.command" in error_str:
+                console.print(f"Error: {error_str}", style="error")
+                show_command_help(console)
+            else:
+                # For other errors, show the error but still with command help
+                console.print(f"Configuration error: {error_str}", style="error")
+                console.print(
+                    "Check your configuration and try again.", style="warning"
+                )
+                show_command_help(console)
+    except Exception as e:
+        # Catch any other exceptions
+        console.print(f"Error: {str(e)}", style="error")
+        show_command_help(console)
+
+
+def show_command_help(console: Console):
+    """Display available commands and usage examples.
+
+    Args:
+        console: Console object for pretty printing
+    """
+    # Print available commands
+    console.print("Available commands:", style="info")
+    for cmd in AzureDataAssetsCommand:
+        console.print(f"  {cmd.value}: {get_command_description(cmd)}", style="info")
+
+    console.print("\nUsage examples:", style="info")
+    # Make long command examples more readable by splitting into multiple lines
+    base_cmd = "python scripts/manage_azure_data_assets.py azure_data_assets.command="
+
+    console.print(
+        f"  {base_cmd}{AzureDataAssetsCommand.REGISTER_BASE_DATASETS.value}",
+        style="info",
+    )
+    console.print(
+        f"  {base_cmd}{AzureDataAssetsCommand.UPLOAD_SPLITS.value}",
+        style="info",
+    )
+    console.print(
+        f"  {base_cmd}{AzureDataAssetsCommand.REGISTER_SPLITS.value}",
+        style="info",
+    )
 
 
 if __name__ == "__main__":

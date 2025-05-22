@@ -7,7 +7,6 @@ segmentation models, optimized for Azure ML's hyperparameter tuning capabilities
 
 from typing import Any  # Only import Any as it doesn't have a built-in equivalent
 
-
 # Search space definitions for different models
 # Each model has a specific set of hyperparameters to tune
 
