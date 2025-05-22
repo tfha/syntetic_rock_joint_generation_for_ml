@@ -33,6 +33,7 @@
 ### Python code - special principles
 
 - Use syntax for Python versions higher than 3.10
+- Never use imports within a function, always import at the top of the file
 - Use type annotated code with the newest syntax
 - For type annotation, use for example: tuple instead of Tuple, list instead of List, str | int instead of Union[str, int], int | None instead of Optional[int, None]
 - For type annotating numpy arrays, use NDarray from numpy.typing

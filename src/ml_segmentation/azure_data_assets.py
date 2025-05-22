@@ -210,7 +210,7 @@ def register_data_asset(
         result = ml_client.data.create_or_update(my_data)
         console.print(
             f"Successfully registered data asset '{name}'"
-            " with version {result.version}",
+            f" with version {result.version}",
             style="success",
         )
         return result

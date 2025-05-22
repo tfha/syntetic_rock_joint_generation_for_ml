@@ -91,6 +91,10 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
         AzureDataAssetsCommand.COMPARE_ASSETS: "Compare two versions of a data asset",
         AzureDataAssetsCommand.UPLOAD_DATA: "Upload local data to Azure Blob storage",
         AzureDataAssetsCommand.GENERATE_SPLITS: "Generate dataset splits locally",
+        AzureDataAssetsCommand.PROCESS_ALL_SPLITS: (
+            "Process all experiment strategies: "
+            "generate, upload, and register splits in one operation"
+        ),
     }
     return descriptions.get(command, "Unknown command")
 
@@ -682,7 +686,7 @@ def prepare_and_save_dataset_splits(
         test_fraction: Fraction of data to use for testing.
     """
 
-    console.print("Generating dataset splits for Azure ML", style="info")
+    console.print("Preparing dataset splits for Azure ML", style="info")
 
     images_directory = Path(images_directory)
     labels_directory = Path(labels_directory)
@@ -705,13 +709,8 @@ def prepare_and_save_dataset_splits(
     # 'dfn_to_slope', etc.
     split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
     split_dir = Path("data/model_ready/splits") / split_subfolder
-
-    # Break long info message into multiple lines
-    disjoint_msg = (
-        "Train and test sets are disjoint. No splitting will be performed; "
-        "using all train and test files as provided."
-    )
-    console.print(disjoint_msg, style="info")
+    if not split_dir.exists():
+        split_dir.mkdir(parents=True, exist_ok=True)
 
     # Break example command into multiple lines
     cmd = (
@@ -788,10 +787,16 @@ def prepare_and_save_dataset_splits(
     console.print(f"  - {split_dir / 'val.json'}", style="info")
     console.print(f"  - {split_dir / 'test.json'}", style="info")
     console.print(
-        "\nYou can now register these splits in Azure ML using:", style="info"
+        "\nYou can now upload and register these splits in Azure ML using:",
+        style="info",
     )
     console.print(
-        "  python scripts/manage_azure_data_assets.py "
+        "  python scripts/azure_manage_data_assets.py "
+        "azure_data_assets.command=upload-splits",
+        style="info",
+    )
+    console.print(
+        "  python scripts/azure_manage_data_assets.py "
         "azure_data_assets.command=register-splits",
         style="info",
     )
@@ -836,6 +841,7 @@ def main(cfg: DictConfig) -> None:
                 AzureDataAssetsCommand.REGISTER_SPLITS,
                 AzureDataAssetsCommand.LIST_ASSETS,
                 AzureDataAssetsCommand.COMPARE_ASSETS,
+                AzureDataAssetsCommand.PROCESS_ALL_SPLITS,
             ]
 
             if command in valid_commands_requiring_connection:
@@ -888,6 +894,64 @@ def main(cfg: DictConfig) -> None:
                     list_data_assets(ml_client, console, asset_name)
                 case AzureDataAssetsCommand.COMPARE_ASSETS:
                     compare_assets(ml_client, console, asset_name, version1, version2)
+                case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:
+                    # List of experiment strategies to process
+                    strategies = [
+                        "verification_box",
+                        "verification_dfn",
+                        "main_objective_dfn_rock_slope",
+                        "main_objective_dfn_box",
+                        "main_objective_box_rock_slope",
+                        "main_objective_box_box",
+                    ]
+                    for strategy in strategies:
+                        console.print(
+                            "\n================ Processing strategy: "
+                            f"{strategy} ================",
+                            style="bold green",
+                        )
+                        try:
+                            # Step 1: Generate splits
+                            console.print(
+                                f"Step 1: Generating splits for {strategy}...",
+                                style="yellow",
+                            )
+                            prepare_and_save_dataset_splits(
+                                console,
+                                images_directory=pcfg.dataset.path_images,
+                                labels_directory=pcfg.dataset.path_processed_mask_labels,
+                                experiment_strategy=strategy,
+                                dataset_strategies=pcfg.experiment.dataset_strategies,
+                                dataset_prefixes=pcfg.dataset.prefixes,
+                                train_fraction=pcfg.experiment.train_fraction,
+                                val_fraction=pcfg.experiment.val_fraction,
+                                test_fraction=pcfg.experiment.test_fraction,
+                            )
+                            # Step 2: Upload splits
+                            console.print(
+                                "Step 2: Uploading splits for "
+                                + f"{strategy} to Azure Blob Storage...",
+                                style="yellow",
+                            )
+                            upload_split_data_to_azure_blob(console, strategy)
+                            # Step 3: Register splits
+                            console.print(
+                                "Step 3: Registering splits for "
+                                + f"{strategy} in Azure ML...",
+                                style="yellow",
+                            )
+                            register_split_data_asset(ml_client, console, strategy)
+                            console.print(
+                                f"Successfully processed {strategy}", style="green"
+                            )
+                        except Exception as e:
+                            console.print(
+                                f"Error processing {strategy}: {str(e)}", style="red"
+                            )
+                    console.print(
+                        "\nAll strategies processed. Check above for any errors.",
+                        style="bold green",
+                    )
                 case _:
                     show_command_help(console)
         except ValueError as e:

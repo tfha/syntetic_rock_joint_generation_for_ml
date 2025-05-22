@@ -18,10 +18,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 def seed_everything(seed: int | None = 42) -> None:
     """
-    Function to set random seed for reproducibility, similar to PyTorch Lightning's seed_everything.
+    Function to set random seed for reproducibility, similar to PyTorch Lightning's
+     seed_everything.
 
     Args:
-        seed (int | None): The seed value to use for random number generators. If None, no seeding is performed.
+        seed (int | None): The seed value to use for random number generators. If None,
+        no seeding is performed.
 
     Returns:
         None
@@ -50,10 +52,13 @@ def create_results_table(
     Creates a results table for a given epoch and session with specified metrics.
     Args:
         epoch (int): The current epoch number.
-        metrics (dict[str, float]): A dictionary containing metric names as keys and their corresponding values.
-        session (str, optional): The session type, either "Training" or "Validation". Defaults to "Training".
+        metrics (dict[str, float]): A dictionary containing metric names as keys and
+        their corresponding values.
+        session (str, optional): The session type, either "Training" or "Validation".
+        Defaults to "Training".
     Returns:
-        Table: A formatted table displaying the metrics and their values for the given epoch and session.
+        Table: A formatted table displaying the metrics and their values for the given
+        epoch and session.
     """
     table = Table(title=f"Epoch {epoch + 1} {session} Results")
     table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
@@ -80,7 +85,8 @@ def log_metrics_to_tensorboard(
     """
     for metric_name, metric_value in metrics.items():
         writer.add_scalar(f"{prefix}/{metric_name}", metric_value, epoch)
-    writer.flush()  # Flush the writer to ensure that all pending events have been written to disk.
+    writer.flush()  # Flush the writer to ensure that all pending events have been
+    # written to disk.
 
 
 def log_metrics_to_mlflow(
@@ -169,7 +175,7 @@ def get_custom_console() -> Console:
             "warning": "yellow",
             "danger": "bold red",
             "error": "bold magenta",
-            "success": "bold green",  # Adding missing 'success' style
+            "success": "bold blue",
         }
     )
     return Console(theme=custom_theme)

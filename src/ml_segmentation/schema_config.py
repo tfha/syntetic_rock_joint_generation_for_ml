@@ -181,6 +181,7 @@ class AzureDataAssetsCommand(str, Enum):
     UPLOAD_DATA = "upload-data"
     GENERATE_SPLITS = "generate-splits"
     UPLOAD_SPLITS = "upload-splits"
+    PROCESS_ALL_SPLITS = "process-all-splits"
 
 
 class AzureDataAssetsConfig(BaseModel):
