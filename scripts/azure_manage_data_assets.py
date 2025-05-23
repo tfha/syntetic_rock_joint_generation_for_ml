@@ -4,7 +4,7 @@ Manage Azure ML data assets for rock mass segmentation.
 This script demonstrates how to use the Azure ML data asset management functionality
 to handle your rock mass segmentation datasets properly.
 
-Usage:
+Example usage:
     # Register base datasets
     python scripts/manage_azure_data_assets.py \
         azure_data_assets.command=register-base-datasets
@@ -99,62 +99,93 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
     return descriptions.get(command, "Unknown command")
 
 
-def get_and_validate_azure_storage_config(
-    console: Console, require_key: bool = False
-) -> tuple[str, str, str, str | None]:
-    """Get and validate Azure storage configuration from environment variables.
+def get_azure_storage_client(
+    console: Console,
+    require_key: bool = False,
+) -> tuple[BlobServiceClient, str, str, str | None]:
+    """Get Azure storage configuration from environment variables and connect to
+    storage.
+
+    This function retrieves Azure storage credentials from environment variables
+    and optionally establishes a connection to the Azure Blob storage.
 
     Args:
         console: Console object for pretty printing
         require_key: Whether to require the storage key (default: False)
 
     Returns:
-        tuple: (storage_account, container_name, connection_string, storage_key)
-        where storage_key is None if require_key is False
+        tuple: (container_client, container_name, storage_account, storage_key)
+            or (None, container_name, storage_account, storage_key) if connection fails
 
     Raises:
         SystemExit: If required configuration is missing
     """
+    # Get storage config from environment variables
     storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
     container_name = os.environ.get("AZURE_BLOB_DATASTORE")
     storage_key = os.environ.get("AZURE_STORAGE_KEY") if require_key else None
 
-    required_vars = [storage_account, container_name]
-    if require_key:
-        required_vars.append(storage_key)
+    # Validate required configuration
+    missing_vars = []
+    if not storage_account:
+        missing_vars.append("AZURE_STORAGE_ACCOUNT")
+    if not container_name:
+        missing_vars.append("AZURE_BLOB_DATASTORE")
+    if require_key and not storage_key:
+        missing_vars.append("AZURE_STORAGE_KEY")
 
-    if not all(required_vars):
+    if missing_vars:
+        console.print("Error: Missing Azure storage configuration.", style="error")
         console.print(
-            "Error: Missing Azure storage configuration in .env file.", style="error"
-        )
-        missing_vars = []
-        if not storage_account:
-            missing_vars.append("AZURE_STORAGE_ACCOUNT")
-        if not container_name:
-            missing_vars.append("AZURE_BLOB_DATASTORE")
-        if require_key and not storage_key:
-            missing_vars.append("AZURE_STORAGE_KEY")
-
-        missing_vars_str = ", ".join(missing_vars)
-        console.print(
-            f"Please set the following environment variables: {missing_vars_str}",
+            "Please set the following environment variables: "
+            f"{', '.join(missing_vars)}",
             style="error",
         )
         sys.exit(1)
 
-        # Build connection string for Azure storage account
+    # If connection is not required, return config only
+    if not require_key:
+        return None, container_name, storage_account, storage_key
+
+    # Build connection string
     endpoint_protocol = "DefaultEndpointsProtocol=https"
     account_name = f"AccountName={storage_account}"
     account_key = f"AccountKey={storage_key}"
     endpoint_suffix = "EndpointSuffix=core.windows.net"
-
     connection_string = (
         f"{endpoint_protocol};{account_name};{account_key};{endpoint_suffix}"
-        if storage_key
-        else None
     )
 
-    return storage_account, container_name, connection_string, storage_key
+    # Connect to Azure Blob storage
+    console.print("Connecting to Azure Blob storage...", style="info")
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            connection_string
+        )
+        container_client = blob_service_client.get_container_client(container_name)
+        console.print(
+            f"Successfully connected to container: {container_name}", style="success"
+        )
+        return container_client, container_name, storage_account, storage_key
+    except Exception as e:
+        console.print(
+            f"Error connecting to Azure Blob storage: {str(e)}", style="error"
+        )
+        return None, container_name, storage_account, storage_key
+
+
+def get_latest_dataset_version(prefix: str, container_client: BlobServiceClient) -> str:
+    """Get the latest dataset version directory for a given prefix."""
+    blobs = container_client.list_blobs(name_starts_with=prefix)
+    versions = set()
+    for blob in blobs:
+        # Extract version from path (e.g., 'rockmass/v20240522/file.jpg' -> 'v20240522')
+        parts = blob.name.split("/")
+        if len(parts) > 1 and parts[1].startswith("v"):
+            versions.add(parts[1])
+    if not versions:
+        raise ValueError(f"No version directories found for {prefix}")
+    return max(versions)  # Latest version based on string comparison
 
 
 def register_base_datasets(ml_client: MLClient, console: Console):
@@ -167,21 +198,39 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 
     console.print("Registering base datasets in Azure ML", style="info")
 
-    # Validate storage configuration
-    storage_account, container_name, _, _ = get_and_validate_azure_storage_config(
-        console
+    # Get storage config and connect to Azure Blob storage in one step
+    container_client, container_name, storage_account, _ = get_azure_storage_client(
+        console, require_key=False
     )
 
     # Define the dataset paths using proper Azure Blob storage URL format
     console.print("Reading dataset paths...", style="info")
 
-    # wasbs is a protocol identifier for Azure Blob Storage secure connection
-    # (with SSL/TLS)
-    dataset_paths = {
-        "images": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/rockmass",
-        "masks": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/binary",
-        "raw": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/raw_data",
-    }
+    try:
+        latest_images_version = get_latest_dataset_version("rockmass", container_client)
+        latest_masks_version = get_latest_dataset_version(
+            "label/binary", container_client
+        )
+        latest_raw_version = get_latest_dataset_version(
+            "label/raw_data", container_client
+        )
+
+        # wasbs is a protocol identifier for Azure Blob Storage secure connection
+        # (with SSL/TLS)
+        dataset_paths = {
+            "images": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/rockmass/{latest_images_version}",
+            "masks": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/binary/{latest_masks_version}",
+            "raw": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/raw_data/{latest_raw_version}",
+        }
+
+        console.print("Using latest versions:", style="info")
+        console.print(f"  Images: {latest_images_version}", style="info")
+        console.print(f"  Masks: {latest_masks_version}", style="info")
+        console.print(f"  Raw: {latest_raw_version}", style="info")
+
+    except Exception as e:
+        console.print(f"Error finding latest versions: {str(e)}", style="error")
+        sys.exit(1)
 
     # Generate a version based on current timestamp
     version = datetime.now().strftime("%Y%m%d.%H%M")
@@ -190,6 +239,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
     assets = {}
 
     # 1. Register the images dataset
+    #########################################################
     console.print("Registering images dataset...", style="info")
     images_metadata = {
         "content_type": "image/jpeg, image/png",
@@ -211,6 +261,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
     assets["images"] = images_asset
 
     # 2. Register the masks dataset
+    #########################################################
     console.print("Registering masks dataset...", style="info")
     masks_metadata = {
         "content_type": "image/png",
@@ -233,6 +284,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
     assets["masks"] = masks_asset
 
     # 3. Register raw data
+    #########################################################
     console.print("Registering raw data...", style="info")
     raw_metadata = {
         "description": "Raw unprocessed data for rock mass joints",
@@ -267,19 +319,20 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
     """Upload split files (train/val/test) to Azure Blob Storage under
     splits/<strategy>/"""
-    # Get storage config
-    (
-        storage_account,
-        container_name,
-        connection_string,
-        _,
-    ) = get_and_validate_azure_storage_config(console)
+    # Get storage config and connect to Azure Blob storage in one step
+    container_client, container_name, storage_account, _ = get_azure_storage_client(
+        console, require_key=True
+    )
 
-    # Comment split into multiple lines for better readability
-    # wasbs is a protocol identifier for Azure Blob Storage secure connection
-    # (with SSL/TLS)
+    if not container_client:
+        console.print("Failed to connect to Azure Blob storage", style="error")
+        sys.exit(1)
+
+    # Format the split subdirectory name
     split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
     split_dir = Path("data/model_ready/splits") / split_subfolder
+
+    # Validate split files exist
     if not split_dir.exists():
         console.print(
             f"Error: Split directory '{split_dir}' not found. Generate splits first.",
@@ -287,7 +340,6 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
         )
         sys.exit(1)
 
-    # Validate files exist
     for fname in ["train.json", "val.json", "test.json"]:
         if not (split_dir / fname).exists():
             console.print(
@@ -295,16 +347,7 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
             )
             sys.exit(1)
 
-    # Validate storage configuration and get connection string
-    _, container_name, connection_string, _ = get_and_validate_azure_storage_config(
-        console, require_key=True
-    )
-
     try:
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
-        )
-        container_client = blob_service_client.get_container_client(container_name)
         blob_folder = f"splits/{split_subfolder}"
         upload_files(
             container_client=container_client,
@@ -327,10 +370,8 @@ def register_split_data_asset(
     """Register the split folder in Azure Blob Storage as a data asset in Azure ML."""
     split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
 
-    # Validate storage configuration
-    storage_account, container_name, _, _ = get_and_validate_azure_storage_config(
-        console
-    )
+    # Get storage configuration in one step
+    _, container_name, storage_account, _ = get_azure_storage_client(console)
 
     version = datetime.now().strftime("%Y%m%d.%H%M")
     asset_name = f"split_{split_subfolder}"
@@ -515,11 +556,6 @@ def upload_base_data_to_azure_blob(
 
     console.print("Preparing to upload data to Azure Blob storage...", style="info")
 
-    # Validate storage configuration and get connection string
-    storage_account, container_name, connection_string, storage_key = (
-        get_and_validate_azure_storage_config(console, require_key=True)
-    )
-
     # Check if paths exist - paths have already been resolved by Hydra
     paths_to_check = {
         "images": Path(path_images),
@@ -542,78 +578,94 @@ def upload_base_data_to_azure_blob(
     console.print(
         "This may take a while depending on the size of your data.", style="warning"
     )
+
     confirmation = input("Do you want to continue? (y/n): ")
 
     if confirmation.strip().lower() != "y":
         console.print("Upload canceled.", style="warning")
         return
 
-    # Connect to Azure Blob storage
-    console.print("Connecting to Azure Blob storage...", style="info")
-    try:
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
-        )
-        container_client = blob_service_client.get_container_client(container_name)
-        console.print(
-            f"Successfully connected to container: {container_name}", style="success"
-        )
-    except Exception as e:
-        console.print(
-            f"Error connecting to Azure Blob storage: {str(e)}", style="error"
-        )
+    # Get storage config and connect to Azure Blob storage in one step
+    container_client, container_name, storage_account, _ = get_azure_storage_client(
+        console, require_key=True
+    )
+
+    if not container_client:
+        console.print("Failed to connect to Azure Blob storage", style="error")
         return
 
-    # Upload images
+    # Generate version for this upload
+    version = f"v{datetime.now().strftime('%Y%m%d')}"
+
+    # Upload images with versioning
     upload_files(
         container_client=container_client,
         console=console,
         local_folder_path=paths_to_check["images"],
         blob_folder="rockmass",
+        version=version,
+        preserve_version=True,
     )
 
-    # Upload processed masks
+    # Upload processed masks with versioning
     upload_files(
         container_client=container_client,
         console=console,
         local_folder_path=paths_to_check["processed_masks"],
         blob_folder="label/binary",
+        version=version,
+        preserve_version=True,
     )
 
-    # Upload raw masks
+    # Upload raw masks with versioning
     upload_files(
         container_client=container_client,
         console=console,
         local_folder_path=paths_to_check["raw_masks"],
         blob_folder="label/raw_data",
+        version=version,
+        preserve_version=True,
     )
 
     console.print("\nUpload complete!", style="success")
     console.print("You can now register the data assets using:", style="info")
     console.print(
-        "python manage_azure_data_assets.py"
+        "python manage_azure_data_assets.py "
         "azure_data_assets.command=register-base-datasets",
         style="info",
     )
 
 
-def upload_files(container_client, console: Console, local_folder_path, blob_folder):
+def upload_files(
+    container_client,
+    console: Console,
+    local_folder_path,
+    blob_folder,
+    version: str | None = None,
+    preserve_version: bool = True,
+):
     """Upload files from a local folder to Azure Blob storage.
 
     Args:
         container_client: Azure Blob container client
         console: Console object for pretty printing
         local_folder_path: Path to the local folder
-        blob_folder: Folder path in the blob container
-    """
-
-    # Get list of files to upload
+        blob_folder: Base folder path in the blob container
+        version: Optional version string. If None and preserve_version is True,
+                generates version based on current date
+        preserve_version: Whether to use versioned directories. If False, files are
+                        uploaded directly to blob_folder without version subfolder
+    """  # Get list of files to upload
     files = list(local_folder_path.glob("**/*"))
     files = [f for f in files if f.is_file()]
 
     if not files:
         console.print(f"No files found in {local_folder_path}", style="warning")
         return
+
+    # If using versioned directories, update the blob folder path
+    if preserve_version:
+        blob_folder = get_dataset_version_path(blob_folder, version)
 
     console.print(f"Uploading {len(files)} files to {blob_folder}/...", style="info")
 
@@ -800,6 +852,98 @@ def prepare_and_save_dataset_splits(
         "azure_data_assets.command=register-splits",
         style="info",
     )
+
+
+def get_dataset_version_path(base_path: str, version: str | None = None) -> str:
+    """Get the versioned path for a dataset in Azure Blob storage.
+
+    Args:
+        base_path: The base path for the dataset (e.g., 'rockmass' or 'label')
+        version: Optional version string. If None, generates version based on
+                current date
+
+    Returns:
+        str: The versioned path (e.g., 'rockmass/v20240522' or 'label/binary/v20240522')
+    """
+    if version is None:
+        version = f"v{datetime.now().strftime('%Y%m%d')}"
+
+    return f"{base_path}/{version}"
+
+
+def get_and_validate_azure_storage_config(
+    console: Console, require_key: bool = False
+) -> tuple[str, str, str, str | None]:
+    """Get and validate Azure storage configuration from environment variables.
+
+    Args:
+        console: Console object for pretty printing
+        require_key: Whether to require the storage key (default: False)
+
+    Returns:
+        tuple: (storage_account, container_name, connection_string, storage_key)
+        where storage_key is None if require_key is False
+
+    Raises:
+        SystemExit: If required configuration is missing
+    """
+    _, container_name, storage_account, storage_key = get_azure_storage_client(
+        console=console, require_key=require_key
+    )
+
+    # Build connection string for Azure storage account
+    endpoint_protocol = "DefaultEndpointsProtocol=https"
+    account_name = f"AccountName={storage_account}"
+    account_key = f"AccountKey={storage_key}" if storage_key else ""
+    endpoint_suffix = "EndpointSuffix=core.windows.net"
+
+    connection_string = None
+    if storage_key:
+        connection_string = (
+            f"{endpoint_protocol};{account_name};{account_key};{endpoint_suffix}"
+        )
+
+    return storage_account, container_name, connection_string, storage_key
+
+
+def connect_to_azure_blob_storage(
+    console: Console,
+    require_key: bool = False,
+    storage_account: str = None,
+    container_name: str = None,
+    connection_string: str = None,
+) -> tuple[BlobServiceClient, str, str] | None:
+    """Connect to Azure Blob storage and return a client.
+
+    Args:
+        console: Console object for pretty printing
+        require_key: Whether to require the storage key (default: False)
+        storage_account: Optional storage account name. If not provided, will be
+        retrieved from environment.
+        container_name: Optional container name. If not provided, will be retrieved
+        from environment.
+        connection_string: Optional connection string. If not provided, will be built
+        from environment variables.
+
+    Returns:
+        tuple: (container_client, container_name, storage_account)
+            or None if connection fails
+
+    Raises:
+        SystemExit: If required configuration is missing
+    """
+    container_client, container_name, storage_account, _ = get_azure_storage_client(
+        console=console,
+        require_key=require_key,
+        storage_account=storage_account,
+        container_name=container_name,
+        connection_string=connection_string,
+    )
+
+    if container_client:
+        return container_client, container_name, storage_account
+    else:
+        return None
 
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")

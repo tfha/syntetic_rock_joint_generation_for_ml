@@ -317,92 +317,56 @@ For security best practices, refresh your authentication when necessary:
 az account get-access-token
 ```
 
-#### Uploading Data to Azure Blob Storage
+#### Uploading and Registering Base Datasets (Images and Masks)
 
-Before registering datasets as data assets, you need to upload your local image data to Azure Blob Storage. The project includes a built-in tool for this task:
+You should upload your local image and mask data to Azure Blob Storage and register them as base datasets in Azure ML. This ensures that your core data is versioned and available for all downstream tasks.
 
 ```sh
 # Upload local data to Azure Blob Storage
 python scripts/azure_manage_data_assets.py azure_data_assets.command=upload-data
-```
 
-This command will:
-
-1. Read local data paths from your configuration file (main.yaml)
-2. Connect to your Azure Blob Storage account using credentials from your `.env` file
-3. Upload your data to the appropriate folder structure in Blob Storage:
-   - Images → `/rockmass`
-   - Binary masks → `/label/binary`
-   - Raw data → `/label/raw_data`
-
-The upload process follows Azure best practices:
-
-- Setting appropriate content types for different image formats
-- Preserving folder hierarchies within each target directory
-- Providing progress tracking for large uploads
-- Efficient parallel uploads with proper error handling
-
-#### Generating and Registering Dataset Splits
-
-Before training, you need to divide your dataset into training, validation, and test sets. The project provides tools to create these splits and register them as Azure ML data assets:
-
-1. First, generate the dataset splits:
-
-```sh
-# Generate train/val/test splits for a specific experiment strategy (e.g., verification_box)
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=verification_box
-
-# For other strategies, repeat with the appropriate value:
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=verification_dfn
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_dfn_rock_slope
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_dfn_box
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_box_rock_slope
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=main_objective_box_box
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=dataset_size_test
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=semi_supervised_learning
-python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=one_shot_segmentation
-```
-
-**Note:**
-- If you set `train_fraction: 1.0` and `test_fraction: 1.0` (and `val_fraction: 0.0`) in your config, all files from the specified training and testing datasets will be assigned to the train and test splits, with no validation set. This is useful for strategies like `main_objective_dfn_rock_slope` where you want to use the full synthetic DFN dataset for training and the full real-world rock slope dataset for testing.
-
-**Note:** You must set the `experiment.experiment_strategy` Hydra variable when generating splits. This needs to be done separately for each experiment strategy you intend to use. The splits will be saved in the corresponding subfolder under `data/model_ready/splits/<strategy>/`.
-
-This command will:
-- Create train, validation, and test splits according to the proportions defined in your configuration
-- Save these splits as JSON files in the correct subfolder under `data/model_ready/splits/<strategy>/`
-- Apply any dataset strategies or filtering options specified in your configuration
-
-2. Then, register the generated splits as a data asset in Azure ML:
-
-```sh
-# Register the split folder as a data asset for your experiment strategy
-python scripts/azure_manage_data_assets.py azure_data_assets.command=register-splits
-```
-
-This will register the folder (e.g. `data/model_ready/splits/verification_box/`) as a versioned Azure ML data asset, following the naming convention `split_<strategy>`. The training pipeline will automatically select the correct split asset based on your experiment strategy.
-
-After uploading your data and registering splits, you can proceed to register your base datasets as data assets if not already done.
-
-#### Managing Data Assets in Azure ML
-
-The project includes tools for managing datasets as versioned data assets in Azure ML. This approach provides better tracking, versioning, and metadata management for your datasets.
-
-First, register your base datasets in Azure ML:
-
-```sh
 # Register images and masks datasets from blob storage
 python scripts/azure_manage_data_assets.py azure_data_assets.command=register-base-datasets
 ```
 
-Next, register your train/val/test splits:
+#### Generating, Uploading, and Registering Dataset Splits (All Strategies)
+
+After your base datasets are registered, you can generate, upload, and register train/val/test splits for all experiment strategies in one step:
 
 ```sh
-# Register dataset splits for training
-python scripts/azure_manage_data_assets.py azure_data_assets.command=register-splits
+# Generate, upload, and register train/val/test splits for all experiment strategies
+python scripts/azure_manage_data_assets.py azure_data_assets.command=process-all-splits
 ```
 
-You can list and inspect registered datasets:
+This command will:
+- Create train, validation, and test splits for all configured experiment strategies according to your configuration
+- Save these splits as JSON files in the correct subfolders under `data/model_ready/splits/<strategy>/`
+- Upload the splits to Azure Blob Storage
+- Register each split folder as a versioned Azure ML data asset (named `split_<strategy>`)
+
+**Note:**
+- If you set `train_fraction: 1.0` and `test_fraction: 1.0` (and `val_fraction: 0.0`) in your config, all files from the specified training and testing datasets will be assigned to the train and test splits, with no validation set. This is useful for strategies like `main_objective_dfn_rock_slope` where you want to use the full synthetic DFN dataset for training and the full real-world rock slope dataset for testing.
+
+#### Example: Manual Generation, Upload, and Registration for One Experiment Strategy
+
+If you want to generate, upload, and register splits for a single experiment strategy (for example, `verification_box`), you can do so step by step:
+
+```sh
+# 1. Generate train/val/test splits for a specific experiment strategy
+python scripts/azure_manage_data_assets.py azure_data_assets.command=generate-splits experiment.experiment_strategy=verification_box
+
+# 2. Upload the generated splits to Azure Blob Storage
+python scripts/azure_manage_data_assets.py azure_data_assets.command=upload-splits experiment.experiment_strategy=verification_box
+
+# 3. Register the split folder as a data asset in Azure ML
+python scripts/azure_manage_data_assets.py azure_data_assets.command=register-splits experiment.experiment_strategy=verification_box
+```
+
+This approach allows you to process only the strategies you are interested in, or to repeat the process for additional strategies as needed.
+
+#### Inspecting and Listing Registered Data Assets
+
+You can list and inspect all registered datasets and their versions in Azure ML:
 
 ```sh
 # List all data assets
@@ -415,6 +379,65 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=list-assets
 python scripts/azure_manage_data_assets.py azure_data_assets.command=compare-assets azure_data_assets.asset_name=rock_images azure_data_assets.version1=1 azure_data_assets.version2=2
 ```
 
+#### Understanding Version Tracking in Azure Storage
+
+The project implements a versioned directory structure in Azure blob storage to maintain data integrity and track changes over time. The versioning system follows this structure:
+
+```
+container/
+├── rockmass/v{date}/  # Base image datasets with version dates
+├── label/v{date}/     # Mask datasets with version dates
+└── splits/            # Train/val/test splits (overwritable)
+    ├── verification_box/
+    ├── verification_dfn/
+    ├── main_objective_dfn_rock_slope/
+    └── ...
+```
+
+Example:
+```
+<container-name>/
+├── rockmass/
+│   ├── v20240522/
+│   └── v20240401/
+├── label/
+│   ├── binary/
+│   │   ├── v20240522/
+│   │   └── v20240401/
+│   └── raw_data/
+│       ├── v20240522/
+│       └── v20240401/
+└── splits/
+```
+
+1. When uploading new data:
+    - Creates new version directories with format vYYYYMMDD
+    - Preserves old versions
+    - Uses consistent versioning across related datasets (images and masks)
+2. When registering datasets as data assets:
+    - Automatically finds the latest version
+    - Points the ML dataset asset to the newest version. This way you can reproduce the training process by using the relevant data asset that points to the corresponding versioned dataset in Azure blob storage. So, each data asset points to a specific version of the dataset.
+3. When upload new splits:
+    - Continues to overwrite files in the splits directory
+    - No versioning applied to splits
+4. When registering splits as data assets:
+    - Each split is registered as a new version
+    - The latest version of the split is always used for training
+
+
+**Version Strategy:**
+- Base datasets (images and masks) are versioned with a date-based system (`v{YYYYMMDD}`)
+- Each version is stored in a separate directory, preserving historical data
+- Splits remain overwritable as they are derived from the versioned base data
+- Version comparison functionality (via `compare-assets`) helps track changes between versions
+
+This versioning approach ensures:
+- Reproducibility of experiments across different data versions
+- Clear tracking of dataset evolution over time
+- Easy rollback to previous versions if needed
+- Efficient storage by versioning only base datasets
+
+
 #### Submitting Training Jobs to Azure ML
 
 To submit a job to Azure ML, use the `azure_submit_job.py` script:
@@ -424,17 +447,51 @@ To submit a job to Azure ML, use the `azure_submit_job.py` script:
 python scripts/azure_submit_job.py
 
 # Submit with custom configuration
-python scripts/azure_submit_job.py model=deeplabv3 experiment.experiment_strategy=synthetic_to_real
+python scripts/azure_submit_job.py model=deeplabv3 experiment.experiment_strategy=verification_box
 ```
 
 #### Understanding the Azure ML Training Pipeline
 
 The training pipeline consists of the following steps:
 
-1. **Data asset retrieval**: Latest versions of rock joint images and masks are loaded
-2. **Training step**: The model is trained on Azure ML compute using the mounted datasets
-3. **Model registration**: The best model is automatically registered in the Azure ML model registry
-4. **Output collection**: Model files, visualizations, and metrics are stored and downloaded
+1. **Initialize Configuration**
+   - Validate and process configuration parameters
+   - Set up logging and console output
+   - Generate unique job display name with timestamp
+
+2. **Environment Setup**
+   - Export Poetry environment to environment.yml
+   - Connect to Azure ML workspace
+   - Validate Azure ML configuration settings
+
+3. **Data Asset Management**
+   - Retrieve latest versions of base image and mask datasets
+   - Get experiment-specific split datasets
+   - Validate all required data assets exist
+
+4. **Compute Resource Validation**
+   - Check compute cluster availability
+   - Verify compute cluster exists and is accessible
+
+5. **Environment Preparation**
+   - Create or retrieve Azure ML environment
+   - Register new environment if needed
+   - Set up run metadata for tracking
+
+6. **Job Configuration**
+   - Define training command and parameters
+   - Configure job inputs (datasets)
+   - Set up job outputs (models, logs, plots)
+
+7. **Job Execution**
+   - Submit training job to Azure ML
+   - Stream logs for real-time monitoring
+   - Handle job interruptions gracefully
+
+8. **Output Management**
+   - Download job outputs (models, plots, examples)
+   - Store results in organized local directory
+   - Print job output information and status
 
 #### Comparing Local vs Azure ML Training
 
@@ -454,7 +511,7 @@ A typical workflow for training in Azure ML:
 
 1. **Prepare environment**: Set up Azure ML workspace and environment variables
 2. **Register datasets**: Upload images and masks to blob storage and register as data assets
-3. **Create splits**: Generate and register train/val/test splits
+3. **Create splits**: Generate, upload, and register train/val/test splits for all experiment strategies using the `process-all-splits` command (or do it manually for a single strategy as shown above)
 4. **Configure training**: Adjust hyperparameters and model architecture in configuration
 5. **Submit job**: Run the submission script to launch training in Azure ML
 6. **Monitor progress**: Track metrics in Azure ML Studio or through streaming logs
