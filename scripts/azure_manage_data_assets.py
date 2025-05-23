@@ -18,10 +18,10 @@ from ml_segmentation.azure_data_assets import (
     prepare_and_save_dataset_splits,
     register_base_datasets,
     register_split_data_asset,
-    setup_azure_environment,
     upload_base_data_to_azure_blob,
     upload_split_data_to_azure_blob,
 )
+from ml_segmentation.azure_utility import setup_azure_environment
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
 from ml_segmentation.utility import seed_everything
 

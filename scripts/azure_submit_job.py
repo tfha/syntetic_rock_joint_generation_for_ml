@@ -18,20 +18,21 @@ from omegaconf import DictConfig, OmegaConf
 from ml_segmentation.azure_data_assets import (
     connect_to_azure_ml,
     get_data_asset,
-    setup_azure_environment,
 )
+from ml_segmentation.azure_utility import setup_azure_environment
 from ml_segmentation.schema_config import ConfigSchema
 from ml_segmentation.utility import export_poetry_to_environment_yml
-
-# Configure logging to reduce verbose Azure client output
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-    logging.WARNING
-)
 
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     """Submit Azure ML job with managed data assets using Command approach."""
+
+    # Configure logging to reduce verbose Azure client output
+    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+        logging.WARNING
+    )
+
     # 1. Initialize configuration
     ###########################################
     # Convert the DictConfig to Python dictionary, then to Pydantic model

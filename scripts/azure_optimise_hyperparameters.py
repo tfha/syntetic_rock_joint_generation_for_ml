@@ -18,19 +18,22 @@ from azure.ai.ml.sweep import Choice, Uniform
 from ml_segmentation.azure_data_assets import (
     connect_to_azure_ml,
     get_data_asset,
-    setup_azure_environment,
 )
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
     get_model_search_space,
 )
+from ml_segmentation.azure_utility import setup_azure_environment
 from ml_segmentation.utility import export_poetry_to_environment_yml
 
 
 def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
     """Parse command line arguments to get model configuration."""
+
     parser = argparse.ArgumentParser(
-        description="Run hyperparameter optimization for segmentation models in Azure ML"
+        description=(
+            "Run hyperparameter optimization for segmentation models in Azure ML"
+        )
     )
 
     parser.add_argument(
@@ -155,7 +158,8 @@ def main():
     except Exception as e:
         console.print(f"Error retrieving data assets: {str(e)}", style="error")
         console.print(
-            "Make sure you have registered data assets using manage_azure_data_assets.py",
+            "Make sure you have registered data assets using "
+            "manage_azure_data_assets.py",
             style="warning",
         )
         return
@@ -319,7 +323,8 @@ def main():
         style="success",
     )
     console.print(
-        "When the job completes, you can use the 'analyze_hyperparameter_results.py' script "
+        "When the job completes, you can use the 'analyze_hyperparameter_results.py'"
+        " script "
         "to analyze the results and generate a report of the best hyperparameters.",
         style="info",
     )
