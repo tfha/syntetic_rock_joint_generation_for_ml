@@ -16,7 +16,6 @@ from azure.ai.ml.entities import BuildContext, Environment
 from azure.ai.ml.sweep import Choice, Uniform
 
 from ml_segmentation.azure_data_assets import (
-    connect_to_azure_ml,
     get_data_asset,
 )
 from ml_segmentation.azure_hyperparameter_spaces import (
@@ -25,6 +24,7 @@ from ml_segmentation.azure_hyperparameter_spaces import (
 )
 from ml_segmentation.azure_utility import (
     configure_azure_logging,
+    connect_to_azure_ml,
     setup_azure_environment,
 )
 from ml_segmentation.utility import export_poetry_to_environment_yml

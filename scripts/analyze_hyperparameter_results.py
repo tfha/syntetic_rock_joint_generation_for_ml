@@ -18,7 +18,7 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv
 
-from ml_segmentation.azure_data_assets import connect_to_azure_ml
+from ml_segmentation.azure_utility import connect_to_azure_ml
 from ml_segmentation.utility import get_custom_console
 
 
@@ -169,7 +169,8 @@ def analyze_results(df: pd.DataFrame, console, top_n: int = 5) -> dict[str, Any]
         if "metric_val_dice_score" not in df.columns:
             metrics = [col for col in df.columns if col.startswith("metric_")]
             console.print(
-                f"Primary metric 'val_dice_score' not found. Available metrics: {metrics}",
+                "Primary metric 'val_dice_score' not found. Available metrics: "
+                f"{metrics}",
                 style="warning",
             )
 

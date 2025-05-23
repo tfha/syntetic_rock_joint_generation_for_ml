@@ -55,7 +55,7 @@ experiment:
   quality_control_data: false
   crossvalidation: false
   path_example_images: ${path_project}/experiments/example_images
-  use_registered_splits: false  # Flag to use registered splits from Azure ML (added for Azure ML pipeline)
+  use_registered_splits: true  # Flag to use registered splits from Azure ML (added for Azure ML pipeline)
   experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:

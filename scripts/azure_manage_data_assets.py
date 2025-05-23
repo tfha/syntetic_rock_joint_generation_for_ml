@@ -11,7 +11,6 @@ from rich.console import Console
 
 from ml_segmentation.azure_data_assets import (
     compare_assets,
-    connect_to_azure_ml,
     list_data_assets,
     prepare_and_save_dataset_splits,
     register_base_datasets,
@@ -21,6 +20,7 @@ from ml_segmentation.azure_data_assets import (
 )
 from ml_segmentation.azure_utility import (
     configure_azure_logging,
+    connect_to_azure_ml,
     setup_azure_environment,
 )
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema

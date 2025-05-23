@@ -14,6 +14,8 @@ import sys
 
 import toml
 import yaml
+from azure.ai.ml import MLClient
+from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
 
 from ml_segmentation.utility import get_custom_console
@@ -385,6 +387,54 @@ def test_environment_export(output_path: str = None) -> None:
         import traceback
 
         console.print(traceback.format_exc())
+
+
+def connect_to_azure_ml(
+    subscription_id: str, resource_group: str = None, workspace_name: str = None
+) -> MLClient:
+    """
+    Connect to Azure ML workspace with proper authentication.
+
+    Args:
+        subscription_id: Azure subscription ID
+        resource_group: Azure resource group name
+        workspace_name: Azure ML workspace name
+
+    Returns:
+        Azure ML client
+    """
+    # Get values from environment if not provided
+    resource_group = resource_group or os.environ.get("AZURE_RESOURCE_GROUP")
+    workspace_name = workspace_name or os.environ.get("AZURE_ML_WORKSPACE")
+
+    if not subscription_id or not resource_group or not workspace_name:
+        raise ValueError(
+            "Missing Azure ML configuration. Provide subscription_id, resource_group, "
+            "and workspace_name as parameters or set them as environment variables."
+        )
+
+    console = get_custom_console()
+    console.print(f"Connecting to Azure ML workspace: {workspace_name}", style="info")
+
+    try:
+        ml_client = MLClient(
+            credential=DefaultAzureCredential(),
+            subscription_id=subscription_id,
+            resource_group_name=resource_group,
+            workspace_name=workspace_name,
+        )
+        # Test connection
+        _ = ml_client.workspaces.get(workspace_name)
+        console.print(
+            f"Successfully connected to workspace: {workspace_name}", style="success"
+        )
+        return ml_client
+
+    except Exception as e:
+        console.print(
+            f"Error connecting to Azure ML workspace: {str(e)}", style="error"
+        )
+        raise
 
 
 if __name__ == "__main__":

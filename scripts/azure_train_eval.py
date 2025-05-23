@@ -44,11 +44,9 @@ from ml_segmentation.utility import (
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Configure logging to reduce verbose Azure client output
-    configure_azure_logging()
-
-    # 1. Initialize MLflow and configuration
+    configure_azure_logging()  # 1. Initialize MLflow and configuration
     ########################################################################
-    # Start MLflow tracking
+    # Start MLflow tracking - Azure ML automatically sets up the tracking URI
     mlflow.start_run()
 
     # Setup configuration
@@ -56,32 +54,47 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**cfg_dict)
     console = get_custom_console()
 
-    # Log key parameters
-    mlflow.log_params(
-        {
-            "model_name": pcfg.model.name,
-            "learning_rate": pcfg.model.learning_rate,
-            "batch_size": pcfg.model.batch_size,
-            "num_epochs": pcfg.model.num_epochs,
-            "experiment_strategy": pcfg.experiment.experiment_strategy,
-        }
-    )
-
     # 2. Setup output directories
     ########################################################################
     console.print(
         "Starting Azure ML training run with strategy:"
         f"{pcfg.experiment.experiment_strategy}",
         style="info",
-    )
-
-    # Create standard output directories
+    )  # Create standard output directories
     output_dir = Path("./outputs")
     output_dir.mkdir(exist_ok=True)
     models_dir = output_dir / "models"
     models_dir.mkdir(exist_ok=True)
     plots_dir = output_dir / "plots"
-    plots_dir.mkdir(exist_ok=True)
+    plots_dir.mkdir(exist_ok=True)  # Create MLflow logs directory for Azure ML
+    mlflow_logs_dir = output_dir / "mlruns"
+    mlflow_logs_dir.mkdir(exist_ok=True)
+    console.print(
+        f"MLflow logs will be saved to: {mlflow_logs_dir}", style="info"
+    )  # Create Hydra outputs directory for Azure ML
+    hydra_outputs_dir = output_dir / "hydra_outputs"
+    hydra_outputs_dir.mkdir(exist_ok=True)
+
+    # Override Hydra's output directory configuration for Azure ML
+    timestamp_date = datetime.now().strftime("%Y-%m-%d")
+    timestamp_time = datetime.now().strftime("%H-%M-%S")
+    hydra_run_dir = hydra_outputs_dir / timestamp_date / timestamp_time
+    hydra_run_dir.mkdir(
+        parents=True, exist_ok=True
+    )  # Override Hydra's output directory
+    hydra_config = {
+        "hydra": {
+            "run": {"dir": str(hydra_run_dir)},
+            "sweep": {
+                "dir": str(hydra_outputs_dir / "multirun"),
+                "subdir": "${hydra.job.num}",
+            },
+        }
+    }
+    hydra.core.config_store.ConfigStore.instance().store(
+        name="hydra_config", node=hydra_config
+    )
+    console.print(f"Hydra outputs will be saved to: {hydra_run_dir}", style="info")
 
     # Create TensorBoard log directory with timestamp
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -102,43 +115,31 @@ def main(cfg: DictConfig) -> None:
     ########################################################################
     console.print(
         "Loading training and testing data from Azure ML inputs...", style="info"
-    )
+    )  # In Azure ML, input datasets are mounted to paths defined in environment
+    # variables
+    # Get the paths from environment variables set by Azure ML
+    images_path = Path(os.environ.get("AZUREML_DATAREFERENCE_images_data", ""))
+    masks_path = Path(os.environ.get("AZUREML_DATAREFERENCE_masks_data", ""))
+    console.print(f"Azure ML mounted images path: {images_path}", style="info")
+    console.print(f"Azure ML mounted masks path: {masks_path}", style="info")
 
-    # In Azure ML, input datasets are mounted to paths defined in environment variables
-    # AZUREML_RUN_ID environment variable is a standard environment variable set by
-    # Azure ML when a job is running
-    if "AZUREML_RUN_ID" in os.environ:
-        # Get the paths from environment variables set by Azure ML
-        images_path = Path(os.environ.get("AZUREML_DATAREFERENCE_images_data", ""))
-        masks_path = Path(os.environ.get("AZUREML_DATAREFERENCE_masks_data", ""))
-        console.print(f"Azure ML mounted images path: {images_path}", style="info")
-        console.print(f"Azure ML mounted masks path: {masks_path}", style="info")
+    # Check if splits dataset is mounted and should be used
+    splits_path = None
+    if pcfg.experiment.use_registered_splits:
+        splits_path = Path(os.environ.get("AZUREML_DATAREFERENCE_splits_data", ""))
+        if splits_path.exists():
+            console.print(f"Azure ML mounted splits path: {splits_path}", style="info")
+            mlflow.log_param("splits_path", str(splits_path))
+        else:
+            console.print(
+                "Splits path not found, using strategy-based filtering",
+                style="warning",
+            )
+            splits_path = None
 
-        # Check if splits dataset is mounted and should be used
-        splits_path = None
-        if pcfg.experiment.use_registered_splits:
-            splits_path = Path(os.environ.get("AZUREML_DATAREFERENCE_splits_data", ""))
-            if splits_path.exists():
-                console.print(
-                    f"Azure ML mounted splits path: {splits_path}", style="info"
-                )
-                mlflow.log_param("splits_path", str(splits_path))
-            else:
-                console.print(
-                    "Splits path not found, using strategy-based filtering",
-                    style="warning",
-                )
-                splits_path = None
-
-        # Log dataset information in MLflow
-        mlflow.log_param("images_path", str(images_path))
-        mlflow.log_param("masks_path", str(masks_path))
-    else:
-        # Fallback to configured paths for local testing
-        images_path = Path(pcfg.dataset.path_images)
-        masks_path = Path(pcfg.dataset.path_processed_mask_labels)
-        splits_path = None
-        console.print("Running in local mode, using configured paths", style="warning")
+    # Log dataset information in MLflow
+    mlflow.log_param("images_path", str(images_path))
+    mlflow.log_param("masks_path", str(masks_path))
 
     # 4. Prepare dataset prefixes and dataloaders
     ########################################################################

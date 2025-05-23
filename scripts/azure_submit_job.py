@@ -15,11 +15,11 @@ from azure.core.exceptions import ResourceNotFoundError, ServiceRequestError
 from omegaconf import DictConfig, OmegaConf
 
 from ml_segmentation.azure_data_assets import (
-    connect_to_azure_ml,
     get_data_asset,
 )
 from ml_segmentation.azure_utility import (
     configure_azure_logging,
+    connect_to_azure_ml,
     export_poetry_to_environment_yml,
     setup_azure_environment,
 )
@@ -107,26 +107,16 @@ def main(cfg: DictConfig) -> None:
 
     except ResourceNotFoundError as e:
         console.print(f"Data asset not found: {str(e)}", style="error")
-        msg = (
-            "Make sure you have registered data assets using "
-            "scripts/manage_azure_data_assets.py "
-            "azure_data_assets.command=register-base-datasets or "
-            "azure_data_assets.command=register-splits"
-        )
+        msg = "Make sure you have registered data assets"
         console.print(msg, style="warning")
         sys.exit(1)
     except Exception as e:
         console.print(f"Error retrieving data assets: {str(e)}", style="error")
-        msg = (
-            "Make sure you have registered data assets using "
-            "scripts/manage_azure_data_assets.py "
-            "azure_data_assets.command=register-base-datasets or "
-            "azure_data_assets.command=register-splits"
-        )
+        msg = "Make sure you have registered data assets"
         console.print(msg, style="warning")
         sys.exit(1)
 
-    # 6. Validate compute cluster exists
+    # 6. Get and validate compute cluster exists
     ###########################################
     try:
         ml_client.compute.get(compute_cluster_name)
@@ -192,12 +182,7 @@ def main(cfg: DictConfig) -> None:
     train_command = (
         f"python scripts/azure_train_eval.py "
         f"model={pcfg.model.name} "
-        f"experiment.log_mlflow=True "
         f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
-        f"model.num_epochs={pcfg.model.num_epochs} "
-        f"model.batch_size={pcfg.model.batch_size} "
-        f"model.learning_rate={pcfg.model.learning_rate} "
-        f"experiment.use_registered_splits=True"
     )
 
     # 10. Configure job inputs and outputs
@@ -217,6 +202,7 @@ def main(cfg: DictConfig) -> None:
         "mlflow_logs": Output(type="uri_folder", path="./outputs/mlruns"),
         "plots": Output(type="uri_folder", path="./outputs/plots"),
         "example_images": Output(type="uri_folder", path="./outputs/example_images"),
+        "hydra_outputs": Output(type="uri_folder", path="./outputs/hydra_outputs"),
     }
 
     # 11. Create and submit the job
