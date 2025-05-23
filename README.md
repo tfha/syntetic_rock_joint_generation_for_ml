@@ -381,61 +381,92 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=compare-ass
 
 #### Understanding Version Tracking in Azure Storage
 
-The project implements a versioned directory structure in Azure blob storage to maintain data integrity and track changes over time. The versioning system follows this structure:
+There is not implemented version tracking in this repo. When uploading new data, the data will be overwritten and new data-assets will be created. This is ok in a more static ML effort which is often the case in several research projects like this. The directory structure in Azure Blob Storage will look like this:
 
 ```
 container/
-├── rockmass/v{date}/  # Base image datasets with version dates
-├── label/v{date}/     # Mask datasets with version dates
-└── splits/            # Train/val/test splits (overwritable)
+├── rockmass/                # Base image datasets
+│   ├── img_001.jpg
+│   ├── img_002.jpg
+│   └── ...
+├── label/                   # Mask datasets
+│   ├── binary/              # Preprocessed binary masks
+│   │   ├── img_001_mask.png
+│   │   ├── img_002_mask.png
+│   │   └── ...
+│   └── raw_data/            # Raw mask images before preprocessing
+│       ├── img_001_mask_raw.png
+│       ├── img_002_mask_raw.png
+│       └── ...
+└── splits/                  # Train/val/test splits (overwritable)
     ├── verification_box/
+    │   ├── train.json
+    │   ├── val.json
+    │   └── test.json
     ├── verification_dfn/
+    │   ├── train.json
+    │   ├── val.json
+    │   └── test.json
     ├── main_objective_dfn_rock_slope/
+    │   ├── train.json
+    │   ├── val.json
+    │   └── test.json
     └── ...
 ```
 
-Example:
+However, for other projects involving several updates of the dataset, both in research and production, it is important to have a versioning strategy in place. A typical filestructure for ML in production where the ML-model is trained on the full dataset can then look like this:
+
 ```
 <container-name>/
-├── rockmass/
-│   ├── v20240522/
-│   └── v20240401/
-├── label/
-│   ├── binary/
-│   │   ├── v20240522/
-│   │   └── v20240401/
-│   └── raw_data/
-│       ├── v20240522/
-│       └── v20240401/
-└── splits/
+├── rock_images/
+│   ├── base/
+│   │   ├── v20250401/                 ← Base dataset version 1
+│   │   └── v20250501/                 ← Base dataset version 2
+│   └── incremental/
+│       ├── 2025_05_08/                ← Week 1 incremental batch
+│       ├── 2025_05_15/                ← Week 2 incremental batch
+│       ├── 2025_05_22/                ← Week 3 incremental batch
+│       └── 2025_05_29/                ← Week 4 incremental batch
+├── rock_masks/
+│   ├── base/
+│   │   ├── v20250401/
+│   │   └── v20250501/
+│   └── incremental/
+│       ├── 2025_05_08/
+│       ├── 2025_05_15/
+│       ├── 2025_05_22/
+│       └── 2025_05_29/
+
 ```
 
-1. When uploading new data:
-    - Creates new version directories with format vYYYYMMDD
-    - Preserves old versions
-    - Uses consistent versioning across related datasets (images and masks)
-2. When registering datasets as data assets:
-    - Automatically finds the latest version
-    - Points the ML dataset asset to the newest version. This way you can reproduce the training process by using the relevant data asset that points to the corresponding versioned dataset in Azure blob storage. So, each data asset points to a specific version of the dataset.
-3. When upload new splits:
-    - Continues to overwrite files in the splits directory
-    - No versioning applied to splits
-4. When registering splits as data assets:
-    - Each split is registered as a new version
-    - The latest version of the split is always used for training
+The Azure ML Data Asset Registration Strategy will then be as follows:
+
+| Data Asset Name           | Version    | Path in Blob Storage          | Purpose                               | Update Frequency |
+| ------------------------- | ---------- | ----------------------------- | ------------------------------------- | ---------------- |
+| `rock_images`             | `20250401` | `rock_images/base/v20250401/` | Initial full dataset                  | One-time         |
+| `rock_images`             | `20250501` | `rock_images/base/v20250501/` | Monthly full dataset (merged in May)  | Monthly          |
+| `rock_images`             | `20250601` | `rock_images/base/v20250601/` | Monthly full dataset (merged in June) | Monthly          |
+| `rock_images_incremental` | `latest`   | `rock_images/incremental/`    | Accumulating weekly batches           | Weekly           |
+| `rock_masks`              | `20250401` | `rock_masks/base/v20250401/`  | Mask set for 20250401 base            | One-time         |
+| `rock_masks`              | `20250501` | `rock_masks/base/v20250501/`  | Mask set for 20250501 base            | Monthly          |
+| `rock_masks`              | `20250601` | `rock_masks/base/v20250601/`  | Mask set for 20250601 base            | Monthly          |
+| `rock_masks_incremental`  | `latest`   | `rock_masks/incremental/`     | Accumulating weekly mask batches      | Weekly           |
 
 
-**Version Strategy:**
-- Base datasets (images and masks) are versioned with a date-based system (`v{YYYYMMDD}`)
-- Each version is stored in a separate directory, preserving historical data
-- Splits remain overwritable as they are derived from the versioned base data
-- Version comparison functionality (via `compare-assets`) helps track changes between versions
+The workflow for uploading and registering new data assets is as follows:
 
-This versioning approach ensures:
-- Reproducibility of experiments across different data versions
-- Clear tracking of dataset evolution over time
-- Easy rollback to previous versions if needed
-- Efficient storage by versioning only base datasets
+- **Weekly workflow**
+    - Append new data to `rock_images/incremental/YYYY_MM_DD/`
+    - Register or reference only the parent `incremental/` directory as a single Azure ML input
+    - Train your model using:
+        - `rock_images:<current_base_version>`
+        - `rock_images/incremental/`
+
+- **Monthly workflow**
+    - Merge base and incremental data into a new folder: `rock_images/base/vYYYYMMDD/`
+    - Register this merged folder as a new Azure ML data asset version
+    - Optionally archive or delete old incremental folders
+    - Update references to use the new base version for the next month
 
 
 #### Submitting Training Jobs to Azure ML
