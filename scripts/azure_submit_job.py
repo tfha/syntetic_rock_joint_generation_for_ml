@@ -3,7 +3,6 @@ Submit Azure ML training job for rock mass segmentation.
 Uses data assets for improved data management.
 """
 
-import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -19,9 +18,12 @@ from ml_segmentation.azure_data_assets import (
     connect_to_azure_ml,
     get_data_asset,
 )
-from ml_segmentation.azure_utility import setup_azure_environment
+from ml_segmentation.azure_utility import (
+    configure_azure_logging,
+    export_poetry_to_environment_yml,
+    setup_azure_environment,
+)
 from ml_segmentation.schema_config import ConfigSchema
-from ml_segmentation.utility import export_poetry_to_environment_yml
 
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
@@ -29,9 +31,7 @@ def main(cfg: DictConfig) -> None:
     """Submit Azure ML job with managed data assets using Command approach."""
 
     # Configure logging to reduce verbose Azure client output
-    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-        logging.WARNING
-    )
+    configure_azure_logging()
 
     # 1. Initialize configuration
     ###########################################

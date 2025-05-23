@@ -5,7 +5,6 @@ This script is designed to work with Azure ML's native dataset handling,
 using registered datasets passed as job inputs.
 """
 
-import logging
 import os
 import time
 from datetime import datetime
@@ -22,6 +21,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
+from ml_segmentation.azure_utility import configure_azure_logging
 from ml_segmentation.data_loading import get_datasets_prefixes
 from ml_segmentation.debug_functionality import better_traceback
 from ml_segmentation.define_model import choose_model
@@ -40,17 +40,12 @@ from ml_segmentation.utility import (
     seed_everything,
 )
 
-# Configure logging to reduce verbose Azure client output
-logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-    logging.WARNING
-)
-logging.getLogger("azure.identity").setLevel(logging.WARNING)
-logging.getLogger("azure.storage").setLevel(logging.WARNING)
-logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
-
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
+    # Configure logging to reduce verbose Azure client output
+    configure_azure_logging()
+
     # 1. Initialize MLflow and configuration
     ########################################################################
     # Start MLflow tracking

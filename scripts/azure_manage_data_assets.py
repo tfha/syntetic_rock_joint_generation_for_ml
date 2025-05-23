@@ -5,8 +5,6 @@ This script demonstrates how to use the Azure ML data asset management functiona
 to handle your rock mass segmentation datasets properly.
 """
 
-import logging
-
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from rich.console import Console
@@ -21,7 +19,10 @@ from ml_segmentation.azure_data_assets import (
     upload_base_data_to_azure_blob,
     upload_split_data_to_azure_blob,
 )
-from ml_segmentation.azure_utility import setup_azure_environment
+from ml_segmentation.azure_utility import (
+    configure_azure_logging,
+    setup_azure_environment,
+)
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
 from ml_segmentation.utility import seed_everything
 
@@ -97,12 +98,7 @@ def main(cfg: DictConfig) -> None:
         cfg: The Hydra configuration object
     """
     # Configure logging to reduce verbose Azure client output
-    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-        logging.WARNING
-    )
-    logging.getLogger("azure.identity").setLevel(logging.WARNING)
-    logging.getLogger("azure.storage").setLevel(logging.WARNING)
-    logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
+    configure_azure_logging()
 
     # Initialize environment and get Azure credentials
     console, subscription_id, resource_group, workspace_name = setup_azure_environment()

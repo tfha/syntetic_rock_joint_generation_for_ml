@@ -1,6 +1,4 @@
 import random
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
@@ -230,140 +228,13 @@ def track_sample_num(func: Callable) -> Callable:
     return df_processing
 
 
-def export_poetry_to_environment_yml(
-    output_file: str = "environment.yml", default_python_version: str = "3.11"
-) -> str:
-    """
-    Export Poetry dependencies to environment.yml format for Azure ML,
-    prioritizing conda packages over pip packages where possible.
-
-    Args:
-        output_file (str): The path where the environment.yml file will be saved.
-        default_python_version (str): Default Python version to use if detection fails.
-
-    Returns:
-        str: The path to the created environment.yml file.
-    """
-    print("Exporting Poetry environment to environment.yml...")
-
-    # Run poetry export to get dependencies in requirements format
-    try:
-        result = subprocess.run(
-            ["poetry", "export", "--format", "requirements.txt", "--without-hashes"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        requirements_raw = result.stdout.strip().split("\n")
-    except subprocess.CalledProcessError as e:
-        print(f"Error exporting Poetry environment: {e}")
-        print(f"Output: {e.stdout}")
-        print(f"Error: {e.stderr}")
-        sys.exit(1)
-
-    # Clean up and parse requirements
-    requirements = []
-    for req in requirements_raw:
-        if req and not req.startswith("#"):
-            # Extract package name without version constraints
-            if ";" in req:  # Handle environment markers
-                req = req.split(";")[0].strip()
-
-            if "==" in req:
-                pkg_name = req.split("==")[0].strip()
-                version = req.split("==")[1].strip()
-                requirements.append((pkg_name, version, req))
-            elif ">=" in req:
-                pkg_name = req.split(">=")[0].strip()
-                requirements.append((pkg_name, None, req))
-            else:
-                pkg_name = req.split("[")[0].strip() if "[" in req else req.strip()
-                requirements.append((pkg_name, None, req))
-
-    # Get Python version from Poetry
-    try:
-        result = subprocess.run(
-            ["python", "--version"], capture_output=True, text=True, check=True
-        )
-        python_version = result.stdout.strip().split(" ")[1]
-    except subprocess.CalledProcessError:
-        python_version = default_python_version
-        print(f"Could not determine Python version, defaulting to {python_version}")
-
-    # Define common packages that should be installed via conda
-    # This list can be expanded based on project needs
-    conda_preferred_packages = {
-        "numpy",
-        "pandas",
-        "matplotlib",
-        "scipy",
-        "scikit-learn",
-        "pytorch",
-        "torch",
-        "torchvision",
-        "pillow",
-        "pyyaml",
-        "requests",
-        "tqdm",
-        "jupyter",
-        "ipython",
-        "notebook",
-        "seaborn",
-        "plotly",
-        "pytest",
-        "flake8",
-        "black",
-        "isort",
-        "mypy",
-        "tensorboard",
-        "mlflow",
-        "opencv",
-        "hydra-core",
-        "rich",
-    }
-
-    # Separate conda and pip packages
-    conda_packages = [f"python={python_version}", "pip"]
-    pip_only_packages = []
-
-    for pkg_name, version, req_str in requirements:
-        pkg_lower = pkg_name.lower()
-
-        # Check if this is a package we prefer to install via conda
-        if pkg_lower in conda_preferred_packages:
-            if version:
-                conda_packages.append(f"{pkg_name}={version}")
-            else:
-                conda_packages.append(pkg_name)
-        else:
-            # Add to pip_only_packages if not in conda preferred list
-            pip_only_packages.append(req_str)
-
-    # Create environment.yml content
-    env_yaml = {
-        "name": "rock-segmentation",
-        "channels": ["conda-forge", "defaults"],
-        "dependencies": conda_packages,
-    }
-
-    # Add pip packages if there are any
-    if pip_only_packages:
-        env_yaml["dependencies"].append({"pip": pip_only_packages})
-
-    # Write to environment.yml
-    with open(output_file, "w") as f:
-        yaml.dump(env_yaml, f, default_flow_style=False, sort_keys=False)
-
-    print(f"Successfully exported Poetry environment to {output_file}")
-    print(f"- Conda packages: {len(conda_packages) - 2}")  # Subtract python and pip
-    print(f"- Pip-only packages: {len(pip_only_packages)}")
-    return output_file
-
-
 if __name__ == "__main__":
     # Test the export_poetry_to_environment_yml function
     output_file = "environment.yml"
     try:
+        # Import the function from azure_utility instead of using it directly
+        from ml_segmentation.azure_utility import export_poetry_to_environment_yml
+
         result_path = export_poetry_to_environment_yml(output_file=output_file)
         print(f"Environment file created successfully at: {result_path}")
     except Exception as e:

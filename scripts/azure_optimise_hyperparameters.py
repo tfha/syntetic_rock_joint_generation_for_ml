@@ -23,7 +23,10 @@ from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
     get_model_search_space,
 )
-from ml_segmentation.azure_utility import setup_azure_environment
+from ml_segmentation.azure_utility import (
+    configure_azure_logging,
+    setup_azure_environment,
+)
 from ml_segmentation.utility import export_poetry_to_environment_yml
 
 
@@ -96,6 +99,9 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
 
 def main():
     """Main entry point for the script."""
+    # Configure Azure logging
+    configure_azure_logging()
+
     # Setup environment and load configuration
     console, subscription_id, resource_group, workspace_name = setup_azure_environment()
 

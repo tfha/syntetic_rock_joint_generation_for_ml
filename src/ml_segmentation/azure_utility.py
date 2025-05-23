@@ -6,12 +6,32 @@ including environment variable handling, credential management,
 and common Azure configuration functionality.
 """
 
+import argparse
+import logging
 import os
+import subprocess
 import sys
 
+import toml
+import yaml
 from dotenv import load_dotenv
 
 from ml_segmentation.utility import get_custom_console
+
+
+def configure_azure_logging():
+    """Configure logging to reduce verbose Azure client output.
+
+    This function sets the logging level for various Azure client libraries
+    to WARNING, reducing noise in the console output. It should be called
+    at the beginning of any script that interacts with Azure services.
+    """
+    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+        logging.WARNING
+    )
+    logging.getLogger("azure.identity").setLevel(logging.WARNING)
+    logging.getLogger("azure.storage").setLevel(logging.WARNING)
+    logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
 
 
 def setup_azure_environment(console=None):
@@ -62,3 +82,322 @@ def setup_azure_environment(console=None):
         )
 
     return console, subscription_id, resource_group, workspace_name
+
+
+def export_poetry_to_environment_yml(
+    output_file: str = "environment.yml", default_python_version: str = "3.11"
+) -> str:
+    """
+    Export Poetry dependencies to environment.yml format for Azure ML,
+    prioritizing conda packages over pip packages where possible.
+
+    Args:
+        output_file (str): The path where the environment.yml file will be saved.
+        default_python_version (str): Default Python version to use if detection fails.
+
+    Returns:
+        str: The path to the created environment.yml file.
+    """
+    print("Exporting Poetry environment to environment.yml...")
+
+    # Get dependency information
+    try:
+        # No need to get lock information if we're not using it
+        # Just export requirements directly
+        result = subprocess.run(
+            ["poetry", "export", "--format", "requirements.txt", "--without-hashes"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        requirements_raw = result.stdout.strip().split("\n")
+    except subprocess.CalledProcessError as e:
+        print(f"Error exporting Poetry environment: {e}")
+        print(f"Output: {e.stdout}")
+        print(f"Error: {e.stderr}")
+        sys.exit(1)
+
+    # Get pyproject.toml content to analyze sources
+    pyproject_path = os.path.join(os.getcwd(), "pyproject.toml")
+    custom_sources = {}
+    cuda_packages = set()
+
+    if os.path.exists(pyproject_path):
+        try:
+            with open(pyproject_path, "r") as f:
+                pyproject = toml.load(f)
+
+            # Extract custom sources
+            if "tool" in pyproject and "poetry" in pyproject["tool"]:
+                if "source" in pyproject["tool"]["poetry"]:
+                    for source in pyproject["tool"]["poetry"]["source"]:
+                        custom_sources[source["name"]] = source["url"]
+
+                # Check for packages with custom sources
+                if "dependencies" in pyproject["tool"]["poetry"]:
+                    for pkg, info in pyproject["tool"]["poetry"][
+                        "dependencies"
+                    ].items():
+                        if isinstance(info, dict) and "source" in info:
+                            # If package has a custom source, check if it's likely CUDA
+                            if (
+                                "cu" in info.get("version", "")
+                                or "cuda"
+                                in custom_sources.get(info["source"], "").lower()
+                            ):
+                                cuda_packages.add(pkg.lower())
+        except (ImportError, Exception) as e:
+            print(f"Warning: Could not parse pyproject.toml: {e}")
+
+    # Clean up and parse requirements
+    requirements = []
+    for req in requirements_raw:
+        if req and not req.startswith("#"):
+            # Extract package name without version constraints
+            if ";" in req:  # Handle environment markers
+                req = req.split(";")[0].strip()
+
+            if "==" in req:
+                pkg_name = req.split("==")[0].strip()
+                version = req.split("==")[1].strip()
+                requirements.append((pkg_name, version, req))
+            elif ">=" in req:
+                pkg_name = req.split(">=")[0].strip()
+                requirements.append((pkg_name, None, req))
+            else:
+                pkg_name = req.split("[")[0].strip() if "[" in req else req.strip()
+                requirements.append((pkg_name, None, req))
+
+    # Get Python version from Poetry
+    try:
+        result = subprocess.run(
+            ["python", "--version"], capture_output=True, text=True, check=True
+        )
+        python_version = result.stdout.strip().split(" ")[1]
+    except subprocess.CalledProcessError:
+        python_version = default_python_version
+        print(f"Could not determine Python version, defaulting to {python_version}")
+
+    # Define common packages that should be installed via conda
+    # This list can be expanded based on project needs
+    conda_preferred_packages = {
+        "numpy",
+        "pandas",
+        "matplotlib",
+        "scipy",
+        "scikit-learn",
+        "pillow",
+        "pyyaml",
+        "requests",
+        "tqdm",
+        "jupyter",
+        "ipython",
+        "notebook",
+        "seaborn",
+        "plotly",
+        "pytest",
+        "flake8",
+        "black",
+        "isort",
+        "mypy",
+        "tensorboard",
+        "mlflow",
+        "opencv",
+        "hydra-core",
+        "rich",
+    }
+
+    # Special handling for PyTorch-related packages
+    pytorch_related = {"torch", "torchvision", "torchaudio", "pytorch"}
+
+    # Separate conda and pip packages
+    conda_packages = [f"python={python_version}", "pip"]
+    pip_only_packages = []
+    cuda_pip_packages = []
+
+    for pkg_name, version, req_str in requirements:
+        pkg_lower = pkg_name.lower()
+
+        # Special handling for PyTorch with CUDA
+        if pkg_lower in pytorch_related and (
+            pkg_lower in cuda_packages or "torch" in cuda_packages
+        ):
+            cuda_pip_packages.append(req_str)
+            continue
+
+        # Check if this is a package we prefer to install via conda
+        if pkg_lower in conda_preferred_packages:
+            if version:
+                conda_packages.append(f"{pkg_name}={version}")
+            else:
+                conda_packages.append(pkg_name)
+        else:
+            # Add to pip_only_packages if not in conda preferred list
+            pip_only_packages.append(req_str)
+
+    # Create environment.yml content
+    env_yaml = {
+        "name": "rock-segmentation",
+        "channels": ["conda-forge", "defaults"],
+        "dependencies": conda_packages,
+    }
+
+    # Add pip packages if there are any
+    all_pip_packages = pip_only_packages.copy()
+
+    # For CUDA packages, add special handling
+    if cuda_pip_packages:
+        for pkg in cuda_pip_packages:
+            # Replace with just the package name to allow pip to resolve from custom
+            # index
+            for cuda_pkg in cuda_packages:
+                if cuda_pkg in pkg.lower():
+                    print(f"Adding CUDA package: {pkg}")
+                    all_pip_packages.append(pkg)
+
+    if all_pip_packages:
+        # For PyTorch CUDA, add specific pip installation command if needed
+        if cuda_packages and any("torch" in pkg.lower() for pkg in cuda_pip_packages):
+            torch_indexes = [
+                url
+                for name, url in custom_sources.items()
+                if "pytorch" in name.lower() or "torch" in name.lower()
+            ]
+            if torch_indexes:
+                all_pip_packages.append(f"--index-url {torch_indexes[0]}")
+                print(f"Adding PyTorch CUDA custom index: {torch_indexes[0]}")
+
+        env_yaml["dependencies"].append({"pip": all_pip_packages})
+
+    # Write to environment.yml
+    with open(output_file, "w") as f:
+        yaml.dump(env_yaml, f, default_flow_style=False, sort_keys=False)
+
+    print(f"Successfully exported Poetry environment to {output_file}")
+    print(f"- Conda packages: {len(conda_packages) - 2}")  # Subtract python and pip
+    print(f"- Pip-only packages: {len(all_pip_packages)}")
+    if cuda_pip_packages:
+        print(f"- CUDA-enabled packages: {len(cuda_pip_packages)}")
+    return output_file
+
+
+def test_environment_export(output_path: str = None) -> None:
+    """
+    Test the export_poetry_to_environment_yml function by running it
+    and displaying information about the generated environment.yml file.
+
+    Args:
+        output_path (str, optional): Custom path for the output file.
+            Defaults to environment.yml in the current directory.
+    """
+    console = get_custom_console()
+
+    console.print(
+        "\n[bold blue]Testing Poetry to Azure ML environment export[/bold blue]"
+    )
+    console.print("=" * 60)
+
+    # Get the current working directory
+    cwd = os.getcwd()
+    console.print(f"Current working directory: [green]{cwd}[/green]")
+
+    # Check if pyproject.toml exists
+    pyproject_path = os.path.join(cwd, "pyproject.toml")
+    if not os.path.exists(pyproject_path):
+        console.print(
+            f"[bold red]Error:[/bold red] pyproject.toml not found at {pyproject_path}"
+        )
+        console.print("Please run this command from the root of your Python project.")
+        return
+
+    # Run the export function
+    if output_path is None:
+        output_path = os.path.join(cwd, "environment.yml")
+
+    try:
+        console.print(f"Exporting environment to: [green]{output_path}[/green]")
+        result_path = export_poetry_to_environment_yml(output_path)
+
+        # Validate the generated file
+        if os.path.exists(result_path):
+            file_size = os.path.getsize(result_path)
+            console.print(
+                (
+                    f"\n[bold green]Success![/bold green] environment.yml generated "
+                    f"({file_size} bytes)"
+                )
+            )
+
+            # Read and display a summary of the environment.yml
+            with open(result_path, "r") as f:
+                env_data = yaml.safe_load(f)
+
+            # Display a summary
+            console.print("\n[bold]Environment Summary:[/bold]")
+            console.print(f"Name: [cyan]{env_data.get('name', 'unnamed')}[/cyan]")
+            console.print(
+                f"Channels: [cyan]{', '.join(env_data.get('channels', []))}[/cyan]"
+            )
+
+            dependencies = env_data.get("dependencies", [])
+            conda_deps = [d for d in dependencies if isinstance(d, str)]
+            pip_deps = []
+
+            for dep in dependencies:
+                if isinstance(dep, dict) and "pip" in dep:
+                    pip_deps = dep["pip"]
+
+            console.print(f"Conda packages: [cyan]{len(conda_deps)}[/cyan]")
+            console.print(f"Pip packages: [cyan]{len(pip_deps)}[/cyan]")
+
+            # Check for PyTorch CUDA packages
+            cuda_packages = [
+                p
+                for p in pip_deps
+                if "torch" in p.lower()
+                and ("cu" in p.lower() or "--index-url" in p.lower())
+            ]
+            if cuda_packages:
+                console.print(
+                    "[bold green]✓[/bold green] Found PyTorch CUDA configurations:"
+                )
+                for pkg in cuda_packages:
+                    console.print(f"  - [cyan]{pkg}[/cyan]")
+
+            # Provide instructions
+            console.print("\n[bold yellow]Next Steps:[/bold yellow]")
+            console.print("1. Inspect the environment.yml file for accuracy")
+            console.print(
+                "2. Use this file with Azure ML for compute environment configuration"
+            )
+            console.print(
+                "3. Test the environment with: [green]conda env create -f "
+                "environment.yml[/green]"
+            )
+        else:
+            console.print(
+                "[bold red]Error:[/bold red] Failed to generate environment.yml"
+                f" at {result_path}"
+            )
+
+    except Exception as e:
+        console.print(f"[bold red]Error during export:[/bold red] {str(e)}")
+        import traceback
+
+        console.print(traceback.format_exc())
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Export Poetry environment to Azure ML environment.yml"
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="environment.yml",
+        help="Path for the output environment.yml file",
+    )
+    args = parser.parse_args()
+
+    test_environment_export(args.output)
