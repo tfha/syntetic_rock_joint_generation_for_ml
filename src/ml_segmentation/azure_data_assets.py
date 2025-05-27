@@ -24,11 +24,13 @@ from ml_segmentation.data_loading import (
     get_datasets_prefixes,
     split_data,
 )
-from ml_segmentation.utility import get_custom_console
+
+# Imports all required modules above
 
 
 def register_data_asset(
     ml_client: MLClient,
+    console: Console,
     name: str,
     version: str,
     description: str,
@@ -43,6 +45,7 @@ def register_data_asset(
 
     Args:
         ml_client: Azure ML client
+        console: Console object for pretty printing
         name: Name of the data asset
         version: Version of the data asset
         description: Description of the data asset
@@ -55,7 +58,6 @@ def register_data_asset(
     Returns:
         Azure ML Data asset
     """
-    console = get_custom_console()
 
     # Prepare metadata
     if metadata is None:
@@ -129,13 +131,18 @@ def register_data_asset(
 
 
 def get_data_asset(
-    ml_client: MLClient, name: str, version: str = None, label: str = "latest"
+    ml_client: MLClient,
+    console: Console,
+    name: str,
+    version: str = None,
+    label: str = "latest",
 ) -> Data:
     """
     Get a data asset from Azure ML workspace.
 
     Args:
         ml_client: Azure ML client
+        console: Console object for pretty printing
         name: Name of the data asset
         version: Version of the data asset (if specific version required)
         label: Label to use if version not provided (default: "latest")
@@ -143,7 +150,6 @@ def get_data_asset(
     Returns:
         Azure ML Data asset
     """
-    console = get_custom_console()
 
     try:
         if version:
@@ -161,18 +167,20 @@ def get_data_asset(
         raise
 
 
-def list_data_asset_versions(ml_client: MLClient, name: str) -> pd.DataFrame:
+def list_data_asset_versions(
+    ml_client: MLClient, console: Console, name: str
+) -> pd.DataFrame:
     """
     List all versions of a data asset with their metadata.
 
     Args:
         ml_client: Azure ML client
+        console: Console object for pretty printing
         name: Name of the data asset
 
     Returns:
         DataFrame with version information
     """
-    console = get_custom_console()
 
     try:
         assets = list(ml_client.data.list(name=name))
@@ -471,9 +479,9 @@ def register_base_datasets(ml_client: MLClient, console: Console):
         "domain": "geology",
         "purpose": "segmentation",
     }
-
     images_asset = register_data_asset(
         ml_client=ml_client,
+        console=console,
         name="rock_images",
         version=version,
         description="Rock mass joint images for segmentation",
@@ -494,9 +502,9 @@ def register_base_datasets(ml_client: MLClient, console: Console):
         "purpose": "segmentation",
         "related_dataset": f"rock_images:{version}",
     }
-
     masks_asset = register_data_asset(
         ml_client=ml_client,
+        console=console,
         name="rock_masks",
         version=version,
         description="Binary masks for rock mass joint segmentation",
@@ -516,9 +524,9 @@ def register_base_datasets(ml_client: MLClient, console: Console):
         "purpose": "archive",
         "processed_datasets": f"rock_images:{version},rock_masks:{version}",
     }
-
     raw_asset = register_data_asset(
         ml_client=ml_client,
+        console=console,
         name="rock_raw_data",
         version=version,
         description="Raw unprocessed rock mass joint data",
@@ -593,23 +601,26 @@ def register_split_data_asset(
 
     version = datetime.now().strftime("%Y%m%d.%H%M")
     asset_name = f"split_{split_subfolder}"
-    description = f"Train/val/test split for {split_subfolder.replace('_', ' ')}"
+    split_name = split_subfolder.replace("_", " ")
+    description = f"Train/val/test split for {split_name}"
 
     # Get base dataset versions
-    rock_images = get_data_asset(ml_client, "rock_images")
-    rock_masks = get_data_asset(ml_client, "rock_masks")
+    rock_images = get_data_asset(ml_client, console, "rock_images")
+    rock_masks = get_data_asset(ml_client, console, "rock_masks")
 
     metadata = {
         "base_images_dataset": f"rock_images:{rock_images.version}",
         "base_masks_dataset": f"rock_masks:{rock_masks.version}",
         "split_strategy": experiment_strategy,
     }
+
     splits_blob_uri = (
         f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/"
         f"splits/{split_subfolder}"
     )
     asset = register_data_asset(
         ml_client=ml_client,
+        console=console,
         name=asset_name,
         version=version,
         description=description,
@@ -635,10 +646,9 @@ def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = No
         asset_name: Optional name of a specific asset to list versions for
     """
 
-    if asset_name:
-        # List versions of a specific asset
+    if asset_name:  # List versions of a specific asset
         console.print(f"Listing versions of data asset: {asset_name}", style="info")
-        df = list_data_asset_versions(ml_client, asset_name)
+        df = list_data_asset_versions(ml_client, console, asset_name)
 
         if df.empty:
             console.print(
@@ -709,13 +719,14 @@ def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = No
 
 
 def compare_data_asset_versions(
-    ml_client: MLClient, name: str, version1: str, version2: str
+    ml_client: MLClient, console: Console, name: str, version1: str, version2: str
 ) -> dict[str, str | list[str]]:
     """
     Compare two versions of a data asset.
 
     Args:
         ml_client: Azure ML client
+        console: Console object for pretty printing
         name: Name of the data asset
         version1: First version to compare
         version2: Second version to compare
@@ -723,7 +734,6 @@ def compare_data_asset_versions(
     Returns:
         Dictionary with comparison results
     """
-    console = get_custom_console()
 
     try:
         asset1 = ml_client.data.get(name=name, version=version1)
@@ -784,15 +794,15 @@ def compare_assets(
             "version1, and version2."
         )
         console.print(err_msg, style="error")
-        return
-
-    console.print(
-        f"Comparing versions {version1} and {version2} of asset '{asset_name}'",
-        style="info",
-    )
+        return console.print(
+            f"Comparing versions {version1} and {version2} of asset '{asset_name}'",
+            style="info",
+        )
 
     # Compare the versions
-    comparison = compare_data_asset_versions(ml_client, asset_name, version1, version2)
+    comparison = compare_data_asset_versions(
+        ml_client, console, asset_name, version1, version2
+    )
 
     if "error" in comparison:
         console.print(f"Error comparing versions: {comparison['error']}", style="error")
