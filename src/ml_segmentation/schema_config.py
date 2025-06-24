@@ -126,6 +126,10 @@ class ExperimentConfig(BaseModel):
             "instead of strategy-based filtering."
         ),
     )
+    download_outputs: bool = Field(
+        False,
+        description="Flag to control whether to download outputs after job completion.",
+    )
 
 
 class DatasetConfig(BaseModel):
@@ -169,6 +173,16 @@ class AzureMLConfig(BaseModel):
         ..., description="Name of the compute cluster to use for Azure ML training."
     )
     experiment_name: str = Field(..., description="Name of the experiment in Azure ML.")
+    environment_name: str = Field(
+        "rock-segmentation-env",
+        description="Name of the Azure ML environment to use or create.",
+    )
+    environment_version: str = Field(
+        "latest", description="Version of the Azure ML environment to use."
+    )
+    use_new_version: bool = Field(
+        False, description="Whether to create and use a new version of the environment."
+    )
 
 
 class AzureDataAssetsCommand(str, Enum):

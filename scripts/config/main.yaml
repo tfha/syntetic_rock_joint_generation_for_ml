@@ -21,6 +21,9 @@ hydra:
 azure_ml:
   compute_name: "Standard-NC6s-v3"  # GPU VM size for training
   experiment_name: "rock-segmentation"
+  environment_name: "rock-segmentation-env"  # Default environment name
+  environment_version: "latest"  # Default environment version
+  use_new_version: false  # Whether to create and use a new version of the environment
 
 # Azure Data Assets configuration
 # Note: Credentials are loaded from .env file at runtime
@@ -56,6 +59,7 @@ experiment:
   crossvalidation: false
   path_example_images: ${path_project}/experiments/example_images
   use_registered_splits: true  # Flag to use registered splits from Azure ML (added for Azure ML pipeline)
+  download_outputs: false  # Flag to control whether to download outputs after job completion in Azure ML
   experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:
@@ -102,7 +106,6 @@ experiment:
       train_datasets:
         - "real_world_rock_slope"
       test_datasets: []
-
 
 dataset:
   path_images: ${path_project}/Data/rockmass

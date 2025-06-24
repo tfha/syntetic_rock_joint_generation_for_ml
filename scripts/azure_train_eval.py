@@ -19,6 +19,7 @@ from segmentation_models_pytorch.losses import DiceLoss
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
+from torchinfo import summary
 
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
 from ml_segmentation.azure_utility import configure_azure_logging
@@ -124,6 +125,7 @@ def main(cfg: DictConfig) -> None:
     console.print(f"Azure ML mounted masks path: {masks_path}", style="info")
 
     # Check if splits dataset is mounted and should be used
+    # TODO: the code below can probably be safely removed
     splits_path = None
     if pcfg.experiment.use_registered_splits:
         splits_path = Path(os.environ.get("AZUREML_DATAREFERENCE_splits_data", ""))
@@ -184,8 +186,6 @@ def main(cfg: DictConfig) -> None:
 
     # Log model info if possible
     try:
-        from torchinfo import summary
-
         model_stats = summary(
             model, input_size=(pcfg.model.batch_size, 3, 224, 224), verbose=0
         )

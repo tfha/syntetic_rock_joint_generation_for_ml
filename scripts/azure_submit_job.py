@@ -137,33 +137,44 @@ def main(cfg: DictConfig) -> None:
 
     # 7. Create or retrieve Azure ML environment
     ###########################################
-    console.print("Creating Azure ML environment...", style="info")
-    env = Environment(
-        name="rock-segmentation-env",
-        description="Environment for rock segmentation model training",
-        build=BuildContext(path="."),
-    )
+    console.print("Creating or retrieving Azure ML environment...", style="info")
 
-    # Register the environment if needed
-    try:
-        registered_env = ml_client.environments.get(
-            name="rock-segmentation-env", label="latest"
+    # Use environment name and version from config
+    env_name = pcfg.azure_ml.environment_name
+    env_version = pcfg.azure_ml.environment_version
+    use_new_version = pcfg.azure_ml.use_new_version
+
+    if use_new_version:
+        console.print(
+            f"Registering new version of environment: {env_name}", style="info"
         )
-        console.print("Using existing environment", style="info")
-        env = registered_env
-    except ResourceNotFoundError:
-        console.print("Registering new environment", style="info")
+        env = Environment(
+            name=env_name,
+            description="Environment for rock segmentation model training",
+            build=BuildContext(path="."),
+        )
         try:
             env = ml_client.environments.create_or_update(env)
-            console.print("Environment registered successfully", style="success")
+            console.print(
+                "Environment registered successfully as a new version", style="success"
+            )
         except Exception as e:
             console.print(f"Error registering environment: {str(e)}", style="error")
             sys.exit(1)
-    except Exception as e:
+    else:
         console.print(
-            f"Error checking for existing environment: {str(e)}", style="error"
+            f"Using existing environment: {env_name}:{env_version}", style="info"
         )
-        sys.exit(1)
+        try:
+            env = ml_client.environments.get(name=env_name, version=env_version)
+        except ResourceNotFoundError:
+            console.print(
+                f"Environment {env_name}:{env_version} not found", style="error"
+            )
+            sys.exit(1)
+        except Exception as e:
+            console.print(f"Error retrieving environment: {str(e)}", style="error")
+            sys.exit(1)
 
     # 8. Set up run metadata
     ###########################################
@@ -185,7 +196,7 @@ def main(cfg: DictConfig) -> None:
         f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
     )
 
-    # 10. Configure job inputs and outputs
+    # 10. Configure job inputs and outputs folders with experiment information
     ###########################################
     # Define job inputs and outputs
     job_inputs = {
@@ -261,40 +272,43 @@ def main(cfg: DictConfig) -> None:
 
     # 13. Download job outputs
     ###########################################
-    # Create a directory for downloading outputs
-    download_dir = Path(f"./downloaded_runs/{display_name}")
-    download_dir.mkdir(parents=True, exist_ok=True)
+    if pcfg.experiment.download_outputs:
+        # Create a directory for downloading outputs
+        download_dir = Path(f"./downloaded_runs/{display_name}")
+        download_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download outputs after completion
-    console.print("Downloading job outputs...", style="info")
-    try:
-        ml_client.jobs.download(
-            name=job_run.name,
-            output_name="model_output",
-            download_path=download_dir / "models",
-        )
-        ml_client.jobs.download(
-            name=job_run.name,
-            output_name="plots",
-            download_path=download_dir / "plots",
-        )
-        ml_client.jobs.download(
-            name=job_run.name,
-            output_name="example_images",
-            download_path=download_dir / "examples",
-        )
-
-        # Log the download location
+        # Download outputs after completion
         console.print(
-            f"Downloaded outputs to: {download_dir.absolute()}", style="success"
+            "Downloading job outputs after training in Azure ML...", style="info"
         )
-    except Exception as e:
-        console.print(f"Error downloading job outputs: {str(e)}", style="error")
-        msg = (
-            "You can download the outputs manually from the Azure ML portal: "
-            f"{job_run.services.get('Studio').endpoint}"
-        )
-        console.print(msg, style="warning")
+        try:
+            ml_client.jobs.download(
+                name=job_run.name,
+                output_name="model_output",
+                download_path=download_dir / "models",
+            )
+            ml_client.jobs.download(
+                name=job_run.name,
+                output_name="plots",
+                download_path=download_dir / "plots",
+            )
+            ml_client.jobs.download(
+                name=job_run.name,
+                output_name="example_images",
+                download_path=download_dir / "examples",
+            )
+
+            # Log the download location
+            console.print(
+                f"Downloaded outputs to: {download_dir.absolute()}", style="success"
+            )
+        except Exception as e:
+            console.print(f"Error downloading job outputs: {str(e)}", style="error")
+            msg = (
+                "You can download the outputs manually from the Azure ML portal: "
+                f"{job_run.services.get('Studio').endpoint}"
+            )
+            console.print(msg, style="warning")
 
     # 14. Print job output information
     ###########################################
