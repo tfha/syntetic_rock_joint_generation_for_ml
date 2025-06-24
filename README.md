@@ -524,6 +524,44 @@ The training pipeline consists of the following steps:
    - Store results in organized local directory
    - Print job output information and status
 
+#### Metrics and Model Tracking in Azure ML
+
+The project implements a comprehensive metrics and model tracking system to ensure the best performing model is always saved and metrics are properly logged. This is crucial since the best metrics often don't occur in the final epoch.
+
+1. **Metrics Tracking**
+   - During each validation phase, all key metrics (IoU, Dice, Precision, Recall) are calculated
+   - The `check_and_update_best_metrics` function compares current metrics with stored best metrics
+   - When new best metrics are found, they are stored with their corresponding epoch number
+   - Best metrics are prominently displayed in the console with a green highlight
+
+2. **Best Model Preservation**
+   - Two separate model checkpoints are maintained:
+     - **Best Metrics Model**: Saved whenever a new best performance metric is achieved
+     - **Early Stopping Model**: Saved by the early stopping mechanism based on validation loss
+   - The model state (weights) is captured at the exact point when best metrics are achieved
+   - This ensures you always retain the optimal model, even if performance degrades in later epochs
+
+3. **MLflow Integration**
+   - All metrics are tracked in real-time through MLflow
+   - Best metrics are logged with specific tags (e.g., `best_iou`, `best_dice`)
+   - The epoch number where best metrics occurred is logged as `best_metrics_epoch`
+   - A comprehensive metrics summary file is saved and registered with MLflow artifacts
+
+4. **Model Registration**
+   - Three model versions are saved and registered:
+     - **Final model**: The model at the end of training
+     - **Best metrics model**: The model with the best performance metrics
+     - **Early stopping model**: The model saved by early stopping (if enabled)
+   - All models are saved in both PyTorch format (.pth) and MLflow format
+   - Models are registered with appropriate tags for easy identification
+
+5. **Visualization Artifacts**
+   - Example predictions are saved periodically throughout training
+   - Final and best model predictions are saved with ground truth comparisons
+   - TensorBoard logs track all metrics for visual performance analysis
+
+This comprehensive tracking ensures that you can always identify and retrieve the best performing model, even if it occurred early in the training process. All metrics and models are accessible through the MLflow interface in Azure ML Studio.
+
 #### Comparing Local vs Azure ML Training
 
 | Feature | Local Training | Azure ML Training |

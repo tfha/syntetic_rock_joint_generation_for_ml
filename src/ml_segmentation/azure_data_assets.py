@@ -140,6 +140,9 @@ def get_data_asset(
     """
     Get a data asset from Azure ML workspace.
 
+    Note: This function should be wrapped with retry_azure_operation when used,
+    as Azure operations may fail due to transient issues.
+
     Args:
         ml_client: Azure ML client
         console: Console object for pretty printing
@@ -151,20 +154,15 @@ def get_data_asset(
         Azure ML Data asset
     """
 
-    try:
-        if version:
-            data = ml_client.data.get(name=name, version=version)
-        else:
-            data = ml_client.data.get(name=name, label=label)
+    if version:
+        data = ml_client.data.get(name=name, version=version)
+    else:
+        data = ml_client.data.get(name=name, label=label)
 
-        console.print(
-            f"Retrieved data asset '{name}' (version {data.version})", style="info"
-        )
-        return data
-
-    except Exception as e:
-        console.print(f"Error retrieving data asset '{name}': {str(e)}", style="error")
-        raise
+    console.print(
+        f"Retrieved data asset '{name}' (version {data.version})", style="info"
+    )
+    return data
 
 
 def list_data_asset_versions(

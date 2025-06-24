@@ -1,12 +1,28 @@
 """
 Submit Azure ML training job for rock mass segmentation.
 Uses data assets for improved data management.
+
+Architecture:
+- Uses Azure ML SDK v2 for job submission
+- Leverages data assets for efficient data versioning and management
+- Implements best practices for error handling and retry logic
+- Supports environment versioning and reproducibility
+- Centralized configuration using Hydra
+- MLflow integration for experiment tracking
+
+This script handles:
+1. Setup and validation of Azure ML environment
+2. Data asset retrieval and validation
+3. Compute target verification
+4. Environment setup and versioning
+5. Job configuration and submission
+6. Output management and retrieval
 """
 
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any  # Only import Any as it doesn't have a built-in equivalent
+from typing import Any
 
 import hydra
 from azure.ai.ml import Input, Output, command
@@ -21,6 +37,7 @@ from ml_segmentation.azure_utility import (
     configure_azure_logging,
     connect_to_azure_ml,
     export_poetry_to_environment_yml,
+    retry_azure_operation,
     setup_azure_environment,
 )
 from ml_segmentation.schema_config import ConfigSchema
@@ -55,7 +72,7 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     try:
         environment_file = export_poetry_to_environment_yml()
-        console.print(f"Environment exported to {environment_file}", style="info")
+        console.print(f"Export environment to {environment_file}", style="info")
     except Exception as e:
         console.print(f"Error exporting environment: {str(e)}", style="error")
         sys.exit(1)
@@ -85,14 +102,23 @@ def main(cfg: DictConfig) -> None:
     try:
         console.print("Retrieving latest data assets from Azure ML...", style="info")
 
-        # Get base image and mask datasets
-        images_dataset = get_data_asset(ml_client, "rock_images")
-        masks_dataset = get_data_asset(ml_client, "rock_masks")
+        # Apply retry logic to data asset retrieval
+        get_data_asset_with_retry = retry_azure_operation(
+            get_data_asset, operation_name="Data asset retrieval"
+        )  # Get base image and mask datasets
+        images_dataset = get_data_asset_with_retry(
+            ml_client, "rock_images", console=console
+        )
+        masks_dataset = get_data_asset_with_retry(
+            ml_client, "rock_masks", console=console
+        )
 
         # Select the correct split asset based on experiment strategy
         strategy = pcfg.experiment.experiment_strategy.lower()
         split_asset_name = f"split_{strategy.replace('.', '_').replace(' ', '_')}"
-        splits_dataset = get_data_asset(ml_client, split_asset_name)
+        splits_dataset = get_data_asset_with_retry(
+            ml_client, split_asset_name, console=console
+        )
 
         console.print(
             f"Using split asset: {split_asset_name} (version {splits_dataset.version})",
@@ -119,7 +145,13 @@ def main(cfg: DictConfig) -> None:
     # 6. Get and validate compute cluster exists
     ###########################################
     try:
-        ml_client.compute.get(compute_cluster_name)
+        # Apply retry logic to compute retrieval
+        get_compute_with_retry = retry_azure_operation(
+            ml_client.compute.get, operation_name="Compute cluster retrieval"
+        )
+
+        # Get compute cluster with retry
+        get_compute_with_retry(compute_cluster_name)
         console.print(f"Using compute cluster: {compute_cluster_name}", style="info")
     except ResourceNotFoundError:
         console.print(
@@ -154,7 +186,14 @@ def main(cfg: DictConfig) -> None:
             build=BuildContext(path="."),
         )
         try:
-            env = ml_client.environments.create_or_update(env)
+            # Apply retry logic to environment creation
+            create_env_with_retry = retry_azure_operation(
+                ml_client.environments.create_or_update,
+                operation_name="Environment registration",
+            )
+
+            # Create environment with retry
+            env = create_env_with_retry(env)
             console.print(
                 "Environment registered successfully as a new version", style="success"
             )
@@ -166,7 +205,13 @@ def main(cfg: DictConfig) -> None:
             f"Using existing environment: {env_name}:{env_version}", style="info"
         )
         try:
-            env = ml_client.environments.get(name=env_name, version=env_version)
+            # Apply retry logic to environment retrieval
+            get_env_with_retry = retry_azure_operation(
+                ml_client.environments.get, operation_name="Environment retrieval"
+            )
+
+            # Get environment with retry
+            env = get_env_with_retry(name=env_name, version=env_version)
         except ResourceNotFoundError:
             console.print(
                 f"Environment {env_name}:{env_version} not found", style="error"
@@ -198,7 +243,9 @@ def main(cfg: DictConfig) -> None:
 
     # 10. Configure job inputs and outputs folders with experiment information
     ###########################################
-    # Define job inputs and outputs
+    # Define job inputs and outputs for remote execution
+    # The directories will be created by the azure_train_eval.py script
+    console.print("Configuring job inputs and outputs...", style="info")
     job_inputs = {
         "images_data": Input(type="uri_folder", path=images_dataset.id),
         "masks_data": Input(type="uri_folder", path=masks_dataset.id),
@@ -234,7 +281,11 @@ def main(cfg: DictConfig) -> None:
     # Submit the job
     console.print("Submitting Azure ML job...", style="info")
     try:
-        job_run = ml_client.jobs.create_or_update(job)
+        # Use retry decorator for job submission
+        submit_job_with_retry = retry_azure_operation(
+            ml_client.jobs.create_or_update, operation_name="Job submission"
+        )
+        job_run = submit_job_with_retry(job)
         console.print(
             f"Job successfully submitted! Job name: {job_run.name}",
             style="success",
@@ -256,7 +307,7 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error submitting job: {str(e)}", style="error")
         sys.exit(1)
 
-    # 12. Stream logs
+    # 12. Stream logs to console
     ###########################################
     # Stream the logs
     console.print("Job submitted. Streaming logs...", style="info")
@@ -270,11 +321,11 @@ def main(cfg: DictConfig) -> None:
         console.print(f"Error streaming logs: {str(e)}", style="error")
         console.print("Job is still running in Azure ML.", style="warning")
 
-    # 13. Download job outputs
+    # 13. Download job outputs from Azure ML
     ###########################################
     if pcfg.experiment.download_outputs:
         # Create a directory for downloading outputs
-        download_dir = Path(f"./downloaded_runs/{display_name}")
+        download_dir = Path(f"./downloaded_remote_runs/{display_name}")
         download_dir.mkdir(parents=True, exist_ok=True)
 
         # Download outputs after completion

@@ -203,11 +203,8 @@ def main():
         f"experiment.log_mlflow=True "
         f"experiment.experiment_strategy={opt_config['experiment_strategy']} "
         f"model.num_epochs={opt_config['epochs']} "
-    )
-
-    # Add data split info if available
-    if has_splits:
-        base_command += " experiment.use_registered_splits=True"
+    )  # Data splits are now always used in the system
+    # No need to add any specific flags
 
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"

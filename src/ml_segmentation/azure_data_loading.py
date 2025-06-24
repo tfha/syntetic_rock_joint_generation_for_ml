@@ -3,6 +3,7 @@ Azure ML specific dataset handling for rock mass segmentation project.
 This module provides utilities for working with Azure ML datasets.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -10,13 +11,12 @@ import mlflow
 from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
+from rich.console import Console
 from torch.utils.data import DataLoader
 
 from ml_segmentation.data_loading import (
     SegmentationDataset,
-    get_data_files,
     get_transforms,
-    split_data,
 )
 
 
@@ -73,42 +73,30 @@ def create_azure_datasets(
 
 
 def setup_azure_dataloader(
+    console: Console,
     images_path: Path,
     labels_path: Path,
-    train_prefixes_list: list[str],
-    test_prefixes_list: list[str],
     batch_size: int,
     num_workers: int,
-    train_fraction: float,
-    val_fraction: float,
-    test_fraction: float,
     optional_transforms: bool = False,
     splits_path: Path = None,
-    use_registered_splits: bool = False,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
-    Uses Azure ML mounted paths for dataset inputs.
+    Uses Azure ML mounted paths for dataset inputs and registered splits.
 
     Args:
+        console: Rich console for pretty printing
         images_path: Path to the images directory
         labels_path: Path to the labels directory
-        train_prefixes_list: List of prefixes for training files
-        test_prefixes_list: List of prefixes for test files
         batch_size: Batch size for the dataloaders
         num_workers: Number of workers for data loading
-        train_fraction: Fraction of data to use for training
-        val_fraction: Fraction of data to use for validation
-        test_fraction: Fraction of data to use for testing
         optional_transforms: Whether to use optional data augmentation
-        splits_path: Optional path to the directory containing registered splits
-        use_registered_splits: Whether to use registered splits from Azure ML
+        splits_path: Path to the directory containing registered splits
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
     """
-    import json
-
     # Check if directories exist
     if not images_path.exists():
         raise ValueError(f"Images directory does not exist: {images_path}")
@@ -119,23 +107,26 @@ def setup_azure_dataloader(
     img_files = list(images_path.glob("*.jpg")) + list(images_path.glob("*.png"))
     mask_files = list(labels_path.glob("*.jpg")) + list(labels_path.glob("*.png"))
 
-    print(f"Found {len(img_files)} images and {len(mask_files)} masks")
-    print(f"Sample image files: {[f.name for f in img_files[:5]]}")
-    print(f"Sample mask files: {[f.name for f in mask_files[:5]]}")
+    console.print(
+        f"Found {len(img_files)} images and {len(mask_files)} masks", style="info"
+    )
+    console.print(
+        f"Sample image files: {[f.name for f in img_files[:5]]}", style="info"
+    )
+    console.print(
+        f"Sample mask files: {[f.name for f in mask_files[:5]]}", style="info"
+    )
 
     # Get transformations
     transforms_dict = get_transforms(optional_transforms=optional_transforms)
-
-    # Check if using registered splits
-    if splits_path is not None and splits_path.exists() and use_registered_splits:
-        print(f"Using registered splits from: {splits_path}")
+    # Use registered splits from Azure ML
+    if splits_path is not None and splits_path.exists():
+        console.print(f"Using registered splits from: {splits_path}", style="info")
 
         # Look for train/val/test split files
         train_file = splits_path / "train_files.json"
         val_file = splits_path / "val_files.json"
-        test_file = splits_path / "test_files.json"
-
-        # Load splits if available
+        test_file = splits_path / "test_files.json"  # Load splits from files
         if train_file.exists() and test_file.exists():
             with open(train_file, "r") as f:
                 train_list = json.load(f)
@@ -148,8 +139,10 @@ def setup_azure_dataloader(
             with open(test_file, "r") as f:
                 test_list = json.load(f)
 
-            print(
-                f"Loaded splits from registered files: train={len(train_list)}, val={len(val_list)}, test={len(test_list)}"
+            console.print(
+                f"Loaded splits from registered files: "
+                f"train={len(train_list)}, val={len(val_list)}, test={len(test_list)}",
+                style="info",
             )
 
             # Log to MLflow if in Azure ML environment
@@ -158,40 +151,20 @@ def setup_azure_dataloader(
                 mlflow.log_param("registered_val_samples", len(val_list))
                 mlflow.log_param("registered_test_samples", len(test_list))
         else:
-            print(
-                "Registered splits files not found, falling back to strategy-based filtering"
-            )
-            # Fall back to strategy-based filtering
-            train_files, test_files = get_data_files(
-                images_path, labels_path, train_prefixes_list, test_prefixes_list
-            )
-
-            # Split data
-            train_list, val_list, test_list = split_data(
-                train_files,
-                test_files,
-                train_frac=train_fraction,
-                val_frac=val_fraction,
-                test_frac=test_fraction,
+            raise ValueError(
+                "Required split files not found in the splits directory. "
+                "Please ensure train_files.json and test_files.json are available."
             )
     else:
-        # Get data files using strategy-based filtering
-        train_files, test_files = get_data_files(
-            images_path, labels_path, train_prefixes_list, test_prefixes_list
-        )
-
-        # Split data
-        train_list, val_list, test_list = split_data(
-            train_files,
-            test_files,
-            train_frac=train_fraction,
-            val_frac=val_fraction,
-            test_frac=test_fraction,
-        )
-
-    # Log dataset splits
-    print(
-        f"Dataset splits: train={len(train_list)}, val={len(val_list)}, test={len(test_list)}"
+        raise ValueError(
+            "Splits path not found or is None. "
+            "Please ensure the 'splits_data' input is correctly configured "
+            "in your Azure ML job."
+        )  # Log dataset splits
+    console.print(
+        f"Dataset splits: train={len(train_list)}, "
+        f"val={len(val_list)}, test={len(test_list)}",
+        style="info",
     )
 
     # Log to MLflow if in Azure ML environment

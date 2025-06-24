@@ -68,7 +68,7 @@ exclude = [
 
 [tool.ruff.lint]
 # Enable rules from pycodestyle (E), pyflakes (F), isort (I)
-select = ["E", "F", "I"]
+select = ["E", "F"]
 ignore = []
 
 # Allow unused variables when underscore-prefixed.

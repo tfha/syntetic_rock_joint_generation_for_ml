@@ -24,16 +24,18 @@ def check_and_update_best_metrics(
     """
     Check and update the best metrics if the current metrics are better.
     Args:
-        metrics (dict[str, float]): A dictionary containing the current metrics with keys
-            "loss", "iou", "dice", "precision", and "recall".
+        metrics (dict[str, float]): A dictionary containing the current metrics with
+        keys "loss", "iou", "dice", "precision", and "recall".
         best_metrics (dict[str, Any]): A dictionary containing the best metrics so far.
             If None, the current metrics will be considered the best.
         epoch (int): The current epoch number.
         training_time (float): The total training time up to the current epoch.
-        compare_metric (str, optional): The metric to use for comparison. Default is "loss".
-            For "loss", lower is better. For "iou", "dice", "precision", "recall", higher is better.
+        compare_metric (str, optional): The metric to use for comparison. Default is
+        "loss". For "loss", lower is better. For "iou", "dice", "precision", "recall"
+        higher is better.
     Returns:
-        dict[str, Any]: Updated best metrics dictionary if the current metrics are better,
+        dict[str, Any]: Updated best metrics dictionary if the current metrics are
+        better,
         otherwise returns the original best metrics.
     """
 
@@ -95,12 +97,16 @@ def train_one_epoch(
         criterion (nn.Module): Loss function.
         optimizer (optim.Optimizer): Optimizer.
         device (torch.device): Device to run the training on (CPU or GPU).
-        scaler (torch.cuda.amp.GradScaler): Gradient scaler for mixed precision training.
-        threshold (float, optional): Threshold for converting model outputs to binary predictions. Defaults to 0.5.
-        max_batches (int | None, optional): Maximum number of batches to process. If None, process all batches. Defaults to None.
+        scaler (torch.cuda.amp.GradScaler): Gradient scaler for mixed precision
+        training.
+        threshold (float, optional): Threshold for converting model outputs to
+        binary predictions. Defaults to 0.5.
+        max_batches (int | None, optional): Maximum number of batches to process.
+        If None, process all batches. Defaults to None.
 
     Returns:
-        dict[str, float]: Dictionary containing the training loss and metrics (IoU, Dice, Precision, Recall).
+        dict[str, float]: Dictionary containing the training loss and metrics
+        (IoU, Dice, Precision, Recall).
     """
     model.train()
     running_loss = 0.0
@@ -131,11 +137,19 @@ def train_one_epoch(
 
         # Backward pass and optimization
         ######################################################################
-        # The standard way to run backward propagation is to call loss.backward(). When you call .backward() on scaler.scale(loss), you are still running backward propagation on the loss object, but with the gradient values scaled up by a dynamic factor managed by the GradScaler. This means that the optimizer will apply the gradients scaled by the same factor. The net effect is that the optimizer sees gradients that are of the right scale, and the optimizer’s internal heuristics can be used as intended. This will typically improve the numerical stability of training.
+        # The standard way to run backward propagation is to call loss.backward(). When
+        # you call .backward() on scaler.scale(loss), you are still running backward
+        # propagation on the loss object, but with the gradient values scaled up by a
+        # dynamic factor managed by the GradScaler. This means that the optimizer will
+        # apply the gradients scaled by the same factor. The net effect is that the
+        # optimizer sees gradients that are of the right scale, and the optimizer’s
+        # internal heuristics can be used as intended. This will typically improve the
+        # numerical stability of training.
         scaler.scale(loss).backward()
         scaler.unscale_(
             optimizer
-        )  # unscale the gradients of optimizer's assigned params in-place before the optimizer's step
+        )  # unscale the gradients of optimizer's assigned params in-place before the
+        # optimizer's step
         scaler.step(optimizer)
         scaler.update()
 
@@ -148,13 +162,15 @@ def train_one_epoch(
 
             # For masks where joints=0 (black) and background=1 (white):
             # Calculate IoU for background (where mask == 1)
-            # For background IoU, we're treating areas where mask=1 as the positive class
+            # For background IoU, we're treating areas where mask=1 as the positive
+            # class
             background_preds = preds
             background_masks = masks
             background_iou_metric.update(background_preds, background_masks)
 
             # Calculate IoU for joints (where mask == 0)
-            # For joint IoU, we need to invert both predictions and masks to treat joints as the positive class
+            # For joint IoU, we need to invert both predictions and masks to treat
+            # joints as the positive class
             joint_preds = (
                 ~preds
             )  # Invert to focus on areas where prediction is 0 (joints)
@@ -224,13 +240,15 @@ def validate_one_epoch(
 
             # For masks where joints=0 (black) and background=1 (white):
             # Calculate IoU for background (where mask == 1)
-            # For background IoU, we're treating areas where mask=1 as the positive class
+            # For background IoU, we're treating areas where mask=1 as the positive
+            # class
             background_preds = preds
             background_masks = masks
             background_iou_metric.update(background_preds, background_masks)
 
             # Calculate IoU for joints (where mask == 0)
-            # For joint IoU, we need to invert both predictions and masks to treat joints as the positive class
+            # For joint IoU, we need to invert both predictions and masks to treat
+            # joints as the positive class
             joint_preds = (
                 ~preds
             )  # Invert to focus on areas where prediction is 0 (joints)
@@ -260,17 +278,20 @@ def validate_one_epoch(
 
 class EarlyStopping:
     """
-    EarlyStopping is a class that implements early stopping functionality for model training.
+    EarlyStopping is a class that implements early stopping functionality for model
+    training.
 
     Args:
         patience (int): The number of epochs to wait for improvement before stopping.
         verbose (bool): If True, prints the early stopping counter.
-        delta (float): The minimum change in the monitored metric to be considered as improvement.
+        delta (float): The minimum change in the monitored metric to be considered as
+        improvement.
 
     Attributes:
         patience (int): The number of epochs to wait for improvement before stopping.
         verbose (bool): If True, prints the early stopping counter.
-        delta (float): The minimum change in the monitored metric to be considered as improvement.
+        delta (float): The minimum change in the monitored metric to be considered as
+        improvement.
         counter (int): The number of epochs since the last improvement.
         best_score (float or None): The best score achieved so far.
         early_stop (bool): Whether to stop the training early or not.
@@ -278,7 +299,8 @@ class EarlyStopping:
         best_model (dict or None): The state dictionary of the best model.
 
     Methods:
-        __call__(val_loss, model): Updates the early stopping criteria based on the validation loss.
+        __call__(val_loss, model): Updates the early stopping criteria based on the
+        validation loss.
         _save_best_model(model): Saves the state dictionary of the best model.
 
     """
@@ -355,9 +377,11 @@ def save_image_predictions(
         device (torch.device): Device to run the inference on (CPU or GPU).
         num_samples (int, optional): Number of samples to visualize. Defaults to 3.
         threshold (float, optional): Threshold for binary predictions. Defaults to 0.5.
-        save_dir (Path, optional): Directory to save the images. Defaults to Path("plots/predictions").
+        save_dir (Path, optional): Directory to save the images. Defaults to
+        Path("plots/predictions").
         epoch (int, optional): Current epoch number for filename. Defaults to None.
-        exp_tag (str, optional): Experiment tag/timestamp for filename. Defaults to None.
+        exp_tag (str, optional): Experiment tag/timestamp for filename. Defaults to
+        None.
     """
     model.eval()
     samples = random.sample(list(dataloader), num_samples)

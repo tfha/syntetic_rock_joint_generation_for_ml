@@ -119,13 +119,6 @@ class ExperimentConfig(BaseModel):
     path_example_images: Path = Field(
         ..., description="Path where example images are saved during training."
     )
-    use_registered_splits: bool = Field(
-        False,
-        description=(
-            "Whether to use registered splits from Azure ML Data Assets "
-            "instead of strategy-based filtering."
-        ),
-    )
     download_outputs: bool = Field(
         False,
         description="Flag to control whether to download outputs after job completion.",

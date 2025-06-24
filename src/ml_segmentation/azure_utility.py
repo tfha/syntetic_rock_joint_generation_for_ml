@@ -11,14 +11,99 @@ import logging
 import os
 import subprocess
 import sys
+import time
+from typing import Callable, TypeVar
 
 import toml
 import yaml
 from azure.ai.ml import MLClient
+from azure.core.exceptions import AzureError, ServiceRequestError
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
+from rich.console import Console
 
 from ml_segmentation.utility import get_custom_console
+
+# Type variable for generic retry function
+T = TypeVar("T")
+
+
+def retry_azure_operation(
+    operation: Callable[..., T],
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+    backoff_factor: float = 2.0,
+    exceptions_to_catch: tuple = (AzureError, ServiceRequestError),
+    operation_name: str = "Azure operation",
+) -> Callable[..., T]:
+    """
+    Decorator for retrying Azure operations with exponential backoff.
+
+    Azure operations can fail due to transient issues such as network connectivity,
+    service throttling, or temporary service unavailability. This retry mechanism
+    helps improve resilience and reliability when working with cloud services.
+    Using this functionality replaces the need for manual retry logic or error handling
+    in your Azure operations, allowing you to focus on the core logic of your
+    application.
+
+    Exponential backoff is a standard retry strategy where the wait time between
+    retry attempts increases exponentially. This approach prevents overwhelming
+    the service with rapid-fire retries and gives the service time to recover
+    from any issues. For example:
+        - First retry: Wait 1 second
+        - Second retry: Wait 2 seconds (1 * 2.0)
+        - Third retry: Wait 4 seconds (2 * 2.0)
+        - And so on...
+
+    This pattern is essential for cloud applications as it:
+        1. Reduces load on potentially stressed services
+        2. Increases probability of eventual success
+        3. Follows Azure service rate-limiting best practices
+        4. Handles intermittent network issues gracefully
+
+    Args:
+        operation: The function to retry
+        max_retries: Maximum number of retry attempts before giving up
+        initial_backoff: Initial backoff time in seconds before first retry
+        backoff_factor: Multiplicative factor to increase backoff time with each retry
+        exceptions_to_catch: Tuple of exception classes that should trigger a retry
+        operation_name: Name of the operation for logging purposes
+
+    Returns:
+        A wrapped function that implements retry logic
+
+    Example:
+        >>> @retry_azure_operation(max_retries=5, operation_name="Get data asset")
+        >>> def get_data_asset_wrapper(client, name):
+        >>>     return client.data.get_asset(name)
+    """
+
+    def wrapper(*args, **kwargs):
+        console = Console()
+
+        retries = 0
+        current_backoff = initial_backoff
+
+        while True:
+            try:
+                return operation(*args, **kwargs)
+            except exceptions_to_catch as e:
+                retries += 1
+                if retries > max_retries:
+                    console.print(
+                        f"[bold red]Failed {operation_name} after "
+                        f"{max_retries} attempts: {str(e)}"
+                    )
+                    raise
+
+                console.print(
+                    f"[yellow]Attempt {retries}/{max_retries} for {operation_name} "
+                    f"failed: {str(e)}. Retrying in {current_backoff} seconds..."
+                )
+                time.sleep(current_backoff)
+                current_backoff *= backoff_factor
+
+    return wrapper
 
 
 def configure_azure_logging():
