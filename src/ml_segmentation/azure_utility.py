@@ -12,7 +12,7 @@ import os
 import subprocess
 import sys
 import time
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 import toml
 import yaml
@@ -26,6 +26,184 @@ from ml_segmentation.utility import get_custom_console
 
 # Type variable for generic retry function
 T = TypeVar("T")
+
+
+def check_compute_permissions(
+    ml_client: MLClient, compute_name: str, console: Console
+) -> dict[str, Any]:
+    """
+    Check if the compute cluster has the necessary permissions to access data.
+
+    Args:
+        ml_client: Azure ML client
+        compute_name: Name of the compute cluster
+        console: Console for logging
+
+    Returns:
+        Dictionary with results of permission checks
+    """
+    permissions = {
+        "has_identity": False,
+        "identity_type": None,
+        "storage_blob_access": False,
+        "workspace_access": False,
+        "log_streaming_access": False,  # New field to track streaming access
+    }
+
+    try:
+        # Get compute cluster details with refresh
+        console.print(f"Checking compute cluster: {compute_name}", style="info")
+
+        # First try to get compute with refresh to ensure we have latest data
+        compute = refresh_compute_cluster(ml_client, compute_name, console)
+
+        if compute is None:
+            # Fall back to standard get if refresh fails
+            compute = ml_client.compute.get(compute_name)
+            console.print(
+                "Using regular compute.get() as refresh failed", style="warning"
+            )
+
+        # Enhanced identity detection - try multiple ways to access identity
+        identity = None
+
+        # First attempt - check if compute has an identity attribute
+        identity = getattr(compute, "identity", None)
+        console.print(f"Identity attribute access: {type(identity)}", style="info")
+
+        # If identity is not found or is None, try accessing it as a dictionary
+        if identity is None and hasattr(compute, "properties"):
+            # Second attempt - try to access through properties dictionary
+            props = getattr(compute, "properties", {})
+            if isinstance(props, dict) and "identity" in props:
+                identity = props["identity"]
+                console.print("Found identity in compute properties", style="info")
+
+        # In case we get a serialization wrapper, try to get the actual data
+        if hasattr(identity, "_attribute_map") and hasattr(identity, "as_dict"):
+            identity = identity.as_dict()
+            console.print(
+                "Using identity.as_dict() to access identity data", style="info"
+            )
+
+        # Print identity for debugging
+        console.print(f"Identity object: {identity}", style="info")
+
+        if identity is not None:
+            permissions["has_identity"] = True
+
+            # Handle different ways the type might be structured
+            if isinstance(identity, dict):
+                # Check standard location for type
+                identity_type = identity.get("type", None)
+
+                # If not found, try alternative locations
+                if not identity_type:
+                    if "systemAssignedIdentity" in identity:
+                        identity_type = "SystemAssigned"
+                    elif "userAssignedIdentities" in identity:
+                        identity_type = "UserAssigned"
+
+                # Check for dual mode - both system and user assigned
+                has_system = "systemAssignedIdentity" in identity
+                has_user = "userAssignedIdentities" in identity
+                if has_system and has_user:
+                    identity_type = "SystemAssigned,UserAssigned"
+
+                permissions["identity_type"] = identity_type
+                console.print(f"Detected identity type: {identity_type}", style="info")
+            elif hasattr(identity, "type"):
+                # Handle case where identity is an object with a type attribute
+                permissions["identity_type"] = identity.type
+                console.print(
+                    f"Identity object has type: {identity.type}", style="info"
+                )
+
+        # Try to list datastores to check workspace access
+        try:
+            datastores = list(ml_client.datastores.list())
+            if datastores:
+                permissions["workspace_access"] = True
+                console.print(
+                    f"Compute has access to {len(datastores)} datastores", style="info"
+                )
+
+                # Try to check default datastore access
+                default_datastore = None
+                for ds in datastores:
+                    if getattr(ds, "is_default", False):
+                        default_datastore = ds
+                        break
+
+                if default_datastore:
+                    console.print(
+                        f"Default datastore: {default_datastore.name}", style="info"
+                    )
+
+                    # Check if compute has a managed identity
+                    identity_types = ["SystemAssigned", "system_assigned"]
+                    identity_types += ["UserAssigned", "user_assigned"]
+
+                    has_identity = permissions["has_identity"]
+                    id_type = permissions["identity_type"]
+                    if has_identity and id_type in identity_types:
+                        # We can't directly check storage permissions
+                        console.print(
+                            "Compute has a managed identity that may have storage "
+                            "access.",
+                            style="info",
+                        )
+                        console.print(
+                            "If job fails with NoIdentityOnCompute error, ensure "
+                            "identity has Storage Blob Data Contributor role on the "
+                            "storage.",
+                            style="warning",
+                        )
+                        # Try to verify log streaming access permissions (new check)
+                        try:
+                            # Check for log streaming permissions
+                            console.print(
+                                "Checking log streaming permissions...", style="info"
+                            )
+
+                            # We can't fully verify streaming permissions without
+                            # running a job but we can check identity type
+                            id_types = ["SystemAssigned", "system_assigned"]
+                            if permissions["identity_type"] in id_types:
+                                console.print(
+                                    "Compute has system-assigned identity, which is "
+                                    "required for log streaming. Ensure it has:",
+                                    style="info",
+                                )
+                                console.print(
+                                    "1. 'Storage Blob Data Reader' role on the "
+                                    "workspace storage account",
+                                    style="info",
+                                )
+                                console.print(
+                                    "2. 'AzureML Data Scientist' on the workspace",
+                                    style="info",
+                                )
+
+                                # Mark as potentially having streaming access
+                                # We can't be 100% sure without actually trying
+                                permissions["log_streaming_access"] = True
+                        except Exception as stream_error:
+                            console.print(
+                                f"Could not verify log streaming permissions: "
+                                f"{str(stream_error)}",
+                                style="warning",
+                            )
+        except Exception as e:
+            console.print(
+                f"Could not verify datastore access for compute: {str(e)}",
+                style="warning",
+            )
+
+    except Exception as e:
+        console.print(f"Error checking compute permissions: {str(e)}", style="error")
+
+    return permissions
 
 
 def retry_azure_operation(
@@ -121,7 +299,7 @@ def configure_azure_logging():
     logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
 
 
-def setup_azure_environment(console=None):
+def setup_azure_environment_variables(console=None):
     """Set up the Azure environment and return a console for pretty printing.
 
     This function loads environment variables from .env file,
@@ -172,15 +350,29 @@ def setup_azure_environment(console=None):
 
 
 def export_poetry_to_environment_yml(
-    output_file: str = "environment.yml", default_python_version: str = "3.11"
+    output_file: str = "environment.yml",
+    default_python_version: str = "3.10",
+    exclude_pytorch_packages: bool = True,
 ) -> str:
     """
     Export Poetry dependencies to environment.yml format for Azure ML,
     prioritizing conda packages over pip packages where possible.
 
+    When using PyTorch base images in Azure ML, this function can automatically exclude
+    core PyTorch packages to prevent version conflicts. Excluded packages include:
+    - torch, torchvision, torchaudio, pytorch (core PyTorch)
+    - NVIDIA CUDA runtime libraries and tools
+    - MAGMA and Triton (PyTorch dependencies)
+
+    PyTorch ecosystem packages like torchinfo, torchmetrics,
+    segmentation-models-pytorch, timm, etc. are NOT excluded as they are typically
+    not pre-installed in base images.
+
     Args:
         output_file (str): The path where the environment.yml file will be saved.
         default_python_version (str): Default Python version to use if detection fails.
+        exclude_pytorch_packages (bool): Whether to exclude PyTorch-related packages
+            (useful when using PyTorch base images in Azure ML).
 
     Returns:
         str: The path to the created environment.yml file.
@@ -255,15 +447,10 @@ def export_poetry_to_environment_yml(
                 pkg_name = req.split("[")[0].strip() if "[" in req else req.strip()
                 requirements.append((pkg_name, None, req))
 
-    # Get Python version from Poetry
-    try:
-        result = subprocess.run(
-            ["python", "--version"], capture_output=True, text=True, check=True
-        )
-        python_version = result.stdout.strip().split(" ")[1]
-    except subprocess.CalledProcessError:
-        python_version = default_python_version
-        print(f"Could not determine Python version, defaulting to {python_version}")
+    # Use the default Python version for Azure ML compatibility
+    # Azure ML PyTorch base images use Python 3.10
+    python_version = default_python_version
+    print(f"Using Python version {python_version} for Azure ML compatibility")
 
     # Define common packages that should be installed via conda
     # This list can be expanded based on project needs
@@ -288,28 +475,114 @@ def export_poetry_to_environment_yml(
         "isort",
         "mypy",
         "tensorboard",
-        "mlflow",
         "opencv",
         "hydra-core",
         "rich",
     }
 
-    # Special handling for PyTorch-related packages
-    pytorch_related = {"torch", "torchvision", "torchaudio", "pytorch"}
-
     # Separate conda and pip packages
     conda_packages = [f"python={python_version}", "pip"]
     pip_only_packages = []
-    cuda_pip_packages = []
+
+    # Define platform-specific packages that should be excluded from Linux environments
+    windows_specific_packages = {
+        "pywin32",
+        "pypiwin32",
+        "pywinpty",
+        "winrt",
+        "windows-curses",
+    }
+
+    # Define packages that conflict with PyTorch base images in Azure ML
+    # These packages are typically pre-installed in PyTorch base images
+    # Only exclude packages that are ACTUALLY pre-installed in the base image
+    pytorch_base_image_packages = {
+        # Core PyTorch packages (definitely pre-installed)
+        "torch",
+        "torchvision",
+        "torchaudio",
+        "pytorch",
+        "--extra-index-url https://download.pytorch.org/whl/cu121",
+        # NVIDIA/CUDA packages (included in CUDA base images)
+        "nvidia-cuda-runtime-cu11",
+        "nvidia-cuda-runtime-cu12",
+        "nvidia-cublas-cu11",
+        "nvidia-cublas-cu12",
+        "nvidia-curand-cu11",
+        "nvidia-curand-cu12",
+        "nvidia-cusolver-cu11",
+        "nvidia-cusolver-cu12",
+        "nvidia-cusparse-cu11",
+        "nvidia-cusparse-cu12",
+        "nvidia-cudnn-cu11",
+        "nvidia-cudnn-cu12",
+        "nvidia-cufft-cu11",
+        "nvidia-cufft-cu12",
+        "nvidia-nvtx-cu11",
+        "nvidia-nvtx-cu12",
+        "nvidia-ml-py",
+        "nvidia-cuda-cupti-cu12",
+        "nvidia-cuda-nvrtc-cu12",
+        "nvidia-nccl-cu12",
+        "nvidia-nvjitlink-cu12",
+        "cuda-toolkit",
+        "cudatoolkit",
+        # MAGMA (used by PyTorch, included in base images)
+        "magma-cuda110",
+        "magma-cuda111",
+        "magma-cuda112",
+        "magma-cuda113",
+        "magma-cuda114",
+        "magma-cuda115",
+        "magma-cuda116",
+        "magma-cuda117",
+        "magma-cuda118",
+        "magma-cuda121",
+        # Triton (PyTorch JIT compiler, included in newer base images)
+        "triton",
+    }
+
+    # Define version mappings for Python compatibility
+    python_compat_versions = {
+        "ipython": {
+            "3.10": "8.18.1",  # Last version compatible with Python 3.10
+            "3.11": "8.18.1",  # Can use newer versions but this is safe
+            "3.12": "8.18.1",  # Can use newer versions but this is safe
+        }
+    }
 
     for pkg_name, version, req_str in requirements:
         pkg_lower = pkg_name.lower()
 
-        # Special handling for PyTorch with CUDA
-        if pkg_lower in pytorch_related and (
-            pkg_lower in cuda_packages or "torch" in cuda_packages
+        # Skip Windows-specific packages for Azure ML environments
+        if pkg_lower in windows_specific_packages:
+            print(
+                f"Skipping Windows-specific package {pkg_name} for Azure ML environment"
+            )
+            continue
+
+        # Skip packages that conflict with PyTorch base images (if enabled)
+        if exclude_pytorch_packages and pkg_lower in pytorch_base_image_packages:
+            print(
+                f"Skipping PyTorch base image package {pkg_name} "
+                f"(pre-installed in base image)"
+            )
+            continue
+
+        # Handle Python version compatibility issues
+        if (
+            pkg_lower in python_compat_versions
+            and python_version in python_compat_versions[pkg_lower]
         ):
-            cuda_pip_packages.append(req_str)
+            compatible_version = python_compat_versions[pkg_lower][python_version]
+            print(
+                f"Using compatible version {compatible_version} for {pkg_name} "
+                f"with Python {python_version}"
+            )
+            if pkg_lower in conda_preferred_packages:
+                conda_packages.append(f"{pkg_name}={compatible_version}")
+            else:
+                pip_only_packages.append(f"{pkg_name}=={compatible_version}")
             continue
 
         # Check if this is a package we prefer to install via conda
@@ -332,29 +605,11 @@ def export_poetry_to_environment_yml(
     # Add pip packages if there are any
     all_pip_packages = pip_only_packages.copy()
 
-    # For CUDA packages, add special handling
-    if cuda_pip_packages:
-        for pkg in cuda_pip_packages:
-            # Replace with just the package name to allow pip to resolve from custom
-            # index
-            for cuda_pkg in cuda_packages:
-                if cuda_pkg in pkg.lower():
-                    print(f"Adding CUDA package: {pkg}")
-                    all_pip_packages.append(pkg)
-
     if all_pip_packages:
-        # For PyTorch CUDA, add specific pip installation command if needed
-        if cuda_packages and any("torch" in pkg.lower() for pkg in cuda_pip_packages):
-            torch_indexes = [
-                url
-                for name, url in custom_sources.items()
-                if "pytorch" in name.lower() or "torch" in name.lower()
-            ]
-            if torch_indexes:
-                all_pip_packages.append(f"--index-url {torch_indexes[0]}")
-                print(f"Adding PyTorch CUDA custom index: {torch_indexes[0]}")
-
         env_yaml["dependencies"].append({"pip": all_pip_packages})
+
+    # Note: Local package installation (-e .) is handled by setup_azure_environment.py
+    # at runtime instead of in environment.yml to avoid Docker build context issues
 
     # Write to environment.yml
     with open(output_file, "w") as f:
@@ -363,8 +618,10 @@ def export_poetry_to_environment_yml(
     print(f"Successfully exported Poetry environment to {output_file}")
     print(f"- Conda packages: {len(conda_packages) - 2}")  # Subtract python and pip
     print(f"- Pip-only packages: {len(all_pip_packages)}")
-    if cuda_pip_packages:
-        print(f"- CUDA-enabled packages: {len(cuda_pip_packages)}")
+    print("- Local package installation: Handled by setup script at runtime")
+    if exclude_pytorch_packages:
+        print("- Core PyTorch packages excluded (torch, torchvision, torchaudio)")
+        print("- PyTorch ecosystem packages included (torchinfo, torchmetrics, etc.)")
     return output_file
 
 
@@ -520,6 +777,49 @@ def connect_to_azure_ml(
             f"Error connecting to Azure ML workspace: {str(e)}", style="error"
         )
         raise
+
+
+def refresh_compute_cluster(
+    ml_client: MLClient, compute_name: str, console: Console
+) -> Any:
+    """
+    Forcibly refresh the compute cluster information from Azure.
+    Sometimes after making changes to compute in the portal, the local client cache
+    needs to be refreshed to see the changes.
+
+    Args:
+        ml_client: Azure ML client
+        compute_name: Name of the compute cluster
+        console: Console for logging
+
+    Returns:
+        The refreshed compute cluster object
+    """
+    try:
+        console.print(
+            f"Refreshing compute cluster information for: {compute_name}", style="info"
+        )
+
+        # Force refresh by doing a list operation first
+        all_computes = list(ml_client.compute.list())
+        console.print(
+            f"Found {len(all_computes)} compute resource(s) in workspace", style="info"
+        )
+
+        # Now get the specific compute we need - should be fresh
+        compute = ml_client.compute.get(
+            name=compute_name,
+            resource_group_name=None,  # Use default from client
+        )
+
+        console.print(
+            f"Successfully refreshed compute cluster: {compute_name}", style="success"
+        )
+        return compute
+
+    except Exception as e:
+        console.print(f"Error refreshing compute cluster: {str(e)}", style="error")
+        return None
 
 
 if __name__ == "__main__":

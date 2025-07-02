@@ -26,9 +26,10 @@ The script handles:
 
 import os
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any  # Only import Any as it doesn't have a built-in equivalent
+from typing import Any
 
 import hydra
 import mlflow
@@ -64,7 +65,11 @@ from ml_segmentation.utility import (
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Configure logging to reduce verbose Azure client output
-    configure_azure_logging()  # 1. Initialize MLflow and configuration
+    configure_azure_logging()
+    warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
+    warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
+
+    # 1. Initialize MLflow and configuration
     ########################################################################
     # Setup configuration
     cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
@@ -368,22 +373,6 @@ def main(cfg: DictConfig) -> None:
                 if early_stopping.early_stop:
                     console.print("Early stopping triggered", style="warning")
                     break
-
-    except KeyboardInterrupt:  # i.e Ctrl+C
-        console.print("Training interrupted by keyboard.", style="warning")
-        # Log that the training was manually interrupted
-        mlflow.log_param("training_status", "manually_interrupted")
-        mlflow.log_param("completed_epochs", epoch + 1)
-        # Save the current metrics as they are the last available
-        if metrics_validation:
-            for name, value in metrics_validation.items():
-                mlflow.log_metric(f"final_val_{name}", value)
-        if metrics_training:
-            for name, value in metrics_training.items():
-                mlflow.log_metric(f"final_train_{name}", value)
-        console.print(
-            "Metrics from the last completed epoch have been saved.", style="info"
-        )
 
     except Exception as e:
         console.print(f"Error during training: {str(e)}", style="danger")

@@ -25,7 +25,7 @@ from ml_segmentation.azure_hyperparameter_spaces import (
 from ml_segmentation.azure_utility import (
     configure_azure_logging,
     connect_to_azure_ml,
-    setup_azure_environment,
+    setup_azure_environment_variables,
 )
 from ml_segmentation.utility import export_poetry_to_environment_yml
 
@@ -103,7 +103,9 @@ def main():
     configure_azure_logging()
 
     # Setup environment and load configuration
-    console, subscription_id, resource_group, workspace_name = setup_azure_environment()
+    console, subscription_id, resource_group, workspace_name = (
+        setup_azure_environment_variables()
+    )
 
     # Create config for the run
     azure_config = {

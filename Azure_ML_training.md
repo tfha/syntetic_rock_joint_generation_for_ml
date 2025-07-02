@@ -493,23 +493,106 @@ ml_client = MLClient(
 
 ### Compute instance
 
-Azure ML compute instances are virtual machines that you can use to run your training scripts. They are fully managed and can be used for training, inferencing, and data processing. Compute instances can be used for interactive development, training, and deployment of machine learning models. You define a compute instance in your workspace and use it to run your training scripts.
+Azure Machine Learning (Azure ML) supports two main types of compute resources: **Compute Instances** and **Compute Clusters**.
 
-To create a new GPU cluster in Azure ML follow these steps:
+#### Compute Instance vs Compute Cluster
 
-1. Log into Azure ML and choose workspaces
-2. Choose the workspace you want to create the cluster in. Note: the workspace need to be in a region that supports the GPU clusters you want. For example, `North Europe` does not support GPU clusters. Europe North support several clusters.
-3. Click on `Compute` in the left menu
-4. Click on `Compute instances` tab and choose `+ New` to create a new compute instance
-5. Fill in the details for the cluster, such as name, type, and size.
-6. Click `Create` to create the cluster
+| Feature         | Compute Instance                       | Compute Cluster                              |
+| --------------- | -------------------------------------- | -------------------------------------------- |
+| Purpose         | Development, interactive sessions      | Scalable training and inference jobs         |
+| Usage           | One user, notebook use, debugging      | Parallel training, large batch jobs          |
+| Scalability     | Single VM only                         | Auto-scaling from 0 to N nodes               |
+| Cost efficiency | Always running unless stopped manually | Scales to 0 when idle, reducing cost         |
+| Best suited for | Experimentation, lightweight tasks     | Production training, compute-intensive tasks |
 
+#### Recommendation for Computer Vision Tasks
 
-Using azure CLI
+For standard computer vision ML tasks (e.g. model training with images using PyTorch or TensorFlow), a **Compute Cluster** is typically recommended. Clusters support GPU-enabled VMs and can scale automatically based on workload, reducing idle cost. You can start with 0 nodes and scale up during training.
+
+#### Creating a Compute Resource in Azure ML
+
+##### Using the Azure Web Interface:
+
+1. Log into Azure ML and go to your workspace
+2. Click on **Compute** in the left menu
+3. To create a **Compute Instance**:
+
+   * Select the `Compute instances` tab and click `+ New`
+   * Fill in details such as name, VM size (e.g., `Standard_DS3_v2`), and region
+   * Click `Create`
+4. To create a **Compute Cluster**:
+
+   * Select the `Compute clusters` tab and click `+ New`
+   * Choose a GPU VM size (e.g., `Standard_NC6s_v3`) if needed
+   * Define minimum and maximum number of instances
+   * Enable managed identity if you need the cluster to access other resources (like storage)
+   * Click `Create`
+
+> Note: Some regions (e.g., North Europe) may not support GPU VM sizes. Consider using `West Europe`, `East US`, etc.
+
+##### Using Azure CLI:
 
 ```bash
-az ml compute create --name gpu-cluster-ncas8lowcost --type AmlCompute --size Standard_NC8as_T4_v3 --min-instances 0 --max-instances 2 --idle-time-before-scale-down 300 --resource-group rg-rock-joint-detection --workspace-name ws-rock-joint-det
+az ml compute create \
+  --name gpu-cluster-nc6s_v3 \
+  --type AmlCompute \
+  --size Standard_NC6s_v3 \
+  --min-instances 0 \
+  --max-instances 2 \
+  --idle-time-before-scale-down 300 \
+  --resource-group rg-rock-joint-detection \
+  --workspace-name ws-rock-joint-det \
+  --identity-type SystemAssigned
 ```
+
+###### Flag Descriptions:
+
+* `--name`: Specifies the name of the compute resource. Must be unique within the workspace.
+* `--type`: The type of compute to create. Use `AmlCompute` for compute clusters and `ComputeInstance` for development VMs.
+* `--size`: Specifies the size of the virtual machine to use. For GPU tasks, use a GPU-enabled size like `Standard_NC6s_v3`.
+* `--min-instances`: The minimum number of nodes the cluster maintains. Use `0` to scale down fully when idle.
+* `--max-instances`: The maximum number of nodes that the cluster can scale out to based on workload.
+* `--identity-type SystemAssigned`: Enables [Managed Identity](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-use-managed-identities?view=azureml-api-2), allowing the compute to securely access Azure resources.
+* `--idle-time-before-scale-down`: The amount of idle time (in seconds) before the cluster scales down.
+
+##### Using Python SDK:
+
+```python
+from azure.ai.ml.entities import AmlCompute, ComputeSettings
+from azure.ai.ml import MLClient
+from azure.identity import DefaultAzureCredential
+
+ml_client = MLClient(
+    credential=DefaultAzureCredential(),
+    subscription_id="your-subscription-id",
+    resource_group_name="rg-rock-joint-detection",
+    workspace_name="ws-rock-joint-det"
+)
+
+cluster = AmlCompute(
+    name="gpu-cluster-ncas8lowcost",
+    size="Standard_NC6s_v3",
+    min_instances=0,
+    max_instances=2,
+    idle_time_before_scale_down=300,
+    identity=ComputeSettings(identity_type="SystemAssigned")
+)
+
+ml_client.begin_create_or_update(cluster)
+```
+
+### Further Reading
+
+* [Azure ML documentation](https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2)
+* [Managed identities in Azure ML](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-use-managed-identities?view=azureml-api-2)
+* [Azure ML compute types](https://learn.microsoft.com/en-us/azure/machine-learning/concept-compute-target?view=azureml-api-2)
+
+
+
+
+
+
+
 
 
 
@@ -552,7 +635,7 @@ Other datastorage alternatives are:
 - Azure Data Lake Storage - A scalable and secure data lake for big data analytics.
 - Azure SQL Database - A fully managed relational database service.
 - Azure PostgreSQL - A fully managed open-source database service.
-- Azure Cosmos DB - A globally distributed, multi-model database service.
+- Azure Cosmos DB - A fully managed NoSQL and vector database service.
 
 
 #### 1. Prepare and upload your dataset to Azure blob storage
@@ -610,57 +693,172 @@ ml_client.data.create_or_update(dataset)
 
 ## Assets - setup, creating and managing
 
-### Environment
+### Environment Management
 
-Azure Machine Learning environments are an encapsulation of the environment where your machine learning task happens. They specify the software packages, environment variables, and software settings around your training and scoring scripts. The environments are managed and versioned entities within your Machine Learning workspace. Environments enable reproducible, auditable, and portable machine learning workflows across various computes.
+Azure Machine Learning (Azure ML) environments encapsulate the software setup needed to run your ML workflows. They define dependencies, Python version, environment variables, and more. Azure ML supports different ways to define environments depending on your needs.
 
-1. Make a `environment.yml` listing all your dependencies from your `poetry` environment by first exporting to a `requirements.txt` file and then converting it to a `environment.yml` file (paste the content of the `requirements.txt` file into the `environment.yml` file).
+#### Environment from Docker Only (No Conda)
 
-**NOTE**: for Poetry version 2.0.0 and above export functionality need to be installed separately. Install it by running:
+Use this when your repo is fully containerised, e.g., for production workflows or dependencies built with system packages.
 
-```bash
-poetry self add poetry-plugin-export
+```python
+env = Environment(
+    name="fully-custom-env",
+    image="myregistry.azurecr.io/my-custom-image:latest"
+)
+ml_client.environments.create_or_update(env)
 ```
 
-Then export the dependencies to a `requirements.txt` file:
+##### Pros
+- Maximum control
+- Mirrors local dev environments
+
+##### Cons
+- Requires Docker expertise
+- Not tracked as Conda dependencies
+
+----
+
+Relevant files and folder for this use case:
+
+```bash
+project-root/
+│
+├── src/
+│   └── ml_segmentation/
+├── scripts/
+├── pyproject.toml
+├── poetry.lock
+├── docker/ (or Dockerfile here)
+└── .env
+```
 
 
+#### Use Case: Project with Poetry and Custom Python Version
+
+##### Problem:
+- Your repo uses **Python 3.12**, not available in curated images
+- You use **Poetry** for dependency management
+- You have a `pyproject.toml` and `poetry.lock`
+
+##### Recommended Solution:
+1. Export dependencies from Poetry:
 ```bash
 poetry export -f requirements.txt --output requirements.txt --without-hashes
 ```
 
+2. Manually build `environment.yml` including `python=3.12`
+3. Use it with a generic base image (or no image if training on CPU)
 
-Here is an example output yaml file.
 
+----
+
+#### Curated Environments
+
+Azure ML offers several **curated (prebuilt)** environments hosted by Microsoft, optimised for various tasks like PyTorch or Scikit-learn.
+
+##### Example: Using a curated environment
+```python
+from azure.ai.ml.entities import Environment
+
+env = Environment(
+    name="pytorch-env",
+    image="mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
+)
+ml_client.environments.create_or_update(env)
+```
+
+##### Pros
+- No setup needed
+- Fast to use
+- Maintained by Microsoft
+
+##### Cons
+- Limited flexibility
+- Fixed Python version
+- Often lacks specific packages or versions
+
+----
+
+#### Environment from Conda YAML
+
+Useful when you want to define a custom environment but still rely on Azure ML infrastructure to manage it.
+
+##### Generating Conda file from Poetry
+```bash
+poetry self add poetry-plugin-export
+poetry export -f requirements.txt --output requirements.txt --without-hashes
+```
+Convert manually to Conda:
 ```yaml
 name: rock-segmentation-env
 channels:
   - defaults
 dependencies:
-  - python=3.9
+  - python=3.10
   - pip
   - pip:
       - torch
-      - torchvision
       - azure-ai-ml
       - azure-identity
       - your-other-packages
 ```
 
-2. Register the environment in Azure ML:
-
+##### Register in Azure ML
 ```python
-from azure.ai.ml.entities import Environment
-
 env = Environment(
     name="rock-segmentation-env",
-    description="Environment for rock segmentation training",
+    description="Custom env with pip dependencies",
+    image="mcr.microsoft.com/azureml/base:latest",
     conda_file="./environment.yml"
 )
 ml_client.environments.create_or_update(env)
 ```
 
-Reference: https://learn.microsoft.com/en-us/azure/machine-learning/concept-azure-machine-learning-v2?view=azureml-api-2&tabs=sdk#environment
+##### Pros
+- Flexible
+- Supports custom Python versions
+- Reproducible
+
+##### Cons
+- Manual maintenance of YAML file
+- More error-prone
+- Requires defining a base image (important for compatibility)
+
+----
+
+#### Environment from Docker Image + Conda YAML
+
+Useful when your base image needs GPU or system-level dependencies, but your Python dependencies can remain managed by Conda.
+
+```python
+env = Environment(
+    name="rock-env",
+    image="mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37",
+    conda_file="./environment.yml"
+)
+ml_client.environments.create_or_update(env)
+```
+
+##### Pros
+- Combines strengths of both Docker and Conda
+- Useful for training on GPU
+
+##### Cons
+- Dependency conflicts if versions are not aligned
+
+----
+
+
+
+#### Resources
+- Azure ML Environment Concepts:
+  https://learn.microsoft.com/en-us/azure/machine-learning/concept-environments?view=azureml-api-2
+- Curated Environment Registry:
+  https://learn.microsoft.com/en-us/azure/machine-learning/how-to-use-environments?view=azureml-api-2#use-a-curated-environment
+- SDK v2 Environments:
+  https://learn.microsoft.com/en-us/azure/machine-learning/how-to-manage-environments-v2?view=azureml-api-2
+
 
 ### Models
 
@@ -933,7 +1131,7 @@ print(job.inputs["data-dir"].path)  # Outputs the dataset path with version
 
 ---
 
-### 5. Benefits of Dataset Versioning
+### 1. Benefits of Dataset Versioning
 - **Reproducibility**: You can re-run experiments with the exact dataset version used originally.
 - **Traceability**: Experiment logs include dataset version details.
 - **Collaboration**: Teams can access shared, versioned datasets across experiments.
@@ -941,7 +1139,7 @@ print(job.inputs["data-dir"].path)  # Outputs the dataset path with version
 
 ---
 
-### 6. Updating Datasets
+### 2. Updating Datasets
 To update an existing dataset with new data, re-register it with the same name but a new version. Azure ML retains all previous versions for reference.
 
 #### Register a New Version
@@ -959,7 +1157,7 @@ ml_client.data.create_or_update(dataset)
 
 ---
 
-### 7. Data Asset Management in Azure ML Studio
+### 3. Data Asset Management in Azure ML Studio
 You can also manage dataset versions via the Azure ML Studio:
 
 1. Navigate to Datasets in the Studio.
@@ -968,7 +1166,7 @@ You can also manage dataset versions via the Azure ML Studio:
 
 ---
 
-### 8. Integrating with Git and CI/CD
+### 4. Integrating with Git and CI/CD
 
 For comprehensive version control:
 

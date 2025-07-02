@@ -21,7 +21,7 @@ from ml_segmentation.azure_data_assets import (
 from ml_segmentation.azure_utility import (
     configure_azure_logging,
     connect_to_azure_ml,
-    setup_azure_environment,
+    setup_azure_environment_variables,
 )
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
 from ml_segmentation.utility import seed_everything
@@ -101,7 +101,9 @@ def main(cfg: DictConfig) -> None:
     configure_azure_logging()
 
     # Initialize environment and get Azure credentials
-    console, subscription_id, resource_group, workspace_name = setup_azure_environment()
+    console, subscription_id, resource_group, workspace_name = (
+        setup_azure_environment_variables()
+    )
 
     try:
         # Convert OmegaConf to a Python dictionary and validate with Pydantic

@@ -232,9 +232,9 @@ python scripts/preprocess_dataset.py dataset.path_raw_mask_labels=path/to/raw/ma
 
 This preprocessing step is essential for ensuring consistent training inputs and is a prerequisite for running the training script.
 
-### Train and Evaluate the Model
+### Train and Evaluate the Model locally
 
-We have implemented both a local and an Azure ML training strategy. The local training strategy is implemented using the `train_eval.py` script, which allows you to train and evaluate the model on your local machine. The Azure ML training strategy is implemented using the `azure_submit_job.py` script, which allows you to submit a training job to Azure ML.
+We have implemented both a local and an Azure ML training strategy. The local training strategy is implemented using the `train_eval.py` script, which allows you to train and evaluate the model on your local machine. The Azure ML training strategy is implemented using the `azure_submit_job.py` script, which allows you to submit a training job to Azure ML. Such a computer vision task is often computationally heavy, and thus it is recommended to use a GPU for training. The local training strategy will run on your local machine, while the Azure ML training strategy will run on a GPU in the cloud.
 
 ```sh
 python scripts/train_eval.py
@@ -281,14 +281,14 @@ This project supports training rock joint segmentation models in Azure Machine L
    AZURE_SUBSCRIPTION_ID=your-subscription-id
    AZURE_RESOURCE_GROUP=rg-rock-joint-detection
    AZURE_ML_WORKSPACE=ws-rock-joint-det
-   AZURE_BLOB_DATASTORE=rock_data
+   AZURE_BLOB_DATASTORE=your-blob-datastore-name
    AZURE_STORAGE_ACCOUNT=your-storage-account-name
    AZURE_STORAGE_KEY=your-storage-account-key
    ```
 
 #### Azure Authentication
 
-Before using any Azure ML functionality, you must authenticate with Azure using the Azure CLI:
+Before using any Azure ML functionality, you must authenticate with Azure using the Azure CLI. By default this will open a web browser box for you to log in interactively using your Azure account credentials (standard NGI account or personal Microsoft account).
 
 ```sh
 # Log in to Azure interactively
@@ -296,19 +296,14 @@ az login
 
 # If you have multiple subscriptions, select the correct one
 az account set --subscription "your-subscription-name-or-id"
+# e.g
+az account set --subscription "ngi_mlops_sandbox"
 
 # Verify your active subscription
 az account show
 ```
 
 This authentication step is required before running any scripts that interact with Azure ML services. The Azure CLI authentication token is used by the Azure SDK to authenticate your requests to Azure services.
-
-If you're working in a headless environment or automation context, you may need to use service principal authentication:
-
-```sh
-# Login with service principal
-az login --service-principal --username APP_ID --password PASSWORD --tenant TENANT_ID
-```
 
 For security best practices, refresh your authentication when necessary:
 

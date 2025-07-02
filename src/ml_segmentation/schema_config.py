@@ -176,6 +176,17 @@ class AzureMLConfig(BaseModel):
     use_new_version: bool = Field(
         False, description="Whether to create and use a new version of the environment."
     )
+    use_curated_env: bool = Field(
+        False, description="Whether to use a curated AzureML environment."
+    )
+    curated_env_name: str = Field(
+        "AzureML-pytorch-2.2-ubuntu20.04-py39-cuda11-gpu",
+        description="The curated environment name to use if enabled.",
+    )
+    base_docker_image: str = Field(
+        "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04",
+        description="Base docker image for custom environments.",
+    )
 
 
 class AzureDataAssetsCommand(str, Enum):
