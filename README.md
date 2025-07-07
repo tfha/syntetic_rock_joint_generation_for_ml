@@ -312,9 +312,93 @@ For security best practices, refresh your authentication when necessary:
 az account get-access-token
 ```
 
-#### Uploading and Registering Base Datasets (Images and Masks)
+#### Preparing for Training
 
-You should upload your local image and mask data to Azure Blob Storage and register them as base datasets in Azure ML. This ensures that your core data is versioned and available for all downstream tasks.
+Before submitting training jobs to Azure ML, you need to prepare your training environment and data assets. This section covers the essential steps to set up your Azure ML workspace for rock joint segmentation training.
+
+##### Building and Registering Training Environment
+
+Building a reliable training environment involves two phases: local testing and Azure ML registration. This approach provides faster feedback and clearer error messages during development.
+
+###### Phase 1: Local Docker Build and Test (Recommended)
+
+Before registering with Azure ML, test your Docker environment locally to catch issues early and get faster feedback:
+
+**Option A: Automated PowerShell Script**
+```powershell
+# Full build and test workflow (Windows/PowerShell)
+.\scripts\build_and_test_docker.ps1
+
+# With custom image name and tag
+.\scripts\build_and_test_docker.ps1 -ImageName "my-ml-env" -Tag "v1.0" -Clean
+
+# Skip container tests if needed
+.\scripts\build_and_test_docker.ps1 -SkipTests
+```
+
+**Option B: Makefile (Cross-platform)**
+```sh
+# Full build and test workflow
+make all
+
+# Individual steps
+make build    # Build Docker image
+make test     # Test the container
+make clean    # Remove existing image
+
+# Custom image name
+make all IMAGE_NAME=my-ml-env TAG=v1.0
+```
+
+**Option C: Manual Step-by-Step**
+```sh
+# 1. Ensure Docker is running
+docker version
+
+# 2. Build the Docker image locally
+docker build -t ml-segmentation-local:latest -f Dockerfile .
+
+# 3. Test the container
+docker run --rm ml-segmentation-local:latest python --version
+docker run --rm ml-segmentation-local:latest python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
+docker run --rm ml-segmentation-local:latest python -c "import ml_segmentation; print('Package imported successfully')"
+
+# 4. Optional: Test CUDA availability
+docker run --rm ml-segmentation-local:latest python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+**Why Build Locally First?**
+- **Faster feedback**: Local builds complete in 5-15 minutes vs 20-30 minutes for Azure Container Registry
+- **Clearer error messages**: Docker build errors are easier to debug locally
+- **Cost efficiency**: Avoid Azure compute costs during development iterations
+- **Offline development**: Test your environment without Azure connectivity
+
+###### Phase 2: Azure ML Environment Registration
+
+After successful local testing, register your environment with Azure ML:
+
+```sh
+# Build and register Azure ML environment from Dockerfile
+python scripts/azure_manage_data_assets.py azure_data_assets.command=build-environment
+```
+
+This command will:
+- Build a Docker image from your project's Dockerfile using Azure Container Registry
+- Register the environment in Azure ML with proper versioning
+- Make the environment available for training jobs
+
+The environment includes:
+- CUDA 12.1 support for GPU training
+- Python 3.11 with Poetry-managed dependencies
+- All project-specific packages and configurations
+
+**Note:** The first Azure ML build may take 15-30 minutes as Azure Container Registry builds and caches the Docker image. Subsequent builds will be faster due to layer caching.
+
+##### Setting Up Data Assets
+
+###### Uploading Base Datasets
+
+Upload your local image and mask data to Azure Blob Storage and register them as base datasets in Azure ML. This ensures that your core data is versioned and available for all downstream tasks.
 
 ```sh
 # Upload local data to Azure Blob Storage
@@ -324,7 +408,7 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=upload-data
 python scripts/azure_manage_data_assets.py azure_data_assets.command=register-base-datasets
 ```
 
-#### Generating, Uploading, and Registering Dataset Splits (All Strategies)
+###### Creating Dataset Splits
 
 After your base datasets are registered, you can generate, upload, and register train/val/test splits for all experiment strategies in one step:
 
@@ -339,12 +423,11 @@ This command will:
 - Upload the splits to Azure Blob Storage
 - Register each split folder as a versioned Azure ML data asset (named `split_<strategy>`)
 
-**Note:**
-- If you set `train_fraction: 1.0` and `test_fraction: 1.0` (and `val_fraction: 0.0`) in your config, all files from the specified training and testing datasets will be assigned to the train and test splits, with no validation set. This is useful for strategies like `main_objective_dfn_rock_slope` where you want to use the full synthetic DFN dataset for training and the full real-world rock slope dataset for testing.
+**Note:** If you set `train_fraction: 1.0` and `test_fraction: 1.0` (and `val_fraction: 0.0`) in your config, all files from the specified training and testing datasets will be assigned to the train and test splits, with no validation set. This is useful for strategies like `main_objective_dfn_rock_slope` where you want to use the full synthetic DFN dataset for training and the full real-world rock slope dataset for testing.
 
-#### Example: Manual Generation, Upload, and Registration for One Experiment Strategy
+###### Manual Dataset Split Management
 
-If you want to generate, upload, and register splits for a single experiment strategy (for example, `verification_box`), you can do so step by step:
+For more granular control, you can process individual experiment strategies step by step:
 
 ```sh
 # 1. Generate train/val/test splits for a specific experiment strategy
@@ -359,7 +442,7 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=register-sp
 
 This approach allows you to process only the strategies you are interested in, or to repeat the process for additional strategies as needed.
 
-#### Inspecting and Listing Registered Data Assets
+##### Managing and Inspecting Data Assets
 
 You can list and inspect all registered datasets and their versions in Azure ML:
 
@@ -374,9 +457,11 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=list-assets
 python scripts/azure_manage_data_assets.py azure_data_assets.command=compare-assets azure_data_assets.asset_name=rock_images azure_data_assets.version1=1 azure_data_assets.version2=2
 ```
 
-#### Understanding Version Tracking in Azure Storage
+##### Data Storage Organization
 
-There is not implemented version tracking in this repo. When uploading new data, the data will be overwritten and new data-assets will be created. This is ok in a more static ML effort which is often the case in several research projects like this. The directory structure in Azure Blob Storage will look like this:
+###### Current Project Structure
+
+The directory structure in Azure Blob Storage for this project is organized as follows:
 
 ```
 container/
@@ -409,7 +494,11 @@ container/
     └── ...
 ```
 
-However, for other projects involving several updates of the dataset, both in research and production, it is important to have a versioning strategy in place. A typical filestructure for ML in production where the ML-model is trained on the full dataset can then look like this:
+**Note:** This project uses a simplified versioning approach suitable for research projects. When uploading new data, existing data will be overwritten and new data assets will be created with updated timestamps.
+
+###### Production-Grade Versioning Strategy
+
+For production environments requiring comprehensive version control, consider implementing a more sophisticated structure:
 
 ```
 <container-name>/
@@ -431,10 +520,9 @@ However, for other projects involving several updates of the dataset, both in re
 │       ├── 2025_05_15/
 │       ├── 2025_05_22/
 │       └── 2025_05_29/
-
 ```
 
-The Azure ML Data Asset Registration Strategy will then be as follows:
+For production workflows, implement the following data asset registration strategy:
 
 | Data Asset Name           | Version    | Path in Blob Storage          | Purpose                               | Update Frequency |
 | ------------------------- | ---------- | ----------------------------- | ------------------------------------- | ---------------- |
@@ -447,21 +535,11 @@ The Azure ML Data Asset Registration Strategy will then be as follows:
 | `rock_masks`              | `20250601` | `rock_masks/base/v20250601/`  | Mask set for 20250601 base            | Monthly          |
 | `rock_masks_incremental`  | `latest`   | `rock_masks/incremental/`     | Accumulating weekly mask batches      | Weekly           |
 
+**Production workflows:**
 
-The workflow for uploading and registering new data assets is as follows:
+- **Weekly workflow:** Append new data to `rock_images/incremental/YYYY_MM_DD/`, register the parent `incremental/` directory as a single Azure ML input, and train using both base and incremental datasets.
 
-- **Weekly workflow**
-    - Append new data to `rock_images/incremental/YYYY_MM_DD/`
-    - Register or reference only the parent `incremental/` directory as a single Azure ML input
-    - Train your model using:
-        - `rock_images:<current_base_version>`
-        - `rock_images/incremental/`
-
-- **Monthly workflow**
-    - Merge base and incremental data into a new folder: `rock_images/base/vYYYYMMDD/`
-    - Register this merged folder as a new Azure ML data asset version
-    - Optionally archive or delete old incremental folders
-    - Update references to use the new base version for the next month
+- **Monthly workflow:** Merge base and incremental data into a new versioned folder, register as a new Azure ML data asset version, and optionally archive old incremental folders.
 
 
 #### Submitting Training Jobs to Azure ML

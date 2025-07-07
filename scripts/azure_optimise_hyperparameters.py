@@ -15,17 +15,17 @@ from azure.ai.ml import Input, Output, command
 from azure.ai.ml.entities import BuildContext, Environment
 from azure.ai.ml.sweep import Choice, Uniform
 
+from ml_segmentation.azure_authentication import (
+    connect_to_azure_ml,
+    setup_azure_environment_variables,
+)
+from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.azure_data_assets import (
     get_data_asset,
 )
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
     get_model_search_space,
-)
-from ml_segmentation.azure_utility import (
-    configure_azure_logging,
-    connect_to_azure_ml,
-    setup_azure_environment_variables,
 )
 from ml_segmentation.utility import export_poetry_to_environment_yml
 

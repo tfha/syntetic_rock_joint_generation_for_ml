@@ -41,8 +41,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
+from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
-from ml_segmentation.azure_utility import configure_azure_logging
 from ml_segmentation.data_loading import get_datasets_prefixes
 from ml_segmentation.debug_functionality import better_traceback
 from ml_segmentation.define_model import choose_model
@@ -147,9 +147,9 @@ def main(cfg: DictConfig) -> None:
         "Loading training and testing data from Azure ML inputs...", style="info"
     )  # In Azure ML, input datasets are mounted to paths defined in environment
     # variables    # Get the paths from environment variables set by Azure ML
-    images_path = Path(os.environ.get("AZUREML_DATAREFERENCE_images_data", ""))
-    masks_path = Path(os.environ.get("AZUREML_DATAREFERENCE_masks_data", ""))
-    splits_path = Path(os.environ.get("AZUREML_DATAREFERENCE_splits_data", ""))
+    images_path = Path(os.environ.get("AZUREML_INPUT_images_data", ""))
+    masks_path = Path(os.environ.get("AZUREML_INPUT_masks_data", ""))
+    splits_path = Path(os.environ.get("AZUREML_INPUT_splits_data", ""))
 
     # Validate all required data inputs
     # Check images path

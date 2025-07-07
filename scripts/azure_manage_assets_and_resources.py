@@ -9,7 +9,13 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from rich.console import Console
 
+from ml_segmentation.azure_authentication import (
+    connect_to_azure_ml,
+    setup_azure_environment_variables,
+)
+from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.azure_data_assets import (
+    build_and_register_environment,
     compare_assets,
     list_data_assets,
     prepare_and_save_dataset_splits,
@@ -17,11 +23,6 @@ from ml_segmentation.azure_data_assets import (
     register_split_data_asset,
     upload_base_data_to_azure_blob,
     upload_split_data_to_azure_blob,
-)
-from ml_segmentation.azure_utility import (
-    configure_azure_logging,
-    connect_to_azure_ml,
-    setup_azure_environment_variables,
 )
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
 from ml_segmentation.utility import seed_everything
@@ -46,16 +47,19 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
             "Register base datasets in Azure ML"
         ),
         AzureDataAssetsCommand.REGISTER_SPLITS: "Register dataset splits in Azure ML",
+        AzureDataAssetsCommand.GENERATE_SPLITS: "Generate dataset splits locally",
         AzureDataAssetsCommand.UPLOAD_SPLITS: (
             "Upload dataset splits to Azure Blob Storage"
+        ),
+        AzureDataAssetsCommand.PROCESS_ALL_SPLITS: (
+            "Process all experiment strategies: "
+            "generate, upload, and register splits in one operation"
         ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",
         AzureDataAssetsCommand.COMPARE_ASSETS: "Compare two versions of a data asset",
         AzureDataAssetsCommand.UPLOAD_DATA: "Upload local data to Azure Blob storage",
-        AzureDataAssetsCommand.GENERATE_SPLITS: "Generate dataset splits locally",
-        AzureDataAssetsCommand.PROCESS_ALL_SPLITS: (
-            "Process all experiment strategies: "
-            "generate, upload, and register splits in one operation"
+        AzureDataAssetsCommand.BUILD_ENVIRONMENT: (
+            "Build and register Azure ML environment from Dockerfile"
         ),
     }
     return descriptions.get(command, "Unknown command")
@@ -78,6 +82,10 @@ def show_command_help(console: Console):
 
     console.print(
         f"  {base_cmd}{AzureDataAssetsCommand.REGISTER_BASE_DATASETS.value}",
+        style="info",
+    )
+    console.print(
+        f"  {base_cmd}{AzureDataAssetsCommand.BUILD_ENVIRONMENT.value}",
         style="info",
     )
     console.print(
@@ -126,7 +134,9 @@ def main(cfg: DictConfig) -> None:
                 AzureDataAssetsCommand.REGISTER_SPLITS,
                 AzureDataAssetsCommand.LIST_ASSETS,
                 AzureDataAssetsCommand.COMPARE_ASSETS,
+                AzureDataAssetsCommand.BUILD_ENVIRONMENT,
                 AzureDataAssetsCommand.PROCESS_ALL_SPLITS,
+                AzureDataAssetsCommand.UPLOAD_SPLITS,
             ]
 
             if command in valid_commands_requiring_connection:
@@ -143,6 +153,10 @@ def main(cfg: DictConfig) -> None:
 
             # Execute the appropriate command based on the enum value
             match command:
+                case AzureDataAssetsCommand.LIST_ASSETS:
+                    list_data_assets(ml_client, console, asset_name)
+                case AzureDataAssetsCommand.COMPARE_ASSETS:
+                    compare_assets(ml_client, console, asset_name, version1, version2)
                 case AzureDataAssetsCommand.UPLOAD_DATA:
                     upload_base_data_to_azure_blob(
                         console,
@@ -175,10 +189,12 @@ def main(cfg: DictConfig) -> None:
                         console,
                         pcfg.experiment.experiment_strategy,
                     )
-                case AzureDataAssetsCommand.LIST_ASSETS:
-                    list_data_assets(ml_client, console, asset_name)
-                case AzureDataAssetsCommand.COMPARE_ASSETS:
-                    compare_assets(ml_client, console, asset_name, version1, version2)
+                case AzureDataAssetsCommand.BUILD_ENVIRONMENT:
+                    build_and_register_environment(
+                        ml_client=ml_client,
+                        console=console,
+                        environment_name=pcfg.azure_ml.environment_name,
+                    )
                 case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:
                     # List of experiment strategies to process
                     strategies = [

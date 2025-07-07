@@ -108,13 +108,10 @@ def setup_azure_dataloader(
     mask_files = list(labels_path.glob("*.jpg")) + list(labels_path.glob("*.png"))
 
     console.print(
-        f"Found {len(img_files)} images and {len(mask_files)} masks", style="info"
-    )
-    console.print(
-        f"Sample image files: {[f.name for f in img_files[:5]]}", style="info"
-    )
-    console.print(
-        f"Sample mask files: {[f.name for f in mask_files[:5]]}", style="info"
+        f"Found {len(img_files)} images and {len(mask_files)} masks\n"
+        f"Sample image files: {[f.name for f in img_files[:5]]}\n"
+        f"Sample mask files: {[f.name for f in mask_files[:5]]}",
+        style="info",
     )
 
     # Get transformations

@@ -232,8 +232,8 @@ if __name__ == "__main__":
     # Test the export_poetry_to_environment_yml function
     output_file = "environment.yml"
     try:
-        # Import the function from azure_utility instead of using it directly
-        from ml_segmentation.azure_utility import export_poetry_to_environment_yml
+        # Import from azure_environment instead of deprecated azure_utility
+        from ml_segmentation.azure_environment import export_poetry_to_environment_yml
 
         result_path = export_poetry_to_environment_yml(output_file=output_file)
         print(f"Environment file created successfully at: {result_path}")

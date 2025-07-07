@@ -10,15 +10,18 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable
 
 import pandas as pd
 from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
+from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from rich.console import Console
 from tqdm import tqdm
 
+from ml_segmentation.azure_core import retry_azure_operation
 from ml_segmentation.data_loading import (
     get_data_files,
     get_datasets_prefixes,
@@ -974,3 +977,95 @@ def prepare_and_save_dataset_splits(
         "azure_data_assets.command=register-splits",
         style="info",
     )
+
+
+def retrieve_and_validate_data_assets(
+    ml_client: MLClient,
+    console: Console,
+    experiment_strategy: str,
+    get_data_asset_func: Callable,
+) -> tuple[Any, Any, Any]:
+    """
+    Retrieve and validate all required data assets for training.
+
+    This function handles data asset retrieval with proper error handling,
+    retry logic, and permission validation.
+
+    Args:
+        ml_client: Azure ML client
+        console: Console for logging
+        experiment_strategy: Strategy name for selecting split assets
+        get_data_asset_func: Function to retrieve data assets
+
+    Returns:
+        tuple: (images_dataset, masks_dataset, splits_dataset)
+
+    Raises:
+        SystemExit: If data assets cannot be retrieved
+    """
+    try:
+        console.print("Retrieving latest data assets from Azure ML...", style="info")
+
+        # Apply retry logic to data asset retrieval
+        get_data_asset_with_retry = retry_azure_operation(
+            get_data_asset_func, operation_name="Data asset retrieval"
+        )
+
+        # Get base image and mask datasets
+        images_dataset = get_data_asset_with_retry(ml_client, console, "rock_images")
+        masks_dataset = get_data_asset_with_retry(ml_client, console, "rock_masks")
+
+        # Select the correct split asset based on experiment strategy
+        strategy = experiment_strategy.lower()
+        split_asset_name = f"split_{strategy.replace('.', '_').replace(' ', '_')}"
+        splits_dataset = get_data_asset_with_retry(ml_client, console, split_asset_name)
+
+        # Log dataset information
+        console.print(
+            f"✓ Using split asset: {split_asset_name} (v{splits_dataset.version})",
+            style="success",
+        )
+        console.print(
+            f"✓ Using images dataset version: {images_dataset.version}", style="success"
+        )
+        console.print(
+            f"✓ Using masks dataset version: {masks_dataset.version}", style="success"
+        )
+
+        # Verify data asset permissions
+        _validate_data_asset_permissions(ml_client, console)
+
+        return images_dataset, masks_dataset, splits_dataset
+
+    except ResourceNotFoundError as e:
+        console.print(f"Data asset not found: {str(e)}", style="error")
+        console.print(
+            "Solution: Register data assets using:\n"
+            "python scripts/azure_manage_data_assets.py "
+            "azure_data_assets.command=register-all",
+            style="info",
+        )
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"Error retrieving data assets: {str(e)}", style="error")
+        console.print(
+            "Solution: Ensure data assets are registered and you have "
+            "access permissions",
+            style="info",
+        )
+        sys.exit(1)
+
+
+def _validate_data_asset_permissions(ml_client: MLClient, console: Console) -> None:
+    """Validate permissions to access data assets."""
+    try:
+        console.print("Verifying data asset permissions...", style="info")
+        assets = ml_client.data.list(max_results=5)
+        asset_count = sum(1 for _ in assets)
+        console.print(
+            f"✓ Verified access to {asset_count} data assets", style="success"
+        )
+    except Exception as perm_e:
+        console.print(
+            f"Warning: Limited data asset permissions: {str(perm_e)}", style="warning"
+        )

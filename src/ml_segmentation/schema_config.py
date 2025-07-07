@@ -193,13 +193,15 @@ class AzureDataAssetsCommand(str, Enum):
     """Available commands for Azure data assets management."""
 
     REGISTER_BASE_DATASETS = "register-base-datasets"
-    REGISTER_SPLITS = "register-splits"
+    UPLOAD_DATA = "upload-data"
     LIST_ASSETS = "list-assets"
     COMPARE_ASSETS = "compare-assets"
-    UPLOAD_DATA = "upload-data"
     GENERATE_SPLITS = "generate-splits"
     UPLOAD_SPLITS = "upload-splits"
+    REGISTER_SPLITS = "register-splits"
+    # Process all split strategies in one operation: generate, upload, register
     PROCESS_ALL_SPLITS = "process-all-splits"
+    BUILD_ENVIRONMENT = "build-environment"
 
 
 class AzureDataAssetsConfig(BaseModel):

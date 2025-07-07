@@ -21,7 +21,7 @@ hydra:
 azure_ml:
   compute_name: "Standard-NC6s-v3"  # GPU VM size for training
   experiment_name: "rock-segmentation" # Default experiment name
-  environment_name: "rock-segmentation-env"  # Name of the Azure ML environment
+  environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
   environment_version: "latest"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
   use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one

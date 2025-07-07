@@ -18,7 +18,7 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv
 
-from ml_segmentation.azure_utility import connect_to_azure_ml
+from ml_segmentation.azure_authentication import connect_to_azure_ml
 from ml_segmentation.utility import get_custom_console
 
 
