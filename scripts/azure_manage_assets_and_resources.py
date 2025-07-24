@@ -15,7 +15,6 @@ from ml_segmentation.azure_authentication import (
 )
 from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.azure_data_assets import (
-    build_and_register_environment,
     compare_assets,
     list_data_assets,
     prepare_and_save_dataset_splits,
@@ -24,6 +23,7 @@ from ml_segmentation.azure_data_assets import (
     upload_base_data_to_azure_blob,
     upload_split_data_to_azure_blob,
 )
+from ml_segmentation.azure_environment import build_and_register_environment
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
 from ml_segmentation.utility import seed_everything
 
@@ -153,6 +153,12 @@ def main(cfg: DictConfig) -> None:
 
             # Execute the appropriate command based on the enum value
             match command:
+                case AzureDataAssetsCommand.BUILD_ENVIRONMENT:
+                    build_and_register_environment(
+                        ml_client=ml_client,
+                        console=console,
+                        environment_name=pcfg.azure_ml.environment_name,
+                    )
                 case AzureDataAssetsCommand.LIST_ASSETS:
                     list_data_assets(ml_client, console, asset_name)
                 case AzureDataAssetsCommand.COMPARE_ASSETS:
@@ -188,12 +194,6 @@ def main(cfg: DictConfig) -> None:
                         ml_client,
                         console,
                         pcfg.experiment.experiment_strategy,
-                    )
-                case AzureDataAssetsCommand.BUILD_ENVIRONMENT:
-                    build_and_register_environment(
-                        ml_client=ml_client,
-                        console=console,
-                        environment_name=pcfg.azure_ml.environment_name,
                     )
                 case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:
                     # List of experiment strategies to process

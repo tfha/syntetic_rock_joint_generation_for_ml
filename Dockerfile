@@ -6,25 +6,24 @@ FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 # ---------- system + Python 3.11 ----------
 RUN apt-get update && \
-    apt-get install -y python3.11 python3.11-venv python3.11-dev build-essential git && \
+    apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip build-essential git curl && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
     python -m pip install --upgrade pip && \
     pip install poetry
 
 ENV POETRY_VIRTUALENVS_CREATE=false \
     PIP_NO_CACHE_DIR=1
 
-# ---------- runtime dependencies ----------
+# ---------- project code and dependencies ----------
 WORKDIR /app
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml poetry.lock README.md ./
+# Copy source code first since Poetry needs it to install the package
+COPY src/ ./src
 # does not install development libraries
 RUN poetry install --without dev --no-ansi --no-interaction
 # pulls torch-2.3.1+cu121
 
-# ---------- project code ----------
-# Scripts run from scripts folder (e.g azure_train_eval.py) will be uploaded to Azure ML on runtime and use the package. Hence scripts should not be included in the docker image
-COPY src/ ./src
-# Alternatively move the copy line before poetry install. Then the package will be installed as well, but this leads to longer docker build since typically the package code changes more frequently
 ENV PYTHONPATH=/app/src
 
 # When I call "python azure_submit_job.py" in the scripts folder the following happens at runtime:

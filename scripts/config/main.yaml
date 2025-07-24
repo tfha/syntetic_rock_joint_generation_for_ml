@@ -22,7 +22,7 @@ azure_ml:
   compute_name: "Standard-NC6s-v3"  # GPU VM size for training
   experiment_name: "rock-segmentation" # Default experiment name
   environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
-  environment_version: "latest"  # Default environment version
+  environment_version: "1"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
   use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one
   curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # The name of the curated environment to use if use_curated_env is true
@@ -45,6 +45,7 @@ azure_data_assets:
   # - register-splits: Register dataset splits in Azure ML
   # - list-assets: List data assets in Azure ML
   # - compare-assets: Compare two versions of a data asset
+  # - build-environment: Build the Azure ML environment in Azure ML
   # - help: Show detailed help and best practices
   command: register-base-datasets  # Default command to register base datasets
   # Parameters for asset commands

@@ -101,7 +101,6 @@ def refresh_compute_cluster(
         # Now get the specific compute we need - should be fresh
         compute = ml_client.compute.get(
             name=compute_name,
-            resource_group_name=None,
         )
 
         console.print(

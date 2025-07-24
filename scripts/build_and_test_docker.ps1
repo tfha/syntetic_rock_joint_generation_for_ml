@@ -162,10 +162,10 @@ Write-Success "Local Docker build and test completed successfully!"
 Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Cyan
 Write-Host "1. Register environment with Azure ML:" -ForegroundColor White
-Write-Host "   python scripts/azure_manage_data_assets.py build-environment --name my-ml-env --description 'My ML environment'" -ForegroundColor Gray
+Write-Host "   python scripts/azure_manage_assets_and_resources.py azure_data_assets.command=build-environment" -ForegroundColor Gray
 Write-Host ""
 Write-Host "2. Submit training job:" -ForegroundColor White
-Write-Host "   python scripts/azure_submit_job.py --environment my-ml-env" -ForegroundColor Gray
+Write-Host "   python scripts/azure_submit_job.py azure_ml.environment_name=rock-segmentation-env-py311" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Local image available as: $FullImageName" -ForegroundColor Yellow
 
