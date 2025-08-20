@@ -12,7 +12,7 @@ from rich.progress import (
 )
 
 
-def process_single_image(file_path, output_dir, threshold):
+def _process_single_image(file_path, output_dir, threshold):
     """Process a single image file."""
     img = Image.open(file_path).convert("L")  # Convert to grayscale
     binary_img = img.point(
@@ -28,8 +28,8 @@ def preprocess_masks(
     output_dir: Path,
     threshold: int = 128,
     limit: int | None = None,
-    max_workers: int = None,
-    resize_dims: tuple = None,
+    max_workers: int | None = None,
+    resize_dims: tuple | None = None,
     normalize: bool = False,
     augment: bool = False,
 ):
@@ -58,7 +58,7 @@ def preprocess_masks(
         ...     input_dir=Path("path/to/masks"),
         ...     output_dir=Path("path/to/processed_masks"),
         ...     threshold=128,
-        ...     limit=5
+        ...     limit=5,
         ... )
 
     This will process only the first 5 valid image files in `path/to/masks`.
@@ -71,11 +71,11 @@ def preprocess_masks(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Get all image files in the directory (scan once)
-    image_files = list(
+    image_files = [
         file
         for file in input_dir.glob("*")
         if file.suffix.lower() in {".png", ".jpg", ".jpeg"}
-    )
+    ]
 
     # Apply limit if necessary
     if limit is not None:
@@ -85,7 +85,7 @@ def preprocess_masks(
 
     # Create a partial function with fixed output_dir and threshold parameters
     process_func = partial(
-        process_single_image, output_dir=output_dir, threshold=threshold
+        _process_single_image, output_dir=output_dir, threshold=threshold
     )
 
     # Improved progress tracking with Rich progress display

@@ -8,7 +8,7 @@ and Azure ML environment configuration.
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import toml
 import yaml
@@ -68,7 +68,7 @@ def export_poetry_to_environment_yml(
     cuda_packages = set()
 
     if os.path.exists(pyproject_path):
-        with open(pyproject_path, "r") as f:
+        with open(pyproject_path) as f:
             pyproject_data = toml.load(f)
 
         # Check for custom package sources (like PyTorch index)
@@ -80,8 +80,8 @@ def export_poetry_to_environment_yml(
         # Identify CUDA packages from dependencies
         poetry_tool = pyproject_data.get("tool", {})
         poetry_config = poetry_tool.get("poetry", {})
-        dependencies = poetry_config.get("dependencies", {})
-        for dep_name in dependencies:
+        poetry_dependencies = poetry_config.get("dependencies", {})
+        for dep_name in poetry_dependencies:
             if "cuda" in dep_name.lower() or "torch" in dep_name.lower():
                 cuda_packages.add(dep_name)
 
@@ -214,16 +214,19 @@ def export_poetry_to_environment_yml(
         else:
             pip_only_packages.append(req)
 
+    # Create a dependencies list that may include strings and a pip section dict
+    env_dependencies: list[str | dict[str, list[str]]] = list(conda_packages)
+
     # Create environment.yml structure
-    env_data = {
+    env_data: dict[str, Any] = {
         "name": "ml-segmentation",
         "channels": ["conda-forge", "defaults"],
-        "dependencies": conda_packages,
+        "dependencies": env_dependencies,
     }
 
     # Add pip dependencies if any
     if pip_only_packages:
-        env_data["dependencies"].append({"pip": pip_only_packages})
+        env_dependencies.append({"pip": pip_only_packages})
 
     # Write environment.yml
     output_path = Path(output_file)
@@ -240,7 +243,7 @@ def export_poetry_to_environment_yml(
     return str(output_path)
 
 
-def test_environment_export(output_path: Optional[str] = None) -> None:
+def test_environment_export(output_path: str | None = None) -> None:
     """
     Test the environment export functionality.
 
@@ -266,7 +269,7 @@ def test_environment_export(output_path: Optional[str] = None) -> None:
             print(f"✓ Environment export test successful: {result_path}")
 
             # Show first few lines
-            with open(result_path, "r") as f:
+            with open(result_path) as f:
                 lines = f.readlines()[:10]
                 print("Preview:")
                 for line in lines:

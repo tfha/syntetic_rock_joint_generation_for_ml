@@ -45,7 +45,7 @@ def setup_environment():
     return console
 
 
-def get_job_details_from_args() -> tuple[str | None, str | None]:
+def get_job_details_from_args() -> argparse.Namespace:
     """Parse command line arguments to get job details."""
     parser = argparse.ArgumentParser(
         description="Analyze hyperparameter optimization results from Azure ML"
@@ -97,7 +97,7 @@ def get_job_info(args, console) -> dict[str, Any]:
                     f"Job info file not found: {args.job_info_file}"
                 )
 
-            with open(job_info_path, "r") as f:
+            with open(job_info_path) as f:
                 job_info = json.load(f)
                 job_name = job_info["job_name"]
                 console.print(f"Loaded job info for job: {job_name}", style="info")
@@ -225,15 +225,15 @@ def analyze_results(df: pd.DataFrame, console, top_n: int = 5) -> dict[str, Any]
             console.print("Calculating parameter importance...", style="info")
             try:
                 # Simple correlation-based importance
+                param_importance: dict[str, float] = {}
                 for param in param_cols:
                     if df_completed[param].nunique() > 1:
                         if pd.api.types.is_numeric_dtype(df_completed[param]):
                             corr = df_completed[param].corr(
                                 df_completed[primary_metric]
                             )
-                            analysis["parameter_importance"][
-                                param.replace("param_", "")
-                            ] = abs(corr)
+                            param_importance[param.replace("param_", "")] = abs(corr)
+                analysis["parameter_importance"] = param_importance
             except Exception as e:
                 console.print(
                     f"Warning: Could not calculate parameter importance: {e}",
@@ -310,7 +310,7 @@ def generate_report(analysis: dict[str, Any], job_info: dict[str, Any], args, co
                     for k in analysis["top_configs"][0].keys()
                     if k.startswith("metric_")
                 ]
-                params = [
+                param_keys = [
                     k
                     for k in analysis["top_configs"][0].keys()
                     if k.startswith("param_")
@@ -320,7 +320,7 @@ def generate_report(analysis: dict[str, Any], job_info: dict[str, Any], args, co
                 header = (
                     ["Rank", "Run ID"]
                     + [m.replace("metric_", "") for m in metrics]
-                    + [p.replace("param_", "") for p in params]
+                    + [p.replace("param_", "") for p in param_keys]
                 )
                 f.write("| " + " | ".join(header) + " |\n")
                 f.write("| " + " | ".join(["---" for _ in header]) + " |\n")
@@ -332,7 +332,7 @@ def generate_report(analysis: dict[str, Any], job_info: dict[str, Any], args, co
                         row.append(str(config.get(m, "N/A")))
 
                     # Add parameters
-                    for p in params:
+                    for p in param_keys:
                         row.append(str(config.get(p, "N/A")))
 
                     f.write("| " + " | ".join(row) + " |\n")
@@ -361,8 +361,15 @@ def generate_report(analysis: dict[str, Any], job_info: dict[str, Any], args, co
                 f.write("```yaml\n")
 
                 # Convert parameters to hydra format
-                hydra_config = {}
-                for param, value in params.items():
+                hydra_config: dict[str, Any] = {}
+                # Re-derive params from best_config to avoid scope issues
+                best_config = analysis["top_configs"][0]
+                best_params = {
+                    k.replace("param_", ""): v
+                    for k, v in best_config.items()
+                    if k.startswith("param_")
+                }
+                for param, value in best_params.items():
                     keys = param.split(".")
                     current = hydra_config
                     for key in keys[:-1]:
@@ -397,8 +404,10 @@ def main():
         args = get_job_details_from_args()
 
         # Get Azure ML client
+        sub_id = os.environ.get("AZURE_SUBSCRIPTION_ID") or ""
         ml_client = connect_to_azure_ml(
-            subscription_id=os.environ.get("AZURE_SUBSCRIPTION_ID"),
+            subscription_id=sub_id,
+            console=console,
             resource_group=os.environ.get("AZURE_RESOURCE_GROUP"),
             workspace_name=os.environ.get("AZURE_ML_WORKSPACE"),
         )

@@ -29,7 +29,7 @@ Functions:
 
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -131,6 +131,7 @@ class DatasetConfig(BaseModel):
     path_processed_mask_labels: Path = Field(
         ..., description="Path to processed masks."
     )
+    crop_size: int = Field(..., description="Crop size for image and label transforms.")
     prefixes: dict[str, list[str]] = Field(
         ...,
         description=(
@@ -170,8 +171,11 @@ class AzureMLConfig(BaseModel):
         "rock-segmentation-env",
         description="Name of the Azure ML environment to use or create.",
     )
-    environment_version: str = Field(
-        "latest", description="Version of the Azure ML environment to use."
+    environment_version: str | int = Field(
+        "latest",
+        description=(
+            "Version of the Azure ML environment to use. Accepts string or integer."
+        ),
     )
     use_new_version: bool = Field(
         False, description="Whether to create and use a new version of the environment."
@@ -237,7 +241,7 @@ class ConfigSchema(BaseModel):
     dataset: DatasetConfig
     azure_ml: AzureMLConfig
     azure_data_assets: AzureDataAssetsConfig = Field(
-        default_factory=AzureDataAssetsConfig,
+        default_factory=AzureDataAssetsConfig,  # type: ignore[arg-type]
         description="Configuration for Azure ML data assets management.",
     )
 
@@ -250,17 +254,18 @@ class ConfigSchema(BaseModel):
                 AzureDataAssetsCommand(v.command)
             except ValueError:
                 available_commands = [cmd.value for cmd in AzureDataAssetsCommand]
+                # Hide inner ValueError context to present a clean validation error
                 raise ValueError(
                     f"'{v.command}' is not a valid command. "
                     f"Available commands: {', '.join(available_commands)}"
-                )
+                ) from None
         return v
 
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
 def testing_scheme_functionality(cfg: DictConfig) -> None:
-    cfg_dict: dict[str, Any] = OmegaConf.to_object(
-        cfg
+    cfg_dict: dict[str, Any] = cast(
+        dict[str, Any], OmegaConf.to_object(cfg)
     )  # Convert OmegaConf to a regular dictionary
     pcfg = ConfigSchema(
         **cfg_dict

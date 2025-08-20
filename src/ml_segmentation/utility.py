@@ -93,20 +93,22 @@ def log_metrics_to_mlflow(
     model_params: dict[str, Any],
     experiment_strategy: str,
     experiment_name: str,
-    tracking_uri: str = None,
-    hydra_cfg_dir: str = None,
+    tracking_uri: str | Path | None = None,
+    hydra_cfg_dir: str | Path | None = None,
     save_best_metrics: bool = True,
     track_prediction_images: bool = False,
     save_model: bool = False,
 ) -> None:
-    if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
+    if tracking_uri is not None:
+        mlflow.set_tracking_uri(str(tracking_uri))
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run():
         # Log Hydra config files as artifacts if provided
-        if hydra_cfg_dir:
-            hydra_cfg_dir = Path(hydra_cfg_dir)
-            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+        if hydra_cfg_dir is not None:
+            hydra_cfg_dir_path = Path(hydra_cfg_dir)
+            hydra_configs = [
+                f for f in hydra_cfg_dir_path.iterdir() if f.suffix == ".yaml"
+            ]
             hydra_cfg_paths = []
             for config_file in hydra_configs:
                 mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
@@ -126,14 +128,16 @@ def log_metrics_to_mlflow(
         # Log JSON files from data/model_ready directory as artifacts
         model_ready_dir = Path("data/model_ready")
         if model_ready_dir.exists():
-            json_files = [f for f in model_ready_dir.glob("*.json")]
+            json_files = list(model_ready_dir.glob("*.json"))
             for json_file in json_files:
                 mlflow.log_artifact(str(json_file), artifact_path="dataset_files")
 
         # Log Hydra config files as artifacts if provided
-        if hydra_cfg_dir:
-            hydra_cfg_dir = Path(hydra_cfg_dir)
-            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+        if hydra_cfg_dir is not None:
+            hydra_cfg_dir_path = Path(hydra_cfg_dir)
+            hydra_configs = [
+                f for f in hydra_cfg_dir_path.iterdir() if f.suffix == ".yaml"
+            ]
             hydra_cfg_paths = []
             for config_file in hydra_configs:
                 mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
@@ -184,8 +188,8 @@ def modify_filepath(original_path: Path, endsection: str) -> Path:
     Modify the given filepath by appending an endsection before the file extension.
 
     For example:
-    >>> original_path = Path('/ML-MWD-prediction-tabular/data/train.csv')
-    >>> modify_filepath(original_path, '_modified')
+    >>> original_path = Path("/ML-MWD-prediction-tabular/data/train.csv")
+    >>> modify_filepath(original_path, "_modified")
     Path('/ML-MWD-prediction-tabular/data/train_modified.csv')
 
     Parameters:

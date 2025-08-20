@@ -13,7 +13,7 @@ from typing import Any  # Only import Any as it doesn't have a built-in equivale
 
 from azure.ai.ml import Input, Output, command
 from azure.ai.ml.entities import BuildContext, Environment
-from azure.ai.ml.sweep import Choice, Uniform
+from azure.ai.ml.sweep import BanditPolicy, Choice, Uniform
 
 from ml_segmentation.azure_authentication import (
     connect_to_azure_ml,
@@ -123,6 +123,7 @@ def main():
     console.print("Connecting to Azure ML...", style="info")
     ml_client = connect_to_azure_ml(
         subscription_id=subscription_id,
+        console=console,
         resource_group=azure_config["resource_group"],
         workspace_name=azure_config["workspace_name"],
     )
@@ -139,12 +140,14 @@ def main():
         console.print("Retrieving latest data assets from Azure ML...", style="info")
 
         # Get base image and mask datasets
-        images_dataset = get_data_asset(ml_client, "rock_images")
-        masks_dataset = get_data_asset(ml_client, "rock_masks")
+        images_dataset = get_data_asset(ml_client, console, "rock_images")
+        masks_dataset = get_data_asset(ml_client, console, "rock_masks")
 
         # Try to get data splits if available
         try:
-            splits_dataset = get_data_asset(ml_client, "rock_segmentation_splits")
+            splits_dataset = get_data_asset(
+                ml_client, console, "rock_segmentation_splits"
+            )
             console.print(
                 f"Using dataset splits version: {splits_dataset.version}", style="info"
             )
@@ -240,7 +243,7 @@ def main():
     search_space = get_model_search_space(model_name)
 
     # Convert the search space to Azure ML sweep parameters
-    sweep_params = {}
+    sweep_params: dict[str, Any] = {}
     for param_name, param_config in search_space.items():
         if param_config["type"] == "choice":
             sweep_params[param_name] = Choice(param_config["values"])
@@ -266,18 +269,18 @@ def main():
         primary_metric=sampling_params["primary_metric"],
         max_total_trials=sampling_params["max_total_trials"],
         max_concurrent_trials=sampling_params["max_concurrent_trials"],
-        parameters=sweep_params,
+        search_space=sweep_params,
     )
 
     # Add early termination if specified
     if "early_termination" in sampling_params:
         et_params = sampling_params["early_termination"]
-        sweep_job.early_termination = {
-            "policy": et_params["type"],
-            "evaluation_interval": et_params["evaluation_interval"],
-            "delay_evaluation": et_params["delay_evaluation"],
-            "slack_factor": et_params["slack_factor"],
-        }
+        if et_params.get("type") == "bandit":
+            sweep_job.early_termination = BanditPolicy(
+                evaluation_interval=et_params["evaluation_interval"],
+                delay_evaluation=et_params["delay_evaluation"],
+                slack_factor=et_params["slack_factor"],
+            )
 
     # Submit the sweep job
     console.print(

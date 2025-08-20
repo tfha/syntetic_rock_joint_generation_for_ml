@@ -3,7 +3,7 @@
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:    # list of supported hooks: https://pre-commit.com/hooks.html
     - id: trailing-whitespace
     - id: end-of-file-fixer
@@ -16,18 +16,32 @@ repos:
     - id: check-toml
 
 -   repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.11.0"
-    hooks:
-        # run the linter
-        - id: ruff
-          args: ["--line-length", "88"]
-        # run the formatter - basically the same as running black: https://docs.astral.sh/ruff/formatter/
-        - id: ruff-format
-          args: ["--line-length", "88"]
+    rev: "v0.12.9"
+    hooks:    # run the linter
+    - id: ruff
+      args:
+        - "--line-length"
+        - "88"
+    - id: ruff-format
+      args:
+        - "--line-length"
+        - "88"
 
-# sorting your imports
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.17.1'
+    hooks:
+    - id: mypy
+      args:
+        - --config-file=pyproject.toml
+      additional_dependencies:
+        # Ensure type stubs are available in the hook's isolated venv
+        - types-PyYAML==6.0.12.20250809
+        - types-toml==0.10.8.20240310
+
 -   repo: https://github.com/timothycrosley/isort
     rev: 6.0.1
     hooks:
-    -   id: isort
-        args: [--profile, black]
+    - id: isort
+      args:
+        - "--profile"
+        - "black"

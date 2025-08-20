@@ -30,7 +30,7 @@ class TestCreateResultsTable:
         """Test creation of a standard table with training metrics."""
         # Arrange
         epoch = 0
-        metrics = {"loss": 0.5, "accuracy": 0.85, "iou": 0.75}
+        metrics: dict[str, float] = {"loss": 0.5, "accuracy": 0.85, "iou": 0.75}
         session = "Training"
 
         # Act
@@ -49,7 +49,7 @@ class TestCreateResultsTable:
         """Test creation of a table with validation metrics."""
         # Arrange
         epoch = 3
-        metrics = {"loss": 0.4, "accuracy": 0.9, "iou": 0.8}
+        metrics: dict[str, float] = {"loss": 0.4, "accuracy": 0.9, "iou": 0.8}
         session = "Validation"
 
         # Act
@@ -63,7 +63,7 @@ class TestCreateResultsTable:
         """Test with empty metrics dictionary."""
         # Arrange
         epoch = 0
-        metrics = {}
+        metrics: dict[str, float] = {}
 
         # Act
         table = create_results_table(epoch, metrics)
@@ -77,7 +77,7 @@ class TestCreateResultsTable:
         """Test with a custom session name."""
         # Arrange
         epoch = 1
-        metrics = {"loss": 0.3}
+        metrics: dict[str, float] = {"loss": 0.3}
         session = "Testing"
 
         # Act
@@ -91,7 +91,7 @@ class TestCreateResultsTable:
         """Test that metrics values are properly formatted to 2 decimal places."""
         # Arrange
         epoch = 0
-        metrics = {"precision": 0.12345, "recall": 0.98765}
+        metrics: dict[str, float] = {"precision": 0.12345, "recall": 0.98765}
 
         # Act
         table = create_results_table(epoch, metrics)

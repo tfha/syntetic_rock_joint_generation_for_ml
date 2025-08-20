@@ -79,6 +79,7 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     ml_client = connect_to_azure_ml(
         subscription_id=subscription_id,
+        console=console,
         resource_group=resource_group,
         workspace_name=workspace_name,
     )

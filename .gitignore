@@ -21,6 +21,8 @@ __pycache__/
 
 .coverage
 
+old
+
 # Environment variables and secrets
 #######################################
 .env

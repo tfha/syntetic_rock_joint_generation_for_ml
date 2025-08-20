@@ -79,7 +79,7 @@ def setup_azure_dataloader(
     batch_size: int,
     num_workers: int,
     optional_transforms: bool = False,
-    splits_path: Path = None,
+    splits_path: Path | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
@@ -125,15 +125,15 @@ def setup_azure_dataloader(
         val_file = splits_path / "val_files.json"
         test_file = splits_path / "test_files.json"  # Load splits from files
         if train_file.exists() and test_file.exists():
-            with open(train_file, "r") as f:
+            with open(train_file) as f:
                 train_list = json.load(f)
 
             val_list = []
             if val_file.exists():
-                with open(val_file, "r") as f:
+                with open(val_file) as f:
                     val_list = json.load(f)
 
-            with open(test_file, "r") as f:
+            with open(test_file) as f:
                 test_list = json.load(f)
 
             console.print(

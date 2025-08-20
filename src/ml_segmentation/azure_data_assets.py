@@ -17,7 +17,7 @@ from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
 from azure.core.exceptions import ResourceNotFoundError
-from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import BlobServiceClient, ContainerClient, ContentSettings
 from rich.console import Console
 from tqdm import tqdm
 
@@ -39,8 +39,8 @@ def register_data_asset(
     description: str,
     path: str,
     asset_type: str = AssetTypes.URI_FOLDER,
-    tags: dict[str, str] = None,
-    metadata: dict[str, str] = None,
+    tags: dict[str, str] | None = None,
+    metadata: dict[str, str] | None = None,
     create_new_version: bool = True,
 ) -> Data:
     """
@@ -105,7 +105,11 @@ def register_data_asset(
         if tags:
             my_data.tags = tags
         if metadata:
-            my_data.metadata = metadata
+            # Data entity supports setting metadata via .tags or properties; some SDK versions expose .metadata
+            try:
+                my_data.metadata = metadata  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
         # Check if dataset already exists with this version
         try:
@@ -137,7 +141,7 @@ def get_data_asset(
     ml_client: MLClient,
     console: Console,
     name: str,
-    version: str = None,
+    version: str | None = None,
     label: str = "latest",
 ) -> Data:
     """
@@ -191,7 +195,7 @@ def list_data_asset_versions(
             return pd.DataFrame()
 
         # Extract relevant information
-        versions_info = []
+        versions_info: list[dict[str, Any]] = []
         for asset in assets:
             info = {
                 "version": asset.version,
@@ -222,7 +226,7 @@ def list_data_asset_versions(
 def get_azure_storage_client(
     console: Console,
     require_key: bool = False,
-) -> tuple[BlobServiceClient, str, str, str | None]:
+) -> tuple[ContainerClient | None, str | None, str | None, str | None]:
     """Get Azure storage configuration from environment variables and connect to
     storage.
 
@@ -241,12 +245,12 @@ def get_azure_storage_client(
         SystemExit: If required configuration is missing
     """
     # Get storage config from environment variables
-    storage_account = os.environ.get("AZURE_STORAGE_ACCOUNT")
-    container_name = os.environ.get("AZURE_BLOB_DATASTORE")
+    storage_account: str | None = os.environ.get("AZURE_STORAGE_ACCOUNT")
+    container_name: str | None = os.environ.get("AZURE_BLOB_DATASTORE")
     storage_key = os.environ.get("AZURE_STORAGE_KEY") if require_key else None
 
     # Validate required configuration
-    missing_vars = []
+    missing_vars: list[str] = []
     if not storage_account:
         missing_vars.append("AZURE_STORAGE_ACCOUNT")
     if not container_name:
@@ -279,10 +283,14 @@ def get_azure_storage_client(
     # Connect to Azure Blob storage
     console.print("Connecting to Azure Blob storage...", style="info")
     try:
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
+        blob_service_client: BlobServiceClient = (
+            BlobServiceClient.from_connection_string(connection_string)
         )
-        container_client = blob_service_client.get_container_client(container_name)
+        # mypy: container_name is validated above, assert for type narrowing
+        assert container_name is not None
+        container_client: ContainerClient = blob_service_client.get_container_client(
+            container_name
+        )  # type: ignore[arg-type]
         console.print(
             f"Successfully connected to container: {container_name}", style="success"
         )
@@ -295,7 +303,7 @@ def get_azure_storage_client(
 
 
 def upload_files(
-    container_client: BlobServiceClient,
+    container_client: ContainerClient,
     console: Console,
     local_folder_path: Path,
     blob_folder: str,
@@ -341,7 +349,7 @@ def upload_files(
 
         # Upload the file
         try:
-            blob_client = container_client.get_blob_client(blob_path)
+            blob_client = container_client.get_blob_client(blob=blob_path)
             with open(file, "rb") as data:
                 blob_client.upload_blob(
                     data, overwrite=True, content_settings=content_settings
@@ -554,6 +562,12 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
     splits/<strategy>/"""
     # Get storage config and connect to Azure Blob storage in one step
     container_client, _, _, _ = get_azure_storage_client(console, require_key=True)
+    if container_client is None:
+        console.print(
+            "Failed to connect to Azure Blob Storage; cannot upload split files.",
+            style="error",
+        )
+        sys.exit(1)
 
     # Format the split subdirectory name
     split_subfolder = experiment_strategy.lower().replace(".", "_").replace(" ", "_")
@@ -638,7 +652,9 @@ def register_split_data_asset(
     console.print(f"Asset path: {splits_blob_uri}", style="info")
 
 
-def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = None):
+def list_data_assets(
+    ml_client: MLClient, console: Console, asset_name: str | None = None
+):
     """List all data assets or versions of a specific data asset.
 
     Args:
@@ -672,7 +688,7 @@ def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = No
                 return
 
             # Group assets by name to show latest version
-            assets_by_name = {}
+            assets_by_name: dict[str, list[dict[str, Any]]] = {}
             for asset in assets:
                 if asset.name not in assets_by_name:
                     assets_by_name[asset.name] = []
@@ -696,8 +712,8 @@ def list_data_assets(ml_client: MLClient, console: Console, asset_name: str = No
             )
 
             # Create a table of latest versions
-            table_data = []
-            for name, versions in assets_by_name.items():
+            table_data: list[dict[str, Any]] = []
+            for _name, versions in assets_by_name.items():
                 # Sort by version descending and get the latest
                 latest = sorted(versions, key=lambda x: x["version"], reverse=True)[0]
                 table_data.append(latest)
@@ -928,9 +944,8 @@ def prepare_and_save_dataset_splits(
             "using all train and test files as provided.",
             style="info",
         )
-
         train_list = list(train_files)
-        val_list = []
+        val_list: list[str] = []
         test_list = list(test_files)
     else:
         console.print(

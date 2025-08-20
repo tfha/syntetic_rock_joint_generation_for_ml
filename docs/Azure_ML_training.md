@@ -509,6 +509,8 @@ Azure Machine Learning (Azure ML) supports two main types of compute resources: 
 
 For standard computer vision ML tasks (e.g. model training with images using PyTorch or TensorFlow), a **Compute Cluster** is typically recommended. Clusters support GPU-enabled VMs and can scale automatically based on workload, reducing idle cost. You can start with 0 nodes and scale up during training.
 
+
+
 #### Creating a Compute Resource in Azure ML
 
 ##### Using the Azure Web Interface:
@@ -580,6 +582,64 @@ cluster = AmlCompute(
 
 ml_client.begin_create_or_update(cluster)
 ```
+
+#### Out-of-Memory (OOM) Errors in Computer Vision Training
+
+A common issue when training computer vision models with deep neural networks is the out-of-memory (OOM) error. This happens when the model and data require more GPU memory than what is available on the compute node. OOM errors will cause your training script to crash, typically with messages like `CUDA out of memory` or a `segmentation fault (SIGSEGV)`.
+
+##### Importance of GPU RAM Size
+
+The amount of GPU RAM is one of the most important factors in successful model training. Computer vision tasks often involve large input images, deep models, and significant intermediate data, which all consume GPU memory. For standard segmentation models (such as U-Net or DeepLab) with image sizes around 512×512 pixels, a GPU with 16 GB of RAM (e.g., NVIDIA V100) can often handle batch sizes up to 8. For larger images (e.g., 768×768 or above), or more complex models, 24 GB or more of GPU RAM is recommended to avoid OOM errors and allow for larger batch sizes or higher model capacity.
+
+##### Alternatives to Increasing GPU RAM
+
+If you encounter OOM errors, increasing the GPU RAM is the most direct solution, but other remediations can also help:
+
+* **Reduce batch size:** Lowering the batch size reduces memory usage proportionally.
+
+* **Use mixed precision:** Training with 16-bit floating point (fp16) instead of 32-bit can save 30–50% of memory. For example, in PyTorch you can enable mixed precision training using `torch.cuda.amp`, which often allows for a higher batch size or larger model:
+
+  ```python
+  # Example: Mixed precision training with PyTorch
+  scaler = torch.cuda.amp.GradScaler()
+  for data, target in train_loader:
+      optimizer.zero_grad()
+      with torch.cuda.amp.autocast():
+          output = model(data)
+          loss = loss_fn(output, target)
+      scaler.scale(loss).backward()
+      scaler.step(optimizer)
+      scaler.update()
+  ```
+
+  This can reduce memory usage and speed up training on supported GPUs.
+
+* **Downscale input images:** Using smaller images reduces memory requirements for both data and intermediate tensors.
+
+* **Simplify the model:** Reducing the number of layers, filters, or parameters decreases memory usage.
+
+* **Use gradient accumulation:** Simulate larger batch sizes by accumulating gradients over multiple smaller batches. For example, in PyTorch, you can manually accumulate gradients over several mini-batches before updating the model:
+
+  ```python
+  accumulation_steps = 4  # Number of mini-batches to accumulate
+  optimizer.zero_grad()
+  for i, (data, target) in enumerate(train_loader):
+      with torch.cuda.amp.autocast():
+          output = model(data)
+          loss = loss_fn(output, target)
+      (loss / accumulation_steps).backward()
+      if (i + 1) % accumulation_steps == 0:
+          optimizer.step()
+          optimizer.zero_grad()
+  ```
+
+  This lets you use a larger effective batch size without exceeding GPU memory limits.
+
+* **Optimise data pipelines:** Ensure only required data is loaded into memory at any time.
+
+Choosing a compute node with sufficient GPU RAM is essential for smooth and efficient computer vision training in Azure ML, but these other strategies can often help fit demanding workloads onto more modest hardware.
+
+
 
 ### Further Reading
 

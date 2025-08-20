@@ -1,8 +1,10 @@
 import random
+from collections.abc import Sized
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,12 +13,33 @@ from rich.progress import track
 from rich.table import Table
 
 # from torch.amp import autocast
-from torchmetrics import Dice, JaccardIndex, Precision, Recall
+from torchmetrics import JaccardIndex, Precision, Recall
+from torchmetrics.classification import BinaryF1Score
+
+
+def _to_float(x: Any) -> float:
+    """Coerce torchmetrics ``compute()`` results to ``float``.
+
+    Condensed why:
+    - Torchmetrics stubs can mark ``compute()`` as returning ``None``; using this helper avoids scattering casts/"type: ignore" at call sites.
+    - Runtime return types vary (Python float, NumPy scalar, or 0-d ``torch.Tensor``), so we centralize the coercion here.
+    - Keeps call sites clean and future-proofs minor return-type changes.
+
+    Note: If a CUDA tensor is returned, this safely moves it to CPU before ``.item()``.
+    """
+    # Fast-path common cases
+    if isinstance(x, (int, float)):
+        return float(x)
+    # Handle torch tensors (including CUDA 0-d tensors)
+    if isinstance(x, torch.Tensor):
+        return x.detach().float().cpu().item()
+    # Fallback for NumPy scalars and other number-like types
+    return float(x)
 
 
 def check_and_update_best_metrics(
     metrics: dict[str, float],
-    best_metrics: dict[str, Any],
+    best_metrics: dict[str, Any] | None,
     epoch: int,
     training_time: float,
     compare_metric: str = "loss",
@@ -41,6 +64,8 @@ def check_and_update_best_metrics(
 
     is_better = False
     if best_metrics is None:
+        # initialize to force creation of a concrete dict below
+        best_metrics = {}
         is_better = True
     elif compare_metric == "loss":
         is_better = metrics[compare_metric] < best_metrics[compare_metric]
@@ -116,7 +141,7 @@ def train_one_epoch(
     # For per-class IoU, use separate binary IoU metrics
     background_iou_metric = JaccardIndex(task="binary").to(device)
     joint_iou_metric = JaccardIndex(task="binary").to(device)
-    dice_metric = Dice(num_classes=2).to(device)
+    dice_metric = BinaryF1Score().to(device)
     precision_metric = Precision(task="binary").to(device)
     recall_metric = Recall(task="binary").to(device)
 
@@ -183,16 +208,17 @@ def train_one_epoch(
             precision_metric.update(preds, masks.int())
             recall_metric.update(preds, masks.int())
 
-    epoch_loss = running_loss / len(dataloader.dataset)
+    ds_sized: Sized = dataloader.dataset  # type: ignore[assignment]
+    epoch_loss = float(running_loss) / float(len(ds_sized))
 
     metrics = {
         "loss": epoch_loss,
-        "iou": round(binary_iou_metric.compute().item(), 4),
-        "iou_background": round(background_iou_metric.compute().item(), 4),
-        "iou_joints": round(joint_iou_metric.compute().item(), 4),
-        "dice": round(dice_metric.compute().item(), 4),
-        "precision": round(precision_metric.compute().item(), 4),
-        "recall": round(recall_metric.compute().item(), 4),
+        "iou": round(_to_float(binary_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "iou_background": round(_to_float(background_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "dice": round(_to_float(dice_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "precision": round(_to_float(precision_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "recall": round(_to_float(recall_metric.compute()), 4),  # type: ignore[func-returns-value]
     }
 
     return metrics
@@ -214,7 +240,7 @@ def validate_one_epoch(
     # For per-class IoU, use separate binary IoU metrics
     background_iou_metric = JaccardIndex(task="binary").to(device)
     joint_iou_metric = JaccardIndex(task="binary").to(device)
-    dice_metric = Dice(num_classes=2).to(device)
+    dice_metric = BinaryF1Score().to(device)
     precision_metric = Precision(task="binary").to(device)
     recall_metric = Recall(task="binary").to(device)
 
@@ -261,16 +287,17 @@ def validate_one_epoch(
             precision_metric.update(preds, masks.int())
             recall_metric.update(preds, masks.int())
 
-    epoch_loss = running_loss / len(dataloader.dataset)
+    ds_sized: Sized = dataloader.dataset  # type: ignore[assignment]
+    epoch_loss = float(running_loss) / float(len(ds_sized))
 
     metrics = {
         "loss": epoch_loss,
-        "iou": round(binary_iou_metric.compute().item(), 4),
-        "iou_background": round(background_iou_metric.compute().item(), 4),
-        "iou_joints": round(joint_iou_metric.compute().item(), 4),
-        "dice": round(dice_metric.compute().item(), 4),
-        "precision": round(precision_metric.compute().item(), 4),
-        "recall": round(recall_metric.compute().item(), 4),
+        "iou": round(_to_float(binary_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "iou_background": round(_to_float(background_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "dice": round(_to_float(dice_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "precision": round(_to_float(precision_metric.compute()), 4),  # type: ignore[func-returns-value]
+        "recall": round(_to_float(recall_metric.compute()), 4),  # type: ignore[func-returns-value]
     }
 
     return metrics
@@ -305,15 +332,21 @@ class EarlyStopping:
 
     """
 
+    # Attribute type declarations (PEP 526)
+    best_score: float | None
+    early_stop: bool
+    val_loss_min: float
+    best_model: dict[str, Any] | None
+
     def __init__(self, patience: int = 7, verbose: bool = False, delta: float = 0.0):
         self.patience = patience
         self.verbose = verbose
         self.delta = delta
         self.counter = 0
-        self.best_score: None | float = None
-        self.early_stop: bool = False
-        self.val_loss_min: float = float("inf")
-        self.best_model: None | dict = None
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = float("inf")
+        self.best_model = None
 
     def __call__(self, val_loss: float, model: nn.Module) -> None:
         """
@@ -355,7 +388,11 @@ class EarlyStopping:
 
         """
         self.best_model = model.state_dict()
-        self.val_loss_min = -self.best_score
+        # Guard against None; best_score is set before calling this method
+        if self.best_score is None:
+            self.val_loss_min = float("inf")
+        else:
+            self.val_loss_min = -self.best_score
 
 
 def save_image_predictions(
@@ -365,8 +402,8 @@ def save_image_predictions(
     num_samples: int = 3,
     threshold: float = 0.5,
     save_dir: Path = Path("plots/predictions"),
-    epoch: int = None,
-    exp_tag: str = None,
+    epoch: int | None = None,
+    exp_tag: str | None = None,
 ) -> None:
     """
     Save predictions from the model as images.
@@ -394,28 +431,24 @@ def save_image_predictions(
             preds = torch.sigmoid(model(images)) > threshold
 
         # Convert tensors to CPU for plotting
-        images = images.cpu().numpy()
-        masks = (
-            1 - masks.cpu().numpy()
-        )  # Invert mask for black lines on white background
-        preds = (
-            1 - preds.cpu().numpy()
-        )  # Invert prediction for black lines on white background
+        images_np: np.ndarray = images.cpu().numpy()
+        masks_np: np.ndarray = 1 - masks.cpu().numpy()  # invert for display
+        preds_np: np.ndarray = 1 - preds.cpu().numpy()  # invert for display
 
         # Plot original image, true mask, and predicted mask
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
         # Normalize and transpose image correctly for display
-        img_to_display = images[0].transpose(1, 2, 0)  # Move channels to the end
+        img_to_display = images_np[0].transpose(1, 2, 0)  # Move channels to the end
         img_to_display = (img_to_display - img_to_display.min()) / (
             img_to_display.max() - img_to_display.min() + 1e-8
         )
 
         axes[0].imshow(img_to_display)  # Already transposed above
         axes[0].set_title("Original Image")
-        axes[1].imshow(masks[0][0], cmap="gray")
+        axes[1].imshow(masks_np[0][0], cmap="gray")
         axes[1].set_title("True Mask")
-        axes[2].imshow(preds[0][0], cmap="gray")
+        axes[2].imshow(preds_np[0][0], cmap="gray")
         axes[2].set_title("Predicted Mask")
 
         # Remove axes

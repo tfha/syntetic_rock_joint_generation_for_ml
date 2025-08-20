@@ -6,7 +6,7 @@ and compute-related operations for Azure ML.
 """
 
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from azure.ai.ml import MLClient
 from azure.core.exceptions import ResourceNotFoundError
@@ -15,7 +15,7 @@ from rich.console import Console
 
 def check_compute_permissions(
     ml_client: MLClient, compute_name: str, console: Console
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Check if the compute cluster has the necessary permissions to access data.
 
@@ -115,7 +115,7 @@ def refresh_compute_cluster(
 
 def validate_and_refresh_compute(
     ml_client: MLClient, console: Console, compute_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Validate and refresh compute cluster, check permissions.
 
@@ -164,7 +164,7 @@ def validate_and_refresh_compute(
         sys.exit(1)
 
 
-def _provide_compute_guidance(console: Console, permissions: Dict[str, Any]) -> None:
+def _provide_compute_guidance(console: Console, permissions: dict[str, Any]) -> None:
     """Provide actionable guidance based on compute permission results."""
 
     # Identity validation
@@ -175,6 +175,8 @@ def _provide_compute_guidance(console: Console, permissions: Dict[str, Any]) -> 
             "Compute > Identity tab",
             style="info",
         )
+        # Provide detailed step-by-step guidance for resolving missing identity
+        _provide_compute_identity_setup_guidance(console)
     else:
         console.print(
             f"✓ Compute identity type: {permissions['identity_type']}", style="success"
@@ -199,7 +201,7 @@ def _provide_compute_guidance(console: Console, permissions: Dict[str, Any]) -> 
         )
 
 
-def _provide_identity_setup_guidance(console: Console) -> None:
+def _provide_compute_identity_setup_guidance(console: Console) -> None:
     """Provide detailed guidance for setting up compute identity."""
     console.print("\n🔧 NoIdentityOnCompute Error - Setup Guide:", style="error")
     console.print(

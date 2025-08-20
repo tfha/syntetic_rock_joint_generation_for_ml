@@ -9,6 +9,10 @@ from typing import Any
 
 from rich.console import Console
 
+from .azure_compute import (
+    _provide_compute_identity_setup_guidance as _provide_identity_setup_guidance,
+)
+
 
 def download_job_outputs(
     ml_client, console: Console, job_run: Any, display_name: str
@@ -123,20 +127,3 @@ def handle_log_streaming_error(
         console.print(
             f"Log streaming error on attempt {attempt}: {str(error)}", style="warning"
         )
-
-
-def _provide_identity_setup_guidance(console: Console) -> None:
-    """Provide detailed guidance for setting up compute identity."""
-    console.print("\n🔧 NoIdentityOnCompute Error - Setup Guide:", style="error")
-    console.print(
-        "1. Azure Portal → Your ML Workspace → Compute → Compute clusters\n"
-        "2. Select your compute cluster → Identity tab\n"
-        "3. Enable 'System assigned' managed identity → Save\n"
-        "4. Navigate to workspace Storage Account → Access Control (IAM)\n"
-        "5. Add role assignment:\n"
-        "   • Role: Storage Blob Data Contributor\n"
-        "   • Assign access to: System assigned managed identity\n"
-        "   • Select: Your compute cluster's identity\n"
-        "6. Save and retry job submission",
-        style="info",
-    )

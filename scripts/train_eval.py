@@ -93,6 +93,10 @@ def main(cfg: DictConfig) -> None:
         f" {pcfg.experiment.experiment_strategy}",
         style="info",
     )
+
+    print(f"Allocated GPU memory: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+    print(f"Max allocated GPU memory: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
+
     # Create a unique log directory for each run
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_dir = os.path.join(pcfg.tensorboard.path, timestamp)
@@ -143,11 +147,11 @@ def main(cfg: DictConfig) -> None:
 
     if train_json.exists() and val_json.exists() and test_json.exists():
         console.print(f"Loading dataset splits from {split_dir}", style="info")
-        with open(train_json, "r") as f:
+        with open(train_json) as f:
             train_list = json.load(f)
-        with open(val_json, "r") as f:
+        with open(val_json) as f:
             val_list = json.load(f)
-        with open(test_json, "r") as f:
+        with open(test_json) as f:
             test_list = json.load(f)
     else:
         console.print(
@@ -444,12 +448,14 @@ def main(cfg: DictConfig) -> None:
             )
             experiment_name = "train_test"
             log_metrics_to_mlflow(
-                best_metrics,
+                best_metrics if best_metrics is not None else {},
                 pcfg.model.name,
                 pcfg.model.params,
                 pcfg.experiment.experiment_strategy,
                 experiment_name,
-                tracking_uri=pcfg.mlflow.path,
+                tracking_uri=str(pcfg.mlflow.path)
+                if pcfg.mlflow.path is not None
+                else None,
                 hydra_cfg_dir=HydraConfig.get().run.dir,
                 save_best_metrics=True,
                 track_prediction_images=True,

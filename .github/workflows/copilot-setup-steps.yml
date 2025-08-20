@@ -1,0 +1,74 @@
+name: "Copilot Setup Steps"
+
+# Automatically run the setup steps when they change for validation, and allow manual testing.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` for Copilot to pick it up.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # Minimize permissions. Copilot gets its own token later.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+          poetry --version
+
+      - name: Configure Poetry virtualenvs.in-project
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install project dependencies (with dev)
+        run: |
+          # Respect extra PyTorch index if present in pyproject
+          poetry install --with dev -n
+
+      - name: Warm tool caches (ruff, mypy)
+        run: |
+          poetry run ruff --version
+          poetry run ruff check --help > /dev/null
+          poetry run mypy --version
+
+      - name: Quick import check
+        run: |
+          poetry run python - << 'PY'
+          import importlib
+          for m in [
+              'ml_segmentation',
+              'numpy', 'pandas', 'torch',
+              'pydantic', 'hydra', 'omegaconf',
+              'azure.ai.ml', 'azure.identity',
+          ]:
+              try:
+                  importlib.import_module(m)
+              except Exception as e:
+                  raise SystemExit(f"Failed to import {m}: {e}")
+          print('Basic imports OK')
+          PY
+
+      - name: Optional quick test discovery
+        run: |
+          if [ -d tests ]; then
+            poetry run pytest --collect-only -q || true
+          fi

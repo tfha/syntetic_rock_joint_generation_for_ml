@@ -7,7 +7,6 @@ and basic authentication operations.
 
 import os
 import sys
-from typing import Optional
 
 from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
@@ -18,7 +17,7 @@ from ml_segmentation.utility import get_custom_console
 
 
 def setup_azure_environment_variables(
-    console: Optional[Console] = None,
+    console: Console | None = None,
 ) -> tuple[Console, str, str, str]:
     """
     Set up the Azure environment and return a console for pretty printing.
@@ -77,14 +76,16 @@ def setup_azure_environment_variables(
 
 def connect_to_azure_ml(
     subscription_id: str,
-    resource_group: Optional[str] = None,
-    workspace_name: Optional[str] = None,
+    console: Console,
+    resource_group: str | None = None,
+    workspace_name: str | None = None,
 ) -> MLClient:
     """
     Connect to Azure ML workspace with proper authentication.
 
     Args:
         subscription_id: Azure subscription ID
+        console: Rich Console instance for logging
         resource_group: Azure resource group name
         workspace_name: Azure ML workspace name
 
@@ -99,11 +100,9 @@ def connect_to_azure_ml(
     workspace_name = workspace_name or os.environ.get("AZURE_ML_WORKSPACE")
 
     if not subscription_id or not resource_group or not workspace_name:
-        console = get_custom_console()
         console.print("Missing required Azure configuration parameters", style="error")
         sys.exit(1)
 
-    console = get_custom_console()
     console.print(f"Connecting to Azure ML workspace: {workspace_name}", style="info")
 
     try:
@@ -156,5 +155,27 @@ def validate_workspace_permissions(ml_client: MLClient, console: Console) -> boo
             f"Warning: Connected to workspace but may have limited permissions. "
             f"Error: {str(perm_error)}",
             style="warning",
+        )
+        console.print(
+            "What this means: your user or managed identity can authenticate to the "
+            "Azure ML workspace, but is missing RBAC permissions to perform standard "
+            "operations (e.g., list datastores, jobs, computes, environments, or read the "
+            "workspace's default storage).",
+            style="info",
+        )
+        console.print(
+            "How to fix (assign roles at the workspace or resource group scope):\n"
+            "- Azure Machine Learning Contributor (or AzureML Data Scientist)\n"
+            "- Storage Blob Data Reader on the workspace's default Storage account to read datastores; "
+            "Storage Blob Data Contributor if you need to write outputs/artifacts\n"
+            "- Key Vault Secrets User on the workspace Key Vault if your workflows access secrets\n"
+            "- AzureML Compute Operator if you need to create or refresh compute",
+            style="info",
+        )
+        console.print(
+            "Also verify you're using the intended subscription/tenant and that role assignments "
+            "have propagated (can take a few minutes). If you're using a managed identity, ensure "
+            "the above roles are assigned to that identity as well.",
+            style="info",
         )
         return False

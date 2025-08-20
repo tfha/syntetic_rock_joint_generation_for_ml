@@ -97,7 +97,9 @@ def _test_job_submission_and_logging(ml_client: MLClient, console: Console) -> N
 
 
 def run_azure_diagnostic_tests(
-    subscription_id: str = None, resource_group: str = None, workspace_name: str = None
+    subscription_id: str | None = None,
+    resource_group: str | None = None,
+    workspace_name: str | None = None,
 ) -> None:
     """
     Run a comprehensive set of diagnostic tests for Azure ML setup.
@@ -128,7 +130,12 @@ def run_azure_diagnostic_tests(
 
     try:
         # Connect to Azure ML
-        ml_client = connect_to_azure_ml(subscription_id, resource_group, workspace_name)
+        ml_client = connect_to_azure_ml(
+            subscription_id,
+            console,
+            resource_group,
+            workspace_name,
+        )
 
         # Run diagnostic tests
         console.print("\n=== Running Diagnostic Tests ===", style="bold")

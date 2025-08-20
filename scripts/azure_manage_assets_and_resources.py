@@ -142,6 +142,7 @@ def main(cfg: DictConfig) -> None:
             if command in valid_commands_requiring_connection:
                 ml_client = connect_to_azure_ml(
                     subscription_id=subscription_id,
+                    console=console,
                     resource_group=resource_group,
                     workspace_name=workspace_name,
                 )
@@ -162,13 +163,22 @@ def main(cfg: DictConfig) -> None:
                 case AzureDataAssetsCommand.LIST_ASSETS:
                     list_data_assets(ml_client, console, asset_name)
                 case AzureDataAssetsCommand.COMPARE_ASSETS:
-                    compare_assets(ml_client, console, asset_name, version1, version2)
+                    if asset_name is None or version1 is None or version2 is None:
+                        console.print(
+                            "asset_name, version1, and version2 must be provided for compare-assets",
+                            style="error",
+                        )
+                    else:
+                        compare_assets(
+                            ml_client, console, asset_name, version1, version2
+                        )
                 case AzureDataAssetsCommand.UPLOAD_DATA:
+                    # upload_base_data_to_azure_blob expects str paths
                     upload_base_data_to_azure_blob(
                         console,
-                        pcfg.dataset.path_images,
-                        pcfg.dataset.path_raw_mask_labels,
-                        pcfg.dataset.path_processed_mask_labels,
+                        str(pcfg.dataset.path_images),
+                        str(pcfg.dataset.path_raw_mask_labels),
+                        str(pcfg.dataset.path_processed_mask_labels),
                     )
                 case AzureDataAssetsCommand.REGISTER_BASE_DATASETS:
                     register_base_datasets(ml_client, console)

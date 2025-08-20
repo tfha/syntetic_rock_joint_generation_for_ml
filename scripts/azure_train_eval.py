@@ -27,9 +27,10 @@ The script handles:
 import os
 import time
 import warnings
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import hydra
 import mlflow
@@ -72,8 +73,13 @@ def main(cfg: DictConfig) -> None:
     # 1. Initialize MLflow and configuration
     ########################################################################
     # Setup configuration
-    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
-    pcfg = ConfigSchema(**cfg_dict)
+    cfg_container = OmegaConf.to_container(cfg, resolve=True)
+    if not isinstance(cfg_container, dict):
+        raise TypeError("Expected Hydra cfg to convert to a dict")
+    # Ensure type for pydantic parsing
+    cfg_mapping = cast(Mapping[str, Any], cfg_container)
+    cfg_dict_typed: dict[str, Any] = dict(cfg_mapping)
+    pcfg = ConfigSchema(**cfg_dict_typed)
     console = get_custom_console()
 
     # Set the experiment name based on the experiment strategy
@@ -235,7 +241,7 @@ def main(cfg: DictConfig) -> None:
         )
         with open(output_dir / "model_summary.txt", "w") as f:
             f.write(str(model_stats))
-        mlflow.log_artifact(output_dir / "model_summary.txt")
+        mlflow.log_artifact(str(output_dir / "model_summary.txt"))
     except ImportError:
         console.print(
             "torchinfo not available, skipping model summary", style="warning"
@@ -273,8 +279,8 @@ def main(cfg: DictConfig) -> None:
     ########################################################################
     console.print("Beginning training and validation...", style="info")
     start_time = time.time()
-    best_metrics = None
-    best_model_state = None  # Store the state of the best model
+    best_metrics: dict[str, Any] | None = None
+    best_model_state: dict[str, Any] | None = None  # Store the state of the best model
 
     try:
         for epoch in range(pcfg.model.num_epochs):
@@ -391,7 +397,7 @@ def main(cfg: DictConfig) -> None:
         # Save final model
         final_model_path = models_dir / "final_model.pth"
         torch.save(model.state_dict(), final_model_path)
-        mlflow.log_artifact(final_model_path)
+        mlflow.log_artifact(str(final_model_path))
 
         # Log model in MLflow format for easier deployment
         mlflow.pytorch.log_model(
@@ -405,7 +411,7 @@ def main(cfg: DictConfig) -> None:
             console.print("Saving best model from metrics tracking...", style="info")
             best_model_path = models_dir / "best_metrics_model.pth"
             torch.save(best_model_state["model_state_dict"], best_model_path)
-            mlflow.log_artifact(best_model_path)
+            mlflow.log_artifact(str(best_model_path))
 
             # Save the model in the current state
             current_state = model.state_dict().copy()
@@ -432,24 +438,23 @@ def main(cfg: DictConfig) -> None:
             model.load_state_dict(early_stopping.best_model)
             best_model_path = models_dir / "best_model.pth"
             torch.save(model.state_dict(), best_model_path)
-            mlflow.log_artifact(best_model_path)
-            mlflow.pytorch.log_model(
-                model,
-                "best_model",
-                registered_model_name=f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}",
-            )
-            mlflow.log_artifact(best_model_path)
-
-            # Register model in MLflow
-            mlflow.pytorch.log_model(model, "best_model")
+            mlflow.log_artifact(str(best_model_path))
 
             # Save the run ID to a file for the registration step
-            current_run_id = mlflow.active_run().info.run_id
-            with open(models_dir / "best_run_id.txt", "w") as f:
-                f.write(current_run_id)
-            console.print(
-                f"Saved run ID {current_run_id} for model registration", style="info"
-            )
+            active = mlflow.active_run()
+            if active is not None:
+                current_run_id = active.info.run_id
+                with open(models_dir / "best_run_id.txt", "w") as f:
+                    f.write(current_run_id)
+                console.print(
+                    f"Saved run ID {current_run_id} for model registration",
+                    style="info",
+                )
+            else:
+                console.print(
+                    "No active MLflow run; skipping run ID file creation",
+                    style="warning",
+                )
 
         # 10. Run final evaluation and generate results
         ########################################################################
@@ -499,7 +504,7 @@ def main(cfg: DictConfig) -> None:
                 f.write("-" * 50 + "\n")
                 for name, value in best_metrics.items():
                     f.write(f"{name}: {value}\n")
-            mlflow.log_artifact(output_dir / "best_metrics.txt")
+            mlflow.log_artifact(str(output_dir / "best_metrics.txt"))
 
         # Mark training as completed
         mlflow.log_param("training_status", "completed")
