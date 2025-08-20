@@ -30,19 +30,19 @@ def plot_optuna_pareto_3D(
 
     # Update layout for axes labels and tick labels
     fig.update_layout(
-        xaxis=dict(
-            title=dict(font=dict(size=30)),  # Adjust font size for x-axis label
-            tickfont=dict(size=20),  # Adjust font size for x-axis tick labels
-        ),
-        yaxis=dict(
-            title=dict(font=dict(size=30)),  # Adjust font size for y-axis label
-            tickfont=dict(size=20),  # Adjust font size for y-axis tick labels
-        ),
+        xaxis={
+            "title": {"font": {"size": 30}},  # Adjust font size for x-axis label
+            "tickfont": {"size": 20},  # Adjust font size for x-axis tick labels
+        },
+        yaxis={
+            "title": {"font": {"size": 30}},  # Adjust font size for y-axis label
+            "tickfont": {"size": 20},  # Adjust font size for y-axis tick labels
+        },
     )
 
     # If the plot includes bar labels (annotation on bars), you can adjust them as well:
     fig.update_traces(
-        textfont=dict(size=20)  # Adjust font size for bar labels
+        textfont={"size": 20}  # Adjust font size for bar labels
     )
 
     fig.write_html(savepath)
@@ -96,7 +96,9 @@ def custom_optimization_history_plot(
         zorder=10,
         label="Trial with default parameters",
     )
-    ax.set_ylim([df_study["value"].min() - 0.05, df_study["value"].max() + 0.05])
+    ax.set_ylim(
+        (float(df_study["value"].min() - 0.05), float(df_study["value"].max() + 0.05))
+    )
     # ax.set_ylim([0.7, 1.0])
     ax.plot(df_study["number"], df_study["value"].ffill().cummax(), color="black")
     ax.grid(alpha=0.5)
@@ -125,6 +127,6 @@ def plot_hyperparameter_parallel_coordinates(
     plot_parallel_coordinate(study)
     fig = plt.gcf()
     fig.set_size_inches(3 * figure_width, 2 * figure_width)
-    fig.tight_layout
+    fig.tight_layout()
     # fig.savefig(savepath)
     save_plot(savepath, save_extra_formats=save_extra_formats)

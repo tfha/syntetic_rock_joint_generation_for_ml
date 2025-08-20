@@ -1,27 +1,39 @@
 """
-This module defines the configuration schema for a machine learning segmentation project using Pydantic models.
-It includes configurations for the model, experiment, dataset, logging, and hyperparameter optimization.
+This module defines the configuration schema for a machine learning segmentation
+project using Pydantic models. It includes configurations for the model,
+experiment, dataset, logging, and hyperparameter optimization.
+
 Classes:
     Scheduler: Configuration for the learning rate scheduler.
-    ModelConfig: Configuration for the model, including parameters like name, number of epochs, batch size, learning rate, and scheduler.
+    ModelConfig: Configuration for the model, including parameters like name,
+        number of epochs, batch size, learning rate, and scheduler.
     ExperimentStrategy: Enum class defining various experiment strategies.
-    ExperimentConfig: Configuration for the experiment, including strategies, dataset configurations, and other training parameters.
+    ExperimentConfig: Configuration for the experiment, including strategies,
+        dataset configurations, and other training parameters.
     DatasetConfig: Configuration for the dataset paths and prefixes.
     MlflowConfig: Configuration for MLflow logging.
     TensorboardConfig: Configuration for Tensorboard logging.
     OptunaConfig: Configuration for Optuna hyperparameter optimization.
-    ConfigSchema: The main configuration schema that includes all other configurations.
+    AzureMLConfig: Configuration for Azure Machine Learning.
+    AzureDataAssetsCommand: Enum class defining available commands for Azure
+        data assets management.
+    AzureDataAssetsConfig: Configuration for Azure ML data assets management.
+    ConfigSchema: The main configuration schema that includes all other
+        configurations.
+
 Functions:
-    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that tests the schema functionality by converting the Hydra config to a Pydantic model and printing it using Rich console.
+    testing_scheme_functionality(cfg: DictConfig): A Hydra main function that
+        tests the schema functionality by converting the Hydra config to a
+        Pydantic model and printing it using Rich console.
 """
 
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from rich.console import Console
 
 
@@ -33,7 +45,10 @@ class Scheduler(BaseModel):
 class ModelConfig(BaseModel):
     name: str = Field(
         ...,
-        description="Name of the model configuration to use, e.g., deeplabv3plus, unet, unetplusplus",
+        description=(
+            "Name of the model configuration to use, e.g., deeplabv3plus, "
+            "unet, unetplusplus"
+        ),
     )
     num_epochs: int = Field(..., description="Number of epochs for training.")
     batch_size: int = Field(..., description="Batch size for training.")
@@ -61,9 +76,10 @@ class ExperimentConfig(BaseModel):
     dataset_strategies: dict[str, dict[str, list[str]]] = Field(
         ...,
         description=(
-            "Mapping of experiment strategies to their corresponding dataset configurations. "
-            "Each strategy includes 'train_datasets' and 'test_datasets', "
-            "which are lists of dataset names used for training and testing respectively."
+            "Mapping of experiment strategies to their corresponding dataset "
+            "configurations. Each strategy includes 'train_datasets' and "
+            "'test_datasets', which are lists of dataset names used for "
+            "training and testing respectively."
         ),
     )
     seed: int = Field(..., description="Random seed for reproducibility.")
@@ -82,6 +98,13 @@ class ExperimentConfig(BaseModel):
     early_stopping_patience: int = Field(
         ..., description="Patience for early stopping in training."
     )
+    early_stopping_delta: float = Field(
+        ...,
+        description=(
+            "Minimum change in the monitored metric to qualify as an "
+            "improvement for early stopping."
+        ),
+    )
     optional_transforms: bool = Field(
         ..., description="Whether optional image transforms are used."
     )
@@ -93,6 +116,13 @@ class ExperimentConfig(BaseModel):
         ..., description="Whether quality control data is used."
     )
     crossvalidation: bool = Field(..., description="Whether cross-validation is used.")
+    path_example_images: Path = Field(
+        ..., description="Path where example images are saved during training."
+    )
+    download_outputs: bool = Field(
+        False,
+        description="Flag to control whether to download outputs after job completion.",
+    )
 
 
 class DatasetConfig(BaseModel):
@@ -101,9 +131,13 @@ class DatasetConfig(BaseModel):
     path_processed_mask_labels: Path = Field(
         ..., description="Path to processed masks."
     )
+    crop_size: int = Field(..., description="Crop size for image and label transforms.")
     prefixes: dict[str, list[str]] = Field(
         ...,
-        description="Mapping of dataset names to lists of prefixes used to filter files for that dataset.",
+        description=(
+            "Mapping of dataset names to lists of prefixes used to filter "
+            "files for that dataset."
+        ),
     )
 
 
@@ -128,6 +162,72 @@ class OptunaConfig(BaseModel):
     )
 
 
+class AzureMLConfig(BaseModel):
+    compute_name: str = Field(
+        ..., description="Name of the compute cluster to use for Azure ML training."
+    )
+    experiment_name: str = Field(..., description="Name of the experiment in Azure ML.")
+    environment_name: str = Field(
+        "rock-segmentation-env",
+        description="Name of the Azure ML environment to use or create.",
+    )
+    environment_version: str | int = Field(
+        "latest",
+        description=(
+            "Version of the Azure ML environment to use. Accepts string or integer."
+        ),
+    )
+    use_new_version: bool = Field(
+        False, description="Whether to create and use a new version of the environment."
+    )
+    use_curated_env: bool = Field(
+        False, description="Whether to use a curated AzureML environment."
+    )
+    curated_env_name: str = Field(
+        "AzureML-pytorch-2.2-ubuntu20.04-py39-cuda11-gpu",
+        description="The curated environment name to use if enabled.",
+    )
+    base_docker_image: str = Field(
+        "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04",
+        description="Base docker image for custom environments.",
+    )
+
+
+class AzureDataAssetsCommand(str, Enum):
+    """Available commands for Azure data assets management."""
+
+    REGISTER_BASE_DATASETS = "register-base-datasets"
+    UPLOAD_DATA = "upload-data"
+    LIST_ASSETS = "list-assets"
+    COMPARE_ASSETS = "compare-assets"
+    GENERATE_SPLITS = "generate-splits"
+    UPLOAD_SPLITS = "upload-splits"
+    REGISTER_SPLITS = "register-splits"
+    # Process all split strategies in one operation: generate, upload, register
+    PROCESS_ALL_SPLITS = "process-all-splits"
+    BUILD_ENVIRONMENT = "build-environment"
+
+
+class AzureDataAssetsConfig(BaseModel):
+    """Configuration for Azure ML data assets management."""
+
+    command: AzureDataAssetsCommand | None = Field(
+        None,
+        description=(
+            "Command to execute (register-base-datasets, register-splits, "
+            "list-assets, compare-assets, upload-data, generate-splits)"
+        ),
+    )
+    asset_name: str | None = Field(
+        None, description="Name of the asset to list or compare"
+    )
+    version1: str | None = Field(None, description="First version for comparison")
+    version2: str | None = Field(None, description="Second version for comparison")
+    output_dir: str = Field(
+        "outputs/azure_data_assets", description="Output directory for logs"
+    )
+
+
 class ConfigSchema(BaseModel):
     path_project: Path = Field(..., description="Path to the project directory.")
     matplotlib_config_path: Path = Field(
@@ -139,12 +239,33 @@ class ConfigSchema(BaseModel):
     tensorboard: TensorboardConfig
     optuna: OptunaConfig
     dataset: DatasetConfig
+    azure_ml: AzureMLConfig
+    azure_data_assets: AzureDataAssetsConfig = Field(
+        default_factory=AzureDataAssetsConfig,  # type: ignore[arg-type]
+        description="Configuration for Azure ML data assets management.",
+    )
+
+    @field_validator("azure_data_assets")
+    @classmethod
+    def validate_command(cls, v):
+        # Check if command is valid
+        if hasattr(v, "command"):
+            try:
+                AzureDataAssetsCommand(v.command)
+            except ValueError:
+                available_commands = [cmd.value for cmd in AzureDataAssetsCommand]
+                # Hide inner ValueError context to present a clean validation error
+                raise ValueError(
+                    f"'{v.command}' is not a valid command. "
+                    f"Available commands: {', '.join(available_commands)}"
+                ) from None
+        return v
 
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
 def testing_scheme_functionality(cfg: DictConfig) -> None:
-    cfg_dict: dict[str, Any] = OmegaConf.to_object(
-        cfg
+    cfg_dict: dict[str, Any] = cast(
+        dict[str, Any], OmegaConf.to_object(cfg)
     )  # Convert OmegaConf to a regular dictionary
     pcfg = ConfigSchema(
         **cfg_dict

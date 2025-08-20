@@ -1,0 +1,24 @@
+# code-ci.yml
+trigger:
+  branches:
+    include: [main]
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.10'
+
+- script: |
+    pip install poetry
+    poetry install
+  displayName: 'Install dependencies'
+
+- script: |
+    poetry run ruff scripts/ src/ml_segmentation/ tests/
+  displayName: 'Lint code with ruff'
+
+- script: pytest tests/
+  displayName: 'Run tests'

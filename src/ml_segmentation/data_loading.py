@@ -1,7 +1,7 @@
 import json
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import hydra
 import torch
@@ -20,7 +20,7 @@ class SegmentationDataset(Dataset):
         images_dir: str | Path,
         labels_dir: str | Path,
         file_list: list[str],
-        transform: transforms.Compose | None = None,
+        transform: dict[str, transforms.Compose] | None = None,
     ):
         self.images_dir = Path(images_dir)
         self.labels_dir = Path(labels_dir)
@@ -38,12 +38,16 @@ class SegmentationDataset(Dataset):
         image = Image.open(image_path).convert("RGB")
         label = Image.open(label_path)
 
-        # Apply transformations if any
-        if self.transform:
+        # Apply transformations if any, else convert to tensors
+        if self.transform is not None:
             image = self.transform["image"](image)
             label = self.transform["label"](label)
-            # Invert label to match the segmentation model's requirements
-            label = 1 - label
+        else:
+            image = transforms.ToTensor()(image)
+            # Convert label to tensor (grayscale -> 1-channel float tensor)
+            label = transforms.ToTensor()(label)
+        # Invert label to match the segmentation model's requirements
+        label = 1 - label
 
         return image, label
 
@@ -94,17 +98,22 @@ def get_dataloaders(
     return train_loader, val_loader, test_loader
 
 
-def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Compose]:
+def get_transforms(
+    optional_transforms: bool = False, crop_size: int = 768
+) -> dict[str, transforms.Compose]:
     """
-    Using all the transforms the effective virtual dataset size will be approximately 14.4 times larger during training compared to the original 1000 images. This means that while you still only have 1000 original images saved, the model will effectively see about 14,400 variations of your images over the course of training, which significantly improves generalisation without explicitly increasing the number of stored images
+    Using all the transforms, the effective virtual dataset size will be
+    ~14.4x larger during training compared to the original 1000 images.
+    While you still only have 1000 original images saved, the model will
+    effectively see about 14,400 variations of your images during training,
+    which significantly improves generalisation without increasing stored
+    images.
     """
-    # Define the size to which the images and labels should be cropped, divisible by 32
-    crop_size = 768  # Example size that is divisible by 32
-    # resize_size = 384  # Example size that is divisible by 32
-
     train_transforms_list = [
         transforms.CenterCrop(crop_size),
-        # transforms.Resize((resize_size, resize_size), interpolation=Image.BILINEAR),
+        # transforms.Resize(
+        #     (resize_size, resize_size), interpolation=Image.BILINEAR
+        # ),
         # transforms.RandomHorizontalFlip(),
         # transforms.RandomVerticalFlip(),
         transforms.ToTensor(),  # transforms the image to a tensor in the range [0, 1]
@@ -129,10 +138,10 @@ def get_transforms(optional_transforms: bool = False) -> dict[str, transforms.Co
     # Apply the same center crop to the labels
     label_transform = transforms.Compose(
         [
-            transforms.CenterCrop(
-                crop_size
-            ),  # Centre crop to the same size as the images
-            # transforms.Resize((resize_size, resize_size), interpolation=Image.NEAREST),
+            transforms.CenterCrop(crop_size),  # Centre crop to match images
+            # transforms.Resize(
+            #     (resize_size, resize_size), interpolation=Image.NEAREST
+            # ),
             transforms.ToTensor(),
         ]
     )
@@ -145,10 +154,12 @@ def validate_data_pre_transform(
 ) -> None:
     """
     Validates dataset files before transformations are applied.
-    This function performs basic validation checks on paired image and label files to ensure:
+    This function performs basic validation checks on paired image and label
+    files to ensure:
     1. Both image and label files exist at the specified paths
     2. Both files can be opened as valid images
     3. Image dimensions match between each image and its corresponding label
+
     Parameters
     ----------
     images_dir : Path
@@ -157,14 +168,18 @@ def validate_data_pre_transform(
         Directory path containing the label files
     file_list : list[str]
         List of file names to validate (should be the same name in both directories)
+
     Returns
     -------
     None
         Function only validates and raises AssertionError if validation fails
+
     Raises
     ------
     AssertionError
-        If an image or label file is missing, cannot be opened, or dimensions don't match
+        If an image or label file is missing, cannot be opened,
+        or dimensions don't match
+
     Notes
     -----
     Uses rich.progress.track for progress visualization during validation
@@ -186,7 +201,7 @@ def validate_data_pre_transform(
         except Exception as e:
             raise AssertionError(
                 f"Failed to open image or label file: {file_name}, Error: {e}"
-            )
+            ) from e
 
         # Light validation to ensure image and label can be read properly
         assert image.size == label.size, (
@@ -199,9 +214,11 @@ def validate_data_post_transform(
 ) -> None:
     # Check if image dimensions are divisible by 32
     _, height, width = image_tensor.shape
-    assert height % 32 == 0 and width % 32 == 0, (
-        f"Transformed image dimensions (HxW): {height}x{width} are not divisible by 32 for file: {file_name}"
+    err_msg = (
+        f"Transformed image dimensions (HxW): {height}x{width} "
+        f"are not divisible by 32 for file: {file_name}"
     )
+    assert height % 32 == 0 and width % 32 == 0, err_msg
 
     # Check if the image has correct channels
     assert image_tensor.shape[0] == 3, (
@@ -228,12 +245,15 @@ def get_data_files(
 ) -> tuple[list[str], list[str]]:
     """
     Get lists of training and testing image file names based on given prefixes.
-    This function filters image files in the specified directory by their prefixes and ensures that corresponding label files exist in the labels directory.
+    This function filters image files in the specified directory by their prefixes
+    and ensures that corresponding label files exist in the labels directory.
+
     Args:
         images_dir (Path): Directory containing the image files.
         labels_dir (Path): Directory containing the label files.
         train_prefixes (list[str]): List of prefixes to filter training image files.
         test_prefixes (list[str]): List of prefixes to filter testing image files.
+
     Returns:
         tuple[list[str], list[str]]: A tuple containing two lists:
             - train_files: List of training image file names.
@@ -266,56 +286,74 @@ def split_data(
     test_frac: float = 0.1,
 ) -> tuple[list[str], list[str], list[str]]:
     """
-    Split data into training, validation, and test sets based on provided file lists. This function handles two scenarios:
-    1. If train_files and test_files are identical, it splits all files into train, validation, and test sets according to the provided fractions.
-    2. If train_files and test_files are different, it splits train_files into train and validation sets, while using test_files as the test set.
-    The function also saves the file lists to disk in JSON format.
+    Splits file lists into training, validation, and test sets, handling both overlapping and disjoint datasets. This function takes two lists of file paths (train_files and test_files) and splits them into train, validation, and test sets according to the provided fractions. If the train_files and test_files are disjoint (no overlap), the test_files are kept as the test set, and train_files are split into train and validation sets proportionally. If the lists overlap or are from the same dataset, the union of both lists is split into train, validation, and test sets according to the specified fractions.
 
-    Parameters:
-    -----------
-    train_files : list[str]
-        List of file paths for training data
-    test_files : list[str]
-        List of file paths for test data
-    train_frac : float, optional
-        Fraction of data to use for training (default: 0.8)
-    val_frac : float, optional
-        Fraction of data to use for validation (default: 0.1)
-    test_frac : float, optional
-        Fraction of data to use for testing (default: 0.1)
-
-    Returns:
-    --------
-    tuple[list[str], list[str], list[str]]
-        Tuple containing three lists: (train_files, validation_files, test_files)
-
-    Raises:
-    -------
-    ValueError
-        If fractions don't add up to 1.0, or if there are duplicates or overlapping files in the splits
+    The function ensures:
+    - The provided fractions sum to 1.0.
+    - No duplicate files within each split.
+    - No overlap between train, validation, and test sets.
+    - The splits are persisted as JSON files for downstream usage.
+    Parameters
+    ----------
+        List of file paths for training data.
+        List of file paths for test data.
+        Fraction of data to use for training (default: 0.8).
+        Fraction of data to use for validation (default: 0.1).
+        Fraction of data to use for testing (default: 0.1).
+    Returns
+        Tuple containing three lists: (train_files, validation_files, test_files).
+    Raises
+    ------
+        If fractions do not sum to 1.0, if there are duplicate files in the input lists,
+        or if there is overlap between the resulting splits.
     """
     # Ensure fractions sum up to 1.0
     if not abs(train_frac + val_frac + test_frac - 1.0) < 1e-6:
         raise ValueError("Fractions must sum to 1.0.")
 
-    # If train_files and test_files are identical, split all into train, validation, and test
-    if set(train_files) == set(test_files):
-        all_files = train_files[:]
-        random.shuffle(all_files)
-        train_end = int(len(all_files) * train_frac)
-        val_end = train_end + int(len(all_files) * val_frac)
+    # Validate inputs contain no duplicates
+    if len(train_files) != len(set(train_files)):
+        raise ValueError("Train set contains duplicate files")
+    if len(test_files) != len(set(test_files)):
+        raise ValueError("Test set contains duplicate files")
 
-        train_list = all_files[:train_end]
-        val_list = all_files[train_end:val_end]
-        test_list = all_files[val_end:]
+    # Prepare output directories and write the combined file list (with duplicates)
+    raw_dir = Path("data/raw")
+    model_ready_dir = Path("data/model_ready")
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    model_ready_dir.mkdir(parents=True, exist_ok=True)
+
+    all_input_files = train_files + test_files
+    with open(raw_dir / "all_files.json", "w") as f:
+        json.dump(all_input_files, f)
+
+    # Disjoint vs similar datasets handling
+    if set(train_files).isdisjoint(set(test_files)):
+        # Different datasets: keep provided test_files unchanged.
+        # Split train_files into train/val based on relative proportions of train+val.
+        total_tv = train_frac + val_frac
+        # Guard against division by zero; though validated earlier to sum to 1.0
+        if total_tv <= 0:
+            # No train/val requested; all train_files become train, no val
+            tv_val_count = 0
+        else:
+            tv_val_count = int(round(len(train_files) * (val_frac / total_tv)))
+
+        shuffled = train_files[:]
+        random.shuffle(shuffled)
+        val_list = shuffled[:tv_val_count]
+        train_list = shuffled[tv_val_count:]
+        test_list = test_files[:]
     else:
-        # Split train_files into train and validation
-        train_files = train_files[:]
-        random.shuffle(train_files)
-        val_end = int(len(train_files) * val_frac / (train_frac + val_frac))
-        val_list = train_files[:val_end]
-        train_list = train_files[val_end:]
-        test_list = test_files
+        # Similar datasets: split the union according to provided fractions
+        unique_files = list(set(train_files) | set(test_files))
+        random.shuffle(unique_files)
+        n = len(unique_files)
+        train_end = int(round(n * train_frac))
+        val_end = train_end + int(round(n * val_frac))
+        train_list = unique_files[:train_end]
+        val_list = unique_files[train_end:val_end]
+        test_list = unique_files[val_end:]
 
     # Validate uniqueness and separation
     def check_no_duplicates(files, label):
@@ -334,19 +372,12 @@ def split_data(
     check_no_overlap(set(train_list), set(test_list), "Train", "Test")
     check_no_overlap(set(val_list), set(test_list), "Validation", "Test")
 
-    # Save file lists
-    data_raw_dir = Path("data/raw")
-    data_raw_dir.mkdir(parents=True, exist_ok=True)
-    with open(data_raw_dir / "all_files.json", "w") as f:
-        json.dump(train_files + test_files, f)
-
-    data_model_ready_dir = Path("data/model_ready")
-    data_model_ready_dir.mkdir(parents=True, exist_ok=True)
-    with open(data_model_ready_dir / "train_files.json", "w") as f:
+    # Persist the splits for downstream usage
+    with open(model_ready_dir / "train_files.json", "w") as f:
         json.dump(train_list, f)
-    with open(data_model_ready_dir / "val_files.json", "w") as f:
+    with open(model_ready_dir / "val_files.json", "w") as f:
         json.dump(val_list, f)
-    with open(data_model_ready_dir / "test_files.json", "w") as f:
+    with open(model_ready_dir / "test_files.json", "w") as f:
         json.dump(test_list, f)
 
     return train_list, val_list, test_list
@@ -358,23 +389,36 @@ def get_datasets_prefixes(
     dataset_prefixes: dict[str, list[str]],
 ) -> dict[str, list[str]]:
     """
-    Retrieve dataset prefixes for training and testing based on the chosen experiment strategy.
+    Retrieve dataset prefixes for training and testing based on the chosen
+    experiment strategy. This is needed to filter the datasets used in the
+    experiment. All datasets are stored in the same directory, so we need
+    to filter them based on the prefixes.
 
     Args:
         experiment_strategy (str): The selected experiment strategy.
-        dataset_strategies (dict): Dictionary of dataset strategies with train and test datasets.
+        dataset_strategies (dict): Dictionary of dataset strategies with train
+            and test datasets.
         dataset_prefixes (dict): Dictionary of prefixes for each dataset.
 
     Returns:
-        dict: A dictionary containing lists of prefixes for training and testing datasets.
-              Keys are 'train_prefixes' and 'test_prefixes'.
+        dict: A dictionary containing lists of prefixes for training and testing
+              datasets. Keys are 'train_prefixes' and 'test_prefixes'.
+
+    Example return:
+        {
+            "train_prefixes": ["prefix1", "prefix2"],
+            "test_prefixes": ["prefix3"]
+        }
+
     """
     # Retrieve the datasets for the chosen experiment strategy
     datasets_used = dataset_strategies.get(experiment_strategy)
     if not datasets_used:
-        raise ValueError(
-            f"Experiment strategy '{experiment_strategy}' not found in dataset strategies."
+        msg = (
+            f"Experiment strategy '{experiment_strategy}' "
+            "not found in dataset strategies."
         )
+        raise ValueError(msg)
 
     # Initialize lists for prefixes
     train_prefixes = []
@@ -403,7 +447,7 @@ def get_datasets_prefixes(
 
 @hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
 def testing_functionality(cfg: DictConfig) -> None:
-    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
+    cfg_dict: dict[str, Any] = cast(dict[str, Any], OmegaConf.to_object(cfg))
     pcfg = ConfigSchema(**cfg_dict)
     print(pcfg)
 
@@ -428,7 +472,10 @@ if __name__ == "__main__":
 #         # Check if image dimensions are divisible by 32
 #         assert (
 #             image.height % 32 == 0 and image.width % 32 == 0
-#         ), f"Image dimensions (HxW): {image.height}x{image.width} are not divisible by 32"
+#         ), (
+#             f"Image dimensions (HxW): {image.height}x{image.width} "
+#             "are not divisible by 32"
+#         )
 
 #         # Check if all images have the same size
 #         assert (

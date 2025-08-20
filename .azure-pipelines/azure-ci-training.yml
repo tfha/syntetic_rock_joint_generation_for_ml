@@ -1,0 +1,27 @@
+trigger: none  # or 'main' if you want auto-trigger on push
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  AZURE_SUBSCRIPTION: 'YourAzureServiceConnectionName'
+  PYTHON_VERSION: '3.10'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '$(PYTHON_VERSION)'
+
+- script: | # Will install dependencies like azure-ai-ml and hydra-core if included in pyproject.toml
+    pip install poetry
+    poetry install
+  displayName: 'Install dependencies'
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: $(AZURE_SUBSCRIPTION)
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      python scripts/azure_submit_job.py
+  displayName: 'Submit training job to Azure ML'

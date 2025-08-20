@@ -1,10 +1,10 @@
 # default values for the UNet model
 name: unet
-num_epochs: 5
-batch_size: 8
+num_epochs: 10
+batch_size: 16
 learning_rate: 0.0001
 scheduler:
-  patience: 5
+  patience: 2
   gamma: 0.1
 params:
   encoder_name: resnet34

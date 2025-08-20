@@ -39,7 +39,7 @@ def timeit(func: Callable) -> Callable:
         res = func(*args)
         t_end = time.time()
         print(
-            f"Function time for {func.__name__}() is: {(t_end-t_start)*1000: 2.2f} ms"
+            f"Function time for {func.__name__}() is: {(t_end - t_start) * 1000: 2.2f} ms"
         )
         return res
 
@@ -59,7 +59,7 @@ def nn_shape(func):
     - p: padding
     - s: stride
 
-    TODO: Set up a summary of the network as done i keras like this:
+    TODO: Set up a summary of the network as done in keras like this:
     https://machinelearningmastery.com/how-to-use-transfer-learning-when-developing-convolutional-neural-network-models/
 
     https://medium.com/the-dl/how-to-use-pytorch-hooks-5041d777f904#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjE3MTllYjk1N2Y2OTU2YjU4MThjMTk2OGZmMTZkZmY3NzRlNzA4ZGUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYmYiOjE2MjI2NjQyMjEsImF1ZCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsInN1YiI6IjExODM1OTEyNDY0MDI2OTk0MTUyNyIsImVtYWlsIjoidG9tLmZyb2RlLmhhbnNlbkBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXpwIjoiMjE2Mjk2MDM1ODM0LWsxazZxZTA2MHMydHAyYTJqYW00bGpkY21zMDBzdHRnLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwibmFtZSI6IlRGIEgiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EtL0FPaDE0R2dLRndIMnNaWWdYSllmR1NnSUFGV3luMHZ5b0pTR0dHbDNqQjk3WGc9czk2LWMiLCJnaXZlbl9uYW1lIjoiVEYiLCJmYW1pbHlfbmFtZSI6IkgiLCJpYXQiOjE2MjI2NjQ1MjEsImV4cCI6MTYyMjY2ODEyMSwianRpIjoiMTdiNDU0MWM0MmE2ZGYzODhkZWNiODM5M2U3MGM2ZTI2MGUwZWYzMyJ9.d3yg4Elw-L9JI83_dy6KSYLtkc9e06BS2q22aJBddP520W-CcN6rwwwcSCPDQnNM8lEakpYS1JveVnEIoeo8BVtOOM-GcuImkq0d1o_5Ts8H6m3TvxbP-7VU7vocTThZZkGmWZrrWrhdWjE-LpJ6AS26S1omclyfDt-As3IXOhXozU59Z9EOI_Ap3xarsBO9MKj0Y_LFF_XreTk3-WJ5UfInuK2aZKPRVI3j3YDMmwVj6q4vlky0Coo7MpBbIIRCc5nZic3v-d7g-iq7nfsJzR3t1fR_-9F9JqyC-8RccGIbWYU3fh144eDvhHLP5sx-dUgIRnZTgQwYJNFMOde_4Q

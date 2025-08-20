@@ -33,7 +33,7 @@ def choose_model(model_name: str, params: dict[str, Any]) -> nn.Module:
 
 class ASPP(nn.Module):
     def __init__(self, in_channels, out_channels):
-        super(ASPP, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(
             in_channels, out_channels, kernel_size=1, stride=1, padding=0
         )
@@ -87,7 +87,7 @@ class ASPP(nn.Module):
 
 class FraSegNetVGG19(nn.Module):
     def __init__(self, num_classes=1):
-        super(FraSegNetVGG19, self).__init__()
+        super().__init__()
         # VGG19 Encoder
         self.encoder_block1 = self._conv_block(3, 64, 2)  # [64, 64]
         self.pool1 = nn.MaxPool2d(2, 2)  # 224 -> 112
@@ -114,7 +114,7 @@ class FraSegNetVGG19(nn.Module):
         self.output_layer = nn.Conv2d(64, num_classes, kernel_size=1, stride=1)
 
     def _conv_block(self, in_channels, out_channels, num_layers):
-        layers = []
+        layers: list[nn.Module] = []
         for _ in range(num_layers):
             layers.append(
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)

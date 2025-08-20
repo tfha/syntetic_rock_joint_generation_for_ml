@@ -297,18 +297,18 @@ class TestSplitData:
 
         # Assert
         # Verify file contents
-        with open(raw_dir / "all_files.json", "r") as f:
+        with open(raw_dir / "all_files.json") as f:
             all_files = json.load(f)
             assert len(all_files) == 200  # Same files are duplicated
 
-        with open(model_ready_dir / "train_files.json", "r") as f:
+        with open(model_ready_dir / "train_files.json") as f:
             saved_train = json.load(f)
             assert saved_train == train_list
 
-        with open(model_ready_dir / "val_files.json", "r") as f:
+        with open(model_ready_dir / "val_files.json") as f:
             saved_val = json.load(f)
             assert saved_val == val_list
 
-        with open(model_ready_dir / "test_files.json", "r") as f:
+        with open(model_ready_dir / "test_files.json") as f:
             saved_test = json.load(f)
             assert saved_test == test_list

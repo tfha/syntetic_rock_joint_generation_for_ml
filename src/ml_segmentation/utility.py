@@ -14,16 +14,21 @@ from rich.theme import Theme
 from torch.utils.tensorboard import SummaryWriter
 
 
-def seed_everything(seed: int = 42) -> None:
+def seed_everything(seed: int | None = 42) -> None:
     """
-    Function to set random seed for reproducibility, similar to PyTorch Lightning's seed_everything.
+    Function to set random seed for reproducibility, similar to PyTorch Lightning's
+     seed_everything.
 
     Args:
-        seed (int): The seed value to use for random number generators.
+        seed (int | None): The seed value to use for random number generators. If None,
+        no seeding is performed.
 
     Returns:
         None
     """
+    if seed is None:
+        return  # Skip seeding when None is provided
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -38,10 +43,21 @@ def seed_everything(seed: int = 42) -> None:
     )
 
 
-# Function to create results table
 def create_results_table(
     epoch: int, metrics: dict[str, float], session: str = "Training"
 ) -> Table:
+    """
+    Creates a results table for a given epoch and session with specified metrics.
+    Args:
+        epoch (int): The current epoch number.
+        metrics (dict[str, float]): A dictionary containing metric names as keys and
+        their corresponding values.
+        session (str, optional): The session type, either "Training" or "Validation".
+        Defaults to "Training".
+    Returns:
+        Table: A formatted table displaying the metrics and their values for the given
+        epoch and session.
+    """
     table = Table(title=f"Epoch {epoch + 1} {session} Results")
     table.add_column("Metric", justify="right", style="cyan", no_wrap=True)
     table.add_column("Value", style="magenta")
@@ -67,7 +83,8 @@ def log_metrics_to_tensorboard(
     """
     for metric_name, metric_value in metrics.items():
         writer.add_scalar(f"{prefix}/{metric_name}", metric_value, epoch)
-    writer.flush()  # Flush the writer to ensure that all pending events have been written to disk.
+    writer.flush()  # Flush the writer to ensure that all pending events have been
+    # written to disk.
 
 
 def log_metrics_to_mlflow(
@@ -76,20 +93,22 @@ def log_metrics_to_mlflow(
     model_params: dict[str, Any],
     experiment_strategy: str,
     experiment_name: str,
-    tracking_uri: str = None,
-    hydra_cfg_dir: str = None,
+    tracking_uri: str | Path | None = None,
+    hydra_cfg_dir: str | Path | None = None,
     save_best_metrics: bool = True,
     track_prediction_images: bool = False,
     save_model: bool = False,
 ) -> None:
-    if tracking_uri:
-        mlflow.set_tracking_uri(tracking_uri)
+    if tracking_uri is not None:
+        mlflow.set_tracking_uri(str(tracking_uri))
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run():
         # Log Hydra config files as artifacts if provided
-        if hydra_cfg_dir:
-            hydra_cfg_dir = Path(hydra_cfg_dir)
-            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+        if hydra_cfg_dir is not None:
+            hydra_cfg_dir_path = Path(hydra_cfg_dir)
+            hydra_configs = [
+                f for f in hydra_cfg_dir_path.iterdir() if f.suffix == ".yaml"
+            ]
             hydra_cfg_paths = []
             for config_file in hydra_configs:
                 mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
@@ -106,10 +125,19 @@ def log_metrics_to_mlflow(
                 # Log as MLflow artifact
                 mlflow.log_artifact(str(best_metrics_path))
 
+        # Log JSON files from data/model_ready directory as artifacts
+        model_ready_dir = Path("data/model_ready")
+        if model_ready_dir.exists():
+            json_files = list(model_ready_dir.glob("*.json"))
+            for json_file in json_files:
+                mlflow.log_artifact(str(json_file), artifact_path="dataset_files")
+
         # Log Hydra config files as artifacts if provided
-        if hydra_cfg_dir:
-            hydra_cfg_dir = Path(hydra_cfg_dir)
-            hydra_configs = [f for f in hydra_cfg_dir.iterdir() if f.suffix == ".yaml"]
+        if hydra_cfg_dir is not None:
+            hydra_cfg_dir_path = Path(hydra_cfg_dir)
+            hydra_configs = [
+                f for f in hydra_cfg_dir_path.iterdir() if f.suffix == ".yaml"
+            ]
             hydra_cfg_paths = []
             for config_file in hydra_configs:
                 mlflow.log_artifact(str(config_file), artifact_path="hydra_configs")
@@ -144,7 +172,13 @@ def get_custom_console() -> Console:
 
     """
     custom_theme = Theme(
-        {"info": "bold green", "warning": "yellow", "danger": "bold red"}
+        {
+            "info": "bold green",
+            "warning": "yellow",
+            "danger": "bold red",
+            "error": "bold magenta",
+            "success": "bold blue",
+        }
     )
     return Console(theme=custom_theme)
 
@@ -154,8 +188,8 @@ def modify_filepath(original_path: Path, endsection: str) -> Path:
     Modify the given filepath by appending an endsection before the file extension.
 
     For example:
-    >>> original_path = Path('/ML-MWD-prediction-tabular/data/train.csv')
-    >>> modify_filepath(original_path, '_modified')
+    >>> original_path = Path("/ML-MWD-prediction-tabular/data/train.csv")
+    >>> modify_filepath(original_path, "_modified")
     Path('/ML-MWD-prediction-tabular/data/train_modified.csv')
 
     Parameters:
@@ -196,3 +230,96 @@ def track_sample_num(func: Callable) -> Callable:
         return res
 
     return df_processing
+
+
+if __name__ == "__main__":
+    # Test the export_poetry_to_environment_yml function
+    output_file = "environment.yml"
+    try:
+        # Import from azure_environment instead of deprecated azure_utility
+        from ml_segmentation.azure_environment import export_poetry_to_environment_yml
+
+        result_path = export_poetry_to_environment_yml(output_file=output_file)
+        print(f"Environment file created successfully at: {result_path}")
+    except Exception as e:
+        print(f"An error occurred during the test: {e}")
+
+    # Demonstrate create_results_table and get_custom_console functions
+    console = get_custom_console()
+    console.print("\n=== Custom Console Style Demonstration ===\n")
+
+    # Demonstrate both ways to apply styles: using markup syntax and style parameter
+    console.print("\n=== Method 1: Using markup syntax ===\n")
+    console.print("[info]This is styled with 'info' (bold green)[/info]")
+    console.print("[warning]This is styled with 'warning' (yellow)[/warning]")
+    console.print("[danger]This is styled with 'danger' (bold red)[/danger]")
+    console.print("[error]This is styled with 'error' (bold magenta)[/error]")
+
+    console.print("\n=== Method 2: Using style parameter ===\n")
+    console.print("This is styled with 'info' (bold green)", style="info")
+    console.print("This is styled with 'warning' (yellow)", style="warning")
+    console.print("This is styled with 'danger' (bold red)", style="danger")
+    console.print("This is styled with 'error' (bold magenta)", style="error")
+
+    # Show examples of styles in different contexts using style parameter
+    console.print("\n=== Practical Examples Using Style Parameter ===\n")
+    console.print("INFO: Model training complete. Accuracy: 92.5%", style="info")
+    console.print(
+        "WARNING: Learning rate may be too high. Consider reducing it.", style="warning"
+    )
+    console.print(
+        "DANGER: Out of memory error detected. Process will be terminated.",
+        style="danger",
+    )
+    console.print(
+        "ERROR: Failed to load dataset from path: /data/train.csv", style="error"
+    )
+
+    # Example metrics for demonstration
+    example_metrics = {
+        "loss": 0.2345,
+        "accuracy": 0.9123,
+        "precision": 0.8978,
+        "recall": 0.8765,
+    }
+
+    console.print("\n=== Results Tables ===\n")
+    # Create and display training results table
+    training_table = create_results_table(
+        epoch=0, metrics=example_metrics, session="Training"
+    )
+    console.print(training_table)
+
+    # Create and display validation results table
+    validation_table = create_results_table(
+        epoch=0, metrics=example_metrics, session="Validation"
+    )
+    console.print(validation_table)
+
+    # Demonstrate combining style parameter with other formatting
+    console.print("\n=== Mixing Style Parameter with Other Formatting ===\n")
+    console.print("Starting data preprocessing...", style="info")
+    console.print("Loading training dataset: ", end="")
+    console.print("100% complete", style="bold")
+    console.print("Processing images: ", end="")
+    console.print("100% complete", style="bold")
+    console.print("Data preprocessing complete!", style="info")
+
+    # Simulate training progress with style parameter
+    console.print("\n=== Training Progress Using Style Parameter ===\n")
+    console.print(
+        "Epoch 1/10: Training accuracy: 85.2%, Validation accuracy: 83.7%", style="info"
+    )
+    console.print(
+        "Epoch 2/10: Training accuracy: 87.9%, Validation accuracy: 86.1%", style="info"
+    )
+    console.print("Epoch 3/10: Learning rate reduced due to plateau", style="warning")
+    console.print(
+        "Epoch 3/10: Training accuracy: 88.5%, Validation accuracy: 87.2%", style="info"
+    )
+    console.print("Epoch 4/10: CUDA out of memory. Batch size reduced.", style="error")
+    console.print(
+        "Epoch 4/10: Training accuracy: 89.7%, Validation accuracy: 88.3%", style="info"
+    )
+    console.print("Training stopped: Early stopping triggered", style="danger")
+    console.print("Best model saved with validation accuracy: 88.3%", style="info")
