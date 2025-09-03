@@ -120,7 +120,7 @@ python_version = "3.11"
 check_untyped_defs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
-files = ["src", "tests"]
+files = ["src", "tests", "scripts"]
 
 [tool.coverage.report]
 show_missing = true

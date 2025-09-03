@@ -1,5 +1,8 @@
-# to update versions run: pre-commit autoupdate
-# to install pre-commit hooks run: pre-commit install
+# USAGE
+#########################################################
+# update hooks by calling: pre-commit autoupdate
+# run hooks on all files by calling: pre-commit run --all-files
+# install hooks by calling: pre-commit install
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
