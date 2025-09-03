@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import mlflow
+import torch
 from azure.ai.ml import MLClient
 from azure.ai.ml.constants import AssetTypes
 from azure.ai.ml.entities import Data
@@ -80,6 +81,9 @@ def setup_azure_dataloader(
     num_workers: int,
     optional_transforms: bool = False,
     splits_path: Path | None = None,
+    device: torch.device | None = None,
+    pin_memory: bool | None = None,
+    persistent_workers: bool | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
@@ -181,27 +185,45 @@ def setup_azure_dataloader(
         images_path, labels_path, test_list, transform=transforms_dict["test"]
     )
 
+    # Resolve DataLoader performance flags
+    if pin_memory is None:
+        if device is not None:
+            pin_memory = device.type == "cuda"
+        else:
+            pin_memory = torch.cuda.is_available()
+    if persistent_workers is None:
+        persistent_workers = num_workers > 0
+
+    console.print(
+        f"Dataloader settings -> batch_size={batch_size}, num_workers={num_workers}, "
+        f"pin_memory={pin_memory}, persistent_workers={persistent_workers}",
+        style="info",
+    )
+
     # Create data loaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
 
     return train_loader, val_loader, test_loader

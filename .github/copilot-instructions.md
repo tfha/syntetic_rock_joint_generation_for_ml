@@ -25,7 +25,7 @@ Avoid (unless explicitly requested):
 - Large data downloads, training runs, or long-running experiments
 - Changes that alter default behavior without tests and justification
 
-### Build, lint, and test
+### Format, lint, and test
 
 Prerequisites: Python 3.11 and Poetry. If a `copilot-setup-steps.yml` is present, Copilot should use it to preinstall dependencies and set up its cloud environment.
 

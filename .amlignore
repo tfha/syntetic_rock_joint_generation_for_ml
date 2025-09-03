@@ -1,0 +1,33 @@
+# Azure ML code upload ignore list
+# Exclude large/local or generated content to speed up submissions
+
+# VCS and metadata
+.git/
+.gitignore
+.gitattributes
+
+# Python environments and caches
+.venv/
+.env
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Data and outputs (not needed in code snapshot)
+data/
+experiments/
+models/
+plots/
+mlruns/
+outputs/
+
+# Notebooks outputs are large; include notebooks but ignore checkpoints above
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

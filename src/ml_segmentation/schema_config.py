@@ -123,6 +123,27 @@ class ExperimentConfig(BaseModel):
         False,
         description="Flag to control whether to download outputs after job completion.",
     )
+    smoke_test: bool = Field(
+        False,
+        description=(
+            "If true, submit a lightweight smoke test job instead of full training. "
+            "Useful for validating compute, CUDA, drivers, and dataset mounts in Azure ML."
+        ),
+    )
+    smoke_test_use_cuda: bool = Field(
+        False,
+        description=(
+            "If true, the smoke test will attempt to use CUDA; when false, the smoke test "
+            "forces CPU to avoid potential driver/library segfaults."
+        ),
+    )
+    smoke_test_minimal: bool = Field(
+        False,
+        description=(
+            "If true (together with smoke_test), runs a ultra-minimal environment probe that "
+            "only runs nvidia-smi and imports torch, without touching the rest of the codebase."
+        ),
+    )
 
 
 class DatasetConfig(BaseModel):

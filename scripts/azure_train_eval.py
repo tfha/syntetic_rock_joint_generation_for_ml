@@ -224,6 +224,9 @@ def main(cfg: DictConfig) -> None:
         num_workers=pcfg.experiment.num_workers,
         optional_transforms=pcfg.experiment.optional_transforms,
         splits_path=splits_path,
+        device=device,  # let function decide pin_memory
+        pin_memory=None,  # auto: True on CUDA, False on CPU
+        persistent_workers=None,  # auto: True if num_workers > 0
     )
 
     # 6. Initialize model architecture
@@ -236,9 +239,9 @@ def main(cfg: DictConfig) -> None:
 
     # Log model info if possible
     try:
-        model_stats = summary(
-            model, input_size=(pcfg.model.batch_size, 3, 224, 224), verbose=0
-        )
+        with torch.no_grad():
+            # Use batch size = 1 to avoid large GPU allocations during summary
+            model_stats = summary(model, input_size=(1, 3, 224, 224), verbose=0)
         with open(output_dir / "model_summary.txt", "w") as f:
             f.write(str(model_stats))
         mlflow.log_artifact(str(output_dir / "model_summary.txt"))

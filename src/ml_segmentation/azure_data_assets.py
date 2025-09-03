@@ -1075,7 +1075,7 @@ def _validate_data_asset_permissions(ml_client: MLClient, console: Console) -> N
     """Validate permissions to access data assets."""
     try:
         console.print("Verifying data asset permissions...", style="info")
-        assets = ml_client.data.list(max_results=5)
+        assets = ml_client.data.list()
         asset_count = sum(1 for _ in assets)
         console.print(
             f"✓ Verified access to {asset_count} data assets", style="success"

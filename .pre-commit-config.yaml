@@ -1,5 +1,8 @@
-# to update versions run: pre-commit autoupdate
-# to install pre-commit hooks run: pre-commit install
+# USAGE
+#########################################################
+# update hooks by calling: pre-commit autoupdate
+# run hooks on all files by calling: pre-commit run --all-files
+# install hooks by calling: pre-commit install
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
@@ -45,3 +48,20 @@ repos:
       args:
         - "--profile"
         - "black"
+
+# -   repo: https://github.com/PyCQA/bandit
+#     rev: 1.7.9
+#     hooks:
+#     - id: bandit
+
+# -   repo: https://github.com/safety-dev/safety
+#     rev: 3.2.6
+#     hooks:
+#     - id: safety
+#       name: safety (check poetry.lock)
+#       pass_filenames: false
+#       args:
+#         - "check"
+#         - "--file=poetry.lock"
+#         - "--full-report"
+#         - "--disable-telemetry"
