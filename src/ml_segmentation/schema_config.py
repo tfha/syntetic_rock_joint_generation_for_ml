@@ -123,6 +123,13 @@ class ExperimentConfig(BaseModel):
         False,
         description="Flag to control whether to download outputs after job completion.",
     )
+    smoke_test: bool = Field(
+        False,
+        description=(
+            "If true, submit a lightweight smoke test job instead of full training. "
+            "Useful for validating compute, CUDA, drivers, and dataset mounts in Azure ML."
+        ),
+    )
 
 
 class DatasetConfig(BaseModel):

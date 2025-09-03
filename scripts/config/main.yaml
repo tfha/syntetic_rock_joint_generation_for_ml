@@ -72,6 +72,7 @@ experiment:
   crossvalidation: false
   path_example_images: ${path_project}/experiments/example_images
   download_outputs: false  # Flag to control whether to download outputs after job completion in Azure ML
+  smoke_test: false        # If true, submit a lightweight smoke test job instead of full training
   experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:

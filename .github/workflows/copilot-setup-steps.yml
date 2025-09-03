@@ -72,3 +72,11 @@ jobs:
           if [ -d tests ]; then
             poetry run pytest --collect-only -q || true
           fi
+
+      - name: Install pre-commit
+        run: python -m pip install pre-commit
+
+      - name: Security checks (Bandit and Safety via pre-commit)
+        run: |
+          pre-commit run --all-files bandit
+          pre-commit run --all-files safety

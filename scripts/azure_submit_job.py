@@ -105,12 +105,18 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     azure_experiment_name = pcfg.azure_ml.experiment_name
 
-    # Training command
-    train_command = (
-        f"python scripts/azure_train_eval.py "
-        f"model={pcfg.model.name} "
-        f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
-    )
+    # Command to execute (smoke test or full training)
+    if pcfg.experiment.smoke_test:
+        console.print(
+            "Smoke test flag is set: submitting azure_smoke_test.py", style="warning"
+        )
+        train_command = "python scripts/azure_smoke_test.py"
+    else:
+        train_command = (
+            f"python scripts/azure_train_eval.py "
+            f"model={pcfg.model.name} "
+            f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
+        )
 
     # Job inputs
     job_inputs = {

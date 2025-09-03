@@ -73,27 +73,45 @@ def get_dataloaders(
     batch_size: int = 4,
     shuffle: bool = True,
     num_workers: int = 2,
+    device: torch.device | None = None,
+    pin_memory: bool | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
+    """
+    Build DataLoaders with sensible defaults:
+    - pin_memory True only when using CUDA (or if explicitly set)
+    - persistent_workers only when num_workers > 0
+    """
+    if pin_memory is None:
+        if device is not None:
+            pin_memory = device.type == "cuda"
+        else:
+            pin_memory = torch.cuda.is_available()
+
+    persistent_workers = num_workers > 0
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
     return train_loader, val_loader, test_loader
 

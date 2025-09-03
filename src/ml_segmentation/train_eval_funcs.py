@@ -1,5 +1,5 @@
-import random
 from collections.abc import Sized
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +155,13 @@ def train_one_epoch(
 
         optimizer.zero_grad()  # Zero the parameter gradients
 
-        with torch.amp.autocast(device_type="cuda"):  # Mixed precision training
+        # Match autocast to active device; disable on CPU to avoid crashes
+        amp_ctx = (
+            torch.amp.autocast(device_type=device.type)
+            if device.type == "cuda"
+            else nullcontext()
+        )
+        with amp_ctx:
             # Forward pass
             outputs = model(images)
             loss = criterion(outputs, masks)
@@ -170,13 +176,14 @@ def train_one_epoch(
         # optimizer sees gradients that are of the right scale, and the optimizer’s
         # internal heuristics can be used as intended. This will typically improve the
         # numerical stability of training.
-        scaler.scale(loss).backward()
-        scaler.unscale_(
-            optimizer
-        )  # unscale the gradients of optimizer's assigned params in-place before the
-        # optimizer's step
-        scaler.step(optimizer)
-        scaler.update()
+        if device.type == "cuda" and scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         running_loss += loss.item() * images.size(0)
 
@@ -253,7 +260,12 @@ def validate_one_epoch(
 
             images, masks = images.to(device), masks.to(device)
 
-            with torch.amp.autocast(device_type="cuda"):
+            amp_ctx = (
+                torch.amp.autocast(device_type=device.type)
+                if device.type == "cuda"
+                else nullcontext()
+            )
+            with amp_ctx:
                 # Forward pass
                 outputs = model(images)
                 loss = criterion(outputs, masks)
@@ -421,49 +433,51 @@ def save_image_predictions(
         None.
     """
     model.eval()
-    samples = random.sample(list(dataloader), num_samples)
-
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    for idx, (images, masks) in enumerate(samples):
-        images, masks = images.to(device), masks.to(device)
-        with torch.no_grad():
+    collected = 0
+    with torch.no_grad():
+        for images, masks in dataloader:
+            images, masks = images.to(device), masks.to(device)
             preds = torch.sigmoid(model(images)) > threshold
 
-        # Convert tensors to CPU for plotting
-        images_np: np.ndarray = images.cpu().numpy()
-        masks_np: np.ndarray = 1 - masks.cpu().numpy()  # invert for display
-        preds_np: np.ndarray = 1 - preds.cpu().numpy()  # invert for display
+            batch_size = images.size(0)
+            for b in range(batch_size):
+                if collected >= num_samples:
+                    break
 
-        # Plot original image, true mask, and predicted mask
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+                # Move only the single sample to CPU/NumPy to reduce memory
+                img_np: np.ndarray = images[b].detach().cpu().numpy()
+                mask_np: np.ndarray = 1 - masks[b].detach().cpu().numpy()  # invert
+                pred_np: np.ndarray = 1 - preds[b].detach().cpu().numpy()  # invert
 
-        # Normalize and transpose image correctly for display
-        img_to_display = images_np[0].transpose(1, 2, 0)  # Move channels to the end
-        img_to_display = (img_to_display - img_to_display.min()) / (
-            img_to_display.max() - img_to_display.min() + 1e-8
-        )
+                fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-        axes[0].imshow(img_to_display)  # Already transposed above
-        axes[0].set_title("Original Image")
-        axes[1].imshow(masks_np[0][0], cmap="gray")
-        axes[1].set_title("True Mask")
-        axes[2].imshow(preds_np[0][0], cmap="gray")
-        axes[2].set_title("Predicted Mask")
+                img_to_display = img_np.transpose(1, 2, 0)
+                img_to_display = (img_to_display - img_to_display.min()) / (
+                    img_to_display.max() - img_to_display.min() + 1e-8
+                )
 
-        # Remove axes
-        for ax in axes:
-            ax.axis("off")
+                axes[0].imshow(img_to_display)
+                axes[0].set_title("Original Image")
+                axes[1].imshow(mask_np[0], cmap="gray")
+                axes[1].set_title("True Mask")
+                axes[2].imshow(pred_np[0], cmap="gray")
+                axes[2].set_title("Predicted Mask")
 
-        # Create a unique filename
-        filename = f"sample_{idx}"
-        if epoch is not None:
-            filename = f"{filename}_epoch_{epoch}"
-        if exp_tag is not None:
-            filename = f"{filename}_{exp_tag}"
+                for ax in axes:
+                    ax.axis("off")
 
-        # Save the figure
-        save_dir.mkdir(parents=True, exist_ok=True)
-        save_path = save_dir / f"{filename}.png"
-        plt.savefig(save_path)
-        plt.close(fig)
+                filename = f"sample_{collected}"
+                if epoch is not None:
+                    filename = f"{filename}_epoch_{epoch}"
+                if exp_tag is not None:
+                    filename = f"{filename}_{exp_tag}"
+
+                plt.savefig(save_dir / f"{filename}.png")
+                plt.close(fig)
+
+                collected += 1
+
+            if collected >= num_samples:
+                break
