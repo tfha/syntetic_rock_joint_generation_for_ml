@@ -16,7 +16,6 @@ from datetime import datetime
 from pathlib import Path
 
 import hydra
-import torch
 from omegaconf import DictConfig, OmegaConf
 
 from ml_segmentation.azure_core import configure_azure_logging
@@ -66,19 +65,41 @@ def main(cfg: DictConfig) -> None:
     lines.append(f"Python: {platform.python_version()}")
     lines.append(f"Platform: {platform.platform()}")
 
-    # Torch/CUDA info
+    # Parse config (lightweight)
+    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+    if not isinstance(cfg_dict, dict):
+        raise TypeError("Expected Hydra cfg to be convertible to dict")
+    pcfg = ConfigSchema(**cfg_dict)  # type: ignore[arg-type]
+
+    # Optionally force CPU to avoid CUDA-related segfaults in smoke test
+    if not pcfg.experiment.smoke_test_use_cuda:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable CUDA for this process
+        # Reduce thread usage to avoid OMP/MKL-related contention
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+    # Defer torch import to honor CUDA visibility settings above
+    import torch  # noqa: WPS433 - intentional deferred import for env control
+
+    # Torch/CUDA info (guarded)
     lines.append(f"torch: {torch.__version__}")
-    cuda_available = torch.cuda.is_available()
+    cuda_available = (
+        bool(pcfg.experiment.smoke_test_use_cuda) and torch.cuda.is_available()
+    )
+    lines.append(f"cuda_requested: {pcfg.experiment.smoke_test_use_cuda}")
     lines.append(f"cuda_available: {cuda_available}")
     if cuda_available:
-        lines.append(f"cuda_device_count: {torch.cuda.device_count()}")
-        lines.append(f"current_device: {torch.cuda.current_device()}")
-        lines.append(f"device_name: {torch.cuda.get_device_name(0)}")
-        # allocate a tiny tensor and do a small op
-        x = torch.randn(4, 4, device="cuda")
-        y = torch.randn(4, 4, device="cuda")
-        z = (x @ y).sum().item()
-        lines.append(f"tiny_cuda_op_result: {z}")
+        try:
+            lines.append(f"cuda_device_count: {torch.cuda.device_count()}")
+            lines.append(f"current_device: {torch.cuda.current_device()}")
+            lines.append(f"device_name: {torch.cuda.get_device_name(0)}")
+            # allocate a tiny tensor and do a small op
+            x = torch.randn(4, 4, device="cuda")
+            y = torch.randn(4, 4, device="cuda")
+            z = (x @ y).sum().item()
+            lines.append(f"tiny_cuda_op_result: {z}")
+        except Exception as e:  # pragma: no cover - best-effort
+            lines.append(f"cuda_probe_exception: {e}")
 
     # nvidia-smi if present
     smi = shutil.which("nvidia-smi")
@@ -124,14 +145,8 @@ def main(cfg: DictConfig) -> None:
     lines.append("images_head:\n" + "\n".join(list_head(images_path)))
     lines.append("masks_head:\n" + "\n".join(list_head(masks_path)))
 
-    # Parse config (lightweight)
-    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-    if not isinstance(cfg_dict, dict):
-        raise TypeError("Expected Hydra cfg to be convertible to dict")
-    pcfg = ConfigSchema(**cfg_dict)  # type: ignore[arg-type]
-
     # Device selection
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if cuda_available else "cpu")
     lines.append(f"device: {device}")
 
     # Try creating dataloaders with batch_size=1
@@ -141,12 +156,13 @@ def main(cfg: DictConfig) -> None:
             images_path=images_path,
             labels_path=masks_path,
             batch_size=1,
-            num_workers=min(1, pcfg.experiment.num_workers),
+            # Be conservative to avoid /dev/shm & worker issues on small nodes
+            num_workers=0,
             optional_transforms=pcfg.experiment.optional_transforms,
             splits_path=splits_path if splits_path.exists() else None,
             device=device,
-            pin_memory=None,
-            persistent_workers=None,
+            pin_memory=False,
+            persistent_workers=False,
         )
         lines.append("dataloaders: created OK (batch_size=1)")
     except Exception as e:  # pragma: no cover - diagnostics path
@@ -172,7 +188,7 @@ def main(cfg: DictConfig) -> None:
 
         amp_ctx = (
             torch.amp.autocast(device_type=device.type)
-            if device.type == "cuda"
+            if cuda_available and device.type == "cuda"
             else nullcontext()
         )
         with torch.no_grad():
@@ -183,8 +199,11 @@ def main(cfg: DictConfig) -> None:
         )
         # Clean up tiny tensors
         del images, outputs, model
-        if device.type == "cuda":
-            torch.cuda.empty_cache()
+        if cuda_available and device.type == "cuda":
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
         lines.append("forward_cleanup_done: True")
     except Exception as e:  # pragma: no cover - diagnostics path
         lines.append(f"forward_exception: {e}")

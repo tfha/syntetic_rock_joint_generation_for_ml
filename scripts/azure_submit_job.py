@@ -19,6 +19,7 @@ This script handles:
 6. Output management and retrieval
 """
 
+import logging
 import warnings
 from datetime import datetime
 from typing import Any
@@ -54,6 +55,8 @@ def main(cfg: DictConfig) -> None:
 
     # Configure logging and warnings to reduce verbose Azure client output
     configure_azure_logging()
+    # Quiet overly chatty urllib3 pool warnings during blob uploads
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
     warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
     warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
 

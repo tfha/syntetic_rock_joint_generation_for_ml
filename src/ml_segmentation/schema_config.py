@@ -130,6 +130,13 @@ class ExperimentConfig(BaseModel):
             "Useful for validating compute, CUDA, drivers, and dataset mounts in Azure ML."
         ),
     )
+    smoke_test_use_cuda: bool = Field(
+        False,
+        description=(
+            "If true, the smoke test will attempt to use CUDA; when false, the smoke test "
+            "forces CPU to avoid potential driver/library segfaults."
+        ),
+    )
 
 
 class DatasetConfig(BaseModel):
