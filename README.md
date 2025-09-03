@@ -556,7 +556,19 @@ python scripts/azure_submit_job.py model=deeplabv3 experiment.experiment_strateg
 
 ##### Quick smoke test on Azure compute
 
-Before running full training, you can verify the compute, CUDA drivers, and dataset mounts with a lightweight smoke test. This will not train; it performs environment checks and a single model forward pass with batch_size=1 and then exits.
+Before running full training, you can verify the compute, CUDA drivers, and dataset mounts with a lightweight smoke test. This will not train; it performs environment checks and a single model forward pass with batch_size=1 and then exits. There are two smoke tests, one minimal called `azure_smoke_min.py` and a full test called `azure_smoke_test.py`.
+
+First run the minimal smoke test:
+
+```sh
+python scripts/azure_submit_job.py experiment.smoke_test=true experiment.smoke_test_minimal=true
+```
+
+Optionally you can run with cuda off if you want to test the CPU-only path:
+
+```sh
+python scripts/azure_submit_job.py experiment.smoke_test=true experiment.smoke_test_minimal=true experiment.smoke_test_use_cuda=false
+```
 
 Run the smoke test:
 

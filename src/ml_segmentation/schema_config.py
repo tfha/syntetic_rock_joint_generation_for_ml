@@ -137,6 +137,13 @@ class ExperimentConfig(BaseModel):
             "forces CPU to avoid potential driver/library segfaults."
         ),
     )
+    smoke_test_minimal: bool = Field(
+        False,
+        description=(
+            "If true (together with smoke_test), runs a ultra-minimal environment probe that "
+            "only runs nvidia-smi and imports torch, without touching the rest of the codebase."
+        ),
+    )
 
 
 class DatasetConfig(BaseModel):

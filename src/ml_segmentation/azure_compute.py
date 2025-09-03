@@ -53,7 +53,8 @@ def check_compute_permissions(
 
         # Test basic workspace access
         try:
-            _ = list(ml_client.datastores.list(max_results=1))
+            # Some SDK versions don't support max_results; just iterate one item
+            _ = next(iter(ml_client.datastores.list()), None)
             permissions["workspace_access"] = True
             console.print("✓ Workspace access confirmed", style="success")
         except Exception:

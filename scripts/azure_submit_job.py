@@ -40,6 +40,7 @@ from ml_segmentation.azure_data_assets import (
     get_data_asset,
     retrieve_and_validate_data_assets,
 )
+from ml_segmentation.azure_diagnostics import preflight_storage_permissions
 from ml_segmentation.azure_jobs import (
     download_job_outputs,
     get_job_details,
@@ -57,6 +58,8 @@ def main(cfg: DictConfig) -> None:
     configure_azure_logging()
     # Quiet overly chatty urllib3 pool warnings during blob uploads
     logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+    # Reduce msrest serialization warnings like 'pathOnCompute is not a known attribute'
+    logging.getLogger("msrest.serialization").setLevel(logging.ERROR)
     warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
     warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
 
@@ -104,16 +107,31 @@ def main(cfg: DictConfig) -> None:
     compute_cluster_name = pcfg.azure_ml.compute_name
     validate_and_refresh_compute(ml_client, console, compute_cluster_name)
 
+    # Only run preflight if we plan to mount inputs (skip for minimal smoke)
+    if not (
+        pcfg.experiment.smoke_test
+        and getattr(pcfg.experiment, "smoke_test_minimal", False)
+    ):
+        preflight_storage_permissions(ml_client, console, compute_cluster_name)
+
     # 5. Configure job parameters
     ###########################################
     azure_experiment_name = pcfg.azure_ml.experiment_name
 
     # Command to execute (smoke test or full training)
     if pcfg.experiment.smoke_test:
-        console.print(
-            "Smoke test flag is set: submitting azure_smoke_test.py", style="warning"
-        )
-        train_command = "python scripts/azure_smoke_test.py"
+        if getattr(pcfg.experiment, "smoke_test_minimal", False):
+            console.print(
+                "Smoke test (minimal) is set: submitting azure_smoke_min.py",
+                style="warning",
+            )
+            train_command = "python scripts/azure_smoke_min.py"
+        else:
+            console.print(
+                "Smoke test flag is set: submitting azure_smoke_test.py",
+                style="warning",
+            )
+            train_command = "python scripts/azure_smoke_test.py"
     else:
         train_command = (
             f"python scripts/azure_train_eval.py "
@@ -122,11 +140,17 @@ def main(cfg: DictConfig) -> None:
         )
 
     # Job inputs
-    job_inputs = {
-        "images_data": Input(type="uri_folder", path=images_dataset.id),
-        "masks_data": Input(type="uri_folder", path=masks_dataset.id),
-        "splits_data": Input(type="uri_folder", path=splits_dataset.id),
-    }
+    if pcfg.experiment.smoke_test and getattr(
+        pcfg.experiment, "smoke_test_minimal", False
+    ):
+        # Minimal smoke does not require dataset mounts; avoid triggering mount permissions
+        job_inputs: dict[str, Any] = {}
+    else:
+        job_inputs = {
+            "images_data": Input(type="uri_folder", path=images_dataset.id),
+            "masks_data": Input(type="uri_folder", path=masks_dataset.id),
+            "splits_data": Input(type="uri_folder", path=splits_dataset.id),
+        }
 
     # Job outputs
     job_outputs = {
@@ -172,6 +196,17 @@ def main(cfg: DictConfig) -> None:
     console.print("Creating Azure ML job...", style="info")
 
     # Create job using Azure ML SDK command()
+    # Optional environment variables for smoke tests
+    env_vars: dict[str, str] | None = None
+    if pcfg.experiment.smoke_test:
+        # Signal minimal smoke whether to try CUDA; default is CPU only
+        env_vars = {
+            "SMOKE_USE_CUDA": ("1" if pcfg.experiment.smoke_test_use_cuda else "0")
+        }
+        # Also proactively limit CUDA visibility when CPU-only to avoid early driver init
+        if not pcfg.experiment.smoke_test_use_cuda:
+            env_vars["CUDA_VISIBLE_DEVICES"] = ""
+
     job = command(
         code="./",
         command=train_command,
@@ -183,6 +218,7 @@ def main(cfg: DictConfig) -> None:
         outputs=job_outputs,
         tags=run_metadata,
         identity=ManagedIdentityConfiguration(),
+        environment_variables=env_vars,
     )
 
     console.print("Submitting job to Azure ML...", style="info")

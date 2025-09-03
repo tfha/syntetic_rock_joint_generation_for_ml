@@ -19,6 +19,66 @@ from ml_segmentation.azure_compute import validate_and_refresh_compute
 from ml_segmentation.azure_core import configure_azure_logging
 
 
+def preflight_storage_permissions(
+    ml_client: MLClient, console: Console, compute_name: str
+) -> None:
+    """Surface compute identity and default datastore information before mounts.
+
+    Prints the compute principalId and the default datastore account/container,
+    with guidance on assigning the 'Storage Blob Data Reader' role to the
+    compute identity at the storage account scope if mounting fails.
+    """
+    console.print("Preflight: checking storage and identity context...", style="info")
+    # Compute principal ID
+    try:
+        comp = ml_client.compute.get(compute_name)
+        principal_id = getattr(
+            getattr(comp, "identity", None), "principal_id", None
+        ) or getattr(getattr(comp, "identity", None), "principalId", None)
+        if principal_id:
+            console.print(f"• Compute principalId: {principal_id}", style="info")
+        else:
+            console.print("• Compute principalId: <unknown>", style="warning")
+    except Exception as e:
+        console.print(f"• Could not read compute identity: {e}", style="warning")
+
+    # Default datastore details (usually workspaceblobstore)
+    try:
+        default_ds = None
+        for ds in ml_client.datastores.list():
+            # Prefer explicit default when available; fallback to name match
+            if getattr(ds, "is_default", False) or ds.name == "workspaceblobstore":
+                default_ds = ds
+                break
+        if default_ds is None:
+            default_ds = next(iter(ml_client.datastores.list()), None)
+        if default_ds is not None:
+            account = getattr(default_ds, "account_name", "<unknown>")
+            container = getattr(
+                default_ds,
+                "container_name",
+                getattr(default_ds, "container", "<unknown>"),
+            )
+            console.print(
+                f"• Default datastore: {default_ds.name} (acct={account}, container={container})",
+                style="info",
+            )
+            # Provide guidance for role assignment
+            console.print(
+                "If input mounting fails with PermissionDenied, assign 'Storage Blob Data Reader' to the compute identity on the storage account.",
+                style="warning",
+            )
+            console.print(
+                "Required scope: /subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.Storage/storageAccounts/"
+                + str(account),
+                style="info",
+            )
+        else:
+            console.print("• Could not resolve a default datastore.", style="warning")
+    except Exception as e:
+        console.print(f"• Could not list datastores: {e}", style="warning")
+
+
 def _test_permission_check(ml_client: MLClient, console: Console) -> None:
     """Test basic permission checking functionality."""
     console.print("Testing permission checks...", style="info")
@@ -40,7 +100,9 @@ def _test_data_asset_retrieval(ml_client: MLClient, console: Console) -> None:
 
     try:
         # Test getting a data asset (this might fail if none exist)
-        assets = list(ml_client.data.list(max_results=1))
+        # Avoid max_results for compatibility across SDK versions
+        first = next(iter(ml_client.data.list()), None)
+        assets = [first] if first else []
 
         if assets:
             asset = assets[0]
