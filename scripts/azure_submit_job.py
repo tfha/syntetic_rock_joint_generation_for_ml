@@ -133,6 +133,16 @@ def main(cfg: DictConfig) -> None:
             )
             train_command = "python scripts/azure_smoke_test.py"
     else:
+        # Standard training command - switch between traditional and Lightning
+        # For Lightning training (recommended for stability):
+        # train_command = (
+        #     f"python scripts/azure_train_eval_lightning.py "
+        #     f"model={pcfg.model.name} "
+        #     f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
+        #     f"lightning.use_lightning=true "
+        # )
+
+        # Traditional training (current default):
         train_command = (
             f"python scripts/azure_train_eval.py "
             f"model={pcfg.model.name} "
