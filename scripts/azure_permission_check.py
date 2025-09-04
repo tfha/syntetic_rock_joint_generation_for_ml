@@ -12,8 +12,14 @@ import shutil
 import subprocess
 import sys
 import traceback
+from pathlib import Path
+from typing import Any, cast
 
 from dotenv import load_dotenv
+from omegaconf import OmegaConf
+
+# Validate config using our Pydantic schema (repository convention)
+from ml_segmentation.schema_config import ConfigSchema
 
 
 def main() -> int:
@@ -77,15 +83,22 @@ def main() -> int:
         traceback.print_exc()
         return 5
 
-    # Additional check: does the configured compute have storage access?
-    compute_name = (
-        os.getenv("AZURE_ML_COMPUTE")
-        or os.getenv("AZURE_COMPUTE_NAME")
-        or os.getenv("AML_COMPUTE")
-    )
-    if not compute_name:
+    # Additional check: does the configured compute (from config) have storage access?
+    compute_name: str | None = None
+    try:
+        # Load config from scripts/config/main.yaml relative to this script
+        cfg_path = Path(__file__).resolve().parent / "config" / "main.yaml"
+        if not cfg_path.exists():
+            raise FileNotFoundError(f"Config file not found: {cfg_path}")
+
+        cfg = OmegaConf.load(str(cfg_path))
+        cfg_obj = OmegaConf.to_object(cfg)
+        pcfg = ConfigSchema(**cast(dict[str, Any], cfg_obj))
+        compute_name = pcfg.azure_ml.compute_name
+    except Exception as e:
         print(
-            "[Info] Skipping compute-to-storage RBAC check: set AZURE_ML_COMPUTE (or AZURE_COMPUTE_NAME) to enable."
+            f"[Info] Could not load compute from config (scripts/config/main.yaml): {e}.\n"
+            "Skipping compute-to-storage RBAC check."
         )
         return 0
 
