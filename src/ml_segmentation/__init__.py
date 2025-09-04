@@ -66,6 +66,15 @@ from .azure_jobs import (
     handle_log_streaming_error,
 )
 
+# Lightning modules for PyTorch Lightning training
+from .lightning_callbacks import (
+    ImagePredictionCallback,
+    MLflowCallback,
+    ModelCheckpointCallback,
+)
+from .lightning_datamodule import SegmentationDataModule
+from .lightning_module import SegmentationLightningModule
+
 __version__ = "2.0.0"
 __author__ = "ML Segmentation Team"
 
@@ -97,6 +106,12 @@ __all__ = [
     # Data loading
     "create_azure_datasets",
     "setup_azure_dataloader",
+    # Lightning modules
+    "SegmentationLightningModule",
+    "SegmentationDataModule",
+    "MLflowCallback",
+    "ImagePredictionCallback",
+    "ModelCheckpointCallback",
     # Environment management
     "export_poetry_to_environment_yml",
     "test_environment_export",

@@ -24,8 +24,8 @@ azure_ml:
   environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
   environment_version: "1"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
-  use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one
-  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # The name of the curated environment to use if use_curated_env is true
+  use_curated_env: true  # Whether to use a curated AzureML environment instead of custom one - recommended for Lightning
+  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # PyTorch 2.2 with CUDA 12.1 - compatible with Lightning
   base_docker_image: "mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
   # base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04"  # Base docker image for custom environments with CUDA 12.4 support
 # Alternatives:
@@ -54,6 +54,16 @@ azure_data_assets:
   version2: null    # Second version for comparison
   # Output directory for logs
   output_dir: outputs/azure_data_assets/${now:%Y-%m-%d_%H-%M-%S}
+
+# PyTorch Lightning configuration
+lightning:
+  use_lightning: false  # Set to true to use PyTorch Lightning training
+  precision: "16-mixed"  # Precision mode: "16-mixed", "32", "bf16-mixed"
+  gradient_clip_val: 1.0  # Gradient clipping value for stability
+  accumulate_grad_batches: 1  # Number of batches to accumulate gradients over
+  save_predictions_every_n_epochs: 10  # Save prediction images every N epochs
+  max_prediction_images: 5  # Maximum number of prediction images to save
+  deterministic: true  # Use deterministic algorithms for reproducibility
 
 experiment:
   seed: 42

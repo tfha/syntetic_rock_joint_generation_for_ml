@@ -20,9 +20,9 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock README.md ./
 # Copy source code first since Poetry needs it to install the package
 COPY src/ ./src
-# does not install development libraries
+# does not install development libraries - PyTorch Lightning is included in main dependencies
 RUN poetry install --without dev --no-ansi --no-interaction
-# pulls torch-2.3.1+cu121
+# pulls torch-2.3.1+cu121 and pytorch-lightning
 
 ENV PYTHONPATH=/app/src
 

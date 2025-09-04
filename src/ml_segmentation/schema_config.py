@@ -249,6 +249,32 @@ class AzureDataAssetsConfig(BaseModel):
     )
 
 
+class LightningConfig(BaseModel):
+    """Configuration for PyTorch Lightning training."""
+
+    use_lightning: bool = Field(
+        False, description="Whether to use PyTorch Lightning for training"
+    )
+    precision: str = Field(
+        "16-mixed", description="Precision mode for Lightning (16-mixed, 32, etc.)"
+    )
+    gradient_clip_val: float = Field(
+        1.0, description="Gradient clipping value for stability"
+    )
+    accumulate_grad_batches: int = Field(
+        1, description="Number of batches to accumulate gradients over"
+    )
+    save_predictions_every_n_epochs: int = Field(
+        10, description="Save prediction images every N epochs"
+    )
+    max_prediction_images: int = Field(
+        5, description="Maximum number of prediction images to save"
+    )
+    deterministic: bool = Field(
+        True, description="Whether to use deterministic algorithms for reproducibility"
+    )
+
+
 class ConfigSchema(BaseModel):
     path_project: Path = Field(..., description="Path to the project directory.")
     matplotlib_config_path: Path = Field(
@@ -264,6 +290,10 @@ class ConfigSchema(BaseModel):
     azure_data_assets: AzureDataAssetsConfig = Field(
         default_factory=AzureDataAssetsConfig,  # type: ignore[arg-type]
         description="Configuration for Azure ML data assets management.",
+    )
+    lightning: LightningConfig = Field(
+        default_factory=LightningConfig,  # type: ignore[arg-type]
+        description="Configuration for PyTorch Lightning training.",
     )
 
     @field_validator("azure_data_assets")
