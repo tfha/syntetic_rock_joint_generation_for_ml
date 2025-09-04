@@ -191,7 +191,12 @@ def main(cfg: DictConfig) -> None:
 
     # 6. Create and submit job
     ###########################################
-    env_ref = f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+    if pcfg.azure_ml.use_curated_env:
+        env_ref = pcfg.azure_ml.curated_env_name
+    else:
+        env_ref = (
+            f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+        )
 
     console.print("Creating Azure ML job...", style="info")
 

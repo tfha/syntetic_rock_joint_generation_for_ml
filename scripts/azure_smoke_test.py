@@ -11,9 +11,23 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
+
+import yaml
+
+try:
+    with Path("scripts/config/main.yaml").open("r", encoding="utf-8") as f:
+        use_curated = (
+            yaml.safe_load(f).get("azure_ml", {}).get("use_curated_env", False)
+        )
+except Exception:
+    use_curated = False
+
+if use_curated:
+    subprocess.run([sys.executable, "scripts/install_missing_packages.py"], check=True)
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
