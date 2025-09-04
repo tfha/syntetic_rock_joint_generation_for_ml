@@ -59,7 +59,7 @@ experiment:
   seed: 42
   log_mlflow: true
   compare_metric: loss # metric for comparison in chosing new best model
-  num_workers: 4 # number of workers for data loading
+  num_workers: 2 # reduced from 4 to 2 for memory optimization on T4 GPUs
   train_fraction: 0.8
   val_fraction: 0.1
   test_fraction: 0.1
@@ -126,7 +126,7 @@ dataset:
   path_images: ${path_project}/Data/rockmass
   path_raw_mask_labels: ${path_project}/Data/label/raw
   path_processed_mask_labels: ${path_project}/Data/label/binary
-  crop_size: 768
+  crop_size: 512  # reduced from 768 to 512 for better memory efficiency on T4 GPUs
   prefixes:
     synthetic_dfn:
       - "FracMan"

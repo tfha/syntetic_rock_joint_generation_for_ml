@@ -1,7 +1,8 @@
-# default values for the UNet model - memory optimized for T4 GPU
+# Memory-optimized UNet configuration for T4 GPU (16GB VRAM)
+# Reduces batch size and adjusts other parameters to prevent OOM errors
 name: unet
 num_epochs: 10
-batch_size: 8  # reduced from 16 to 8 for better memory management on T4 GPUs
+batch_size: 8  # Reduced from 16 to 8 for better memory management
 learning_rate: 0.0001
 scheduler:
   patience: 2
