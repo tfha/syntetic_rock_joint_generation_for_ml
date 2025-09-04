@@ -43,6 +43,10 @@ models/
 
 plots/
 
+# MLflow tracking and outputs (local testing)
+mlruns/
+outputs/
+
 docs/refactoring
 
 images_documentation/
