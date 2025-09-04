@@ -13,6 +13,11 @@ REQUIRED_PACKAGES = [
     "torchmetrics",
     "segmentation-models-pytorch",
     "timm",
+    "pyyaml",
+    "pydantic",
+    "azure-ai-ml",
+    "toml",
+    "strictyaml",
     # Add any other non-ML packages your code imports
 ]
 
