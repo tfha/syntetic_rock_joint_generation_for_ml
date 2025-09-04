@@ -12,11 +12,13 @@ import platform
 import shutil
 import subprocess
 import sys
+import yaml
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 
-import yaml
+src_path = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(src_path))
 
 try:
     with Path("scripts/config/main.yaml").open("r", encoding="utf-8") as f:
