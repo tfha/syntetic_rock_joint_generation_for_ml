@@ -1,0 +1,15 @@
+artifact_uri: file:///home/runner/work/syntetic_rock_joint_generation_for_ml/syntetic_rock_joint_generation_for_ml/mlruns/794295640997918732/99a75d2409e149708ac99b3b75b80b07/artifacts
+end_time: 1756984208544
+entry_point_name: ''
+experiment_id: '794295640997918732'
+lifecycle_stage: active
+run_id: 99a75d2409e149708ac99b3b75b80b07
+run_name: industrious-foal-39
+run_uuid: 99a75d2409e149708ac99b3b75b80b07
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1756984208498
+status: 4
+tags: []
+user_id: runner

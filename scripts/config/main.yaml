@@ -25,7 +25,7 @@ azure_ml:
   environment_version: "1"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
   use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one
-  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # The name of the curated environment to use if use_curated_env is true
+  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/version/40"  # The curated environment from the issue
   base_docker_image: "mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
   # base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04"  # Base docker image for custom environments with CUDA 12.4 support
 # Alternatives:
@@ -75,6 +75,7 @@ experiment:
   smoke_test: false        # If true, submit a lightweight smoke test job instead of full training
   smoke_test_use_cuda: false  # If true, the smoke test will try CUDA; otherwise forces CPU
   smoke_test_minimal: false   # If true with smoke_test, run a tiny env probe (nvidia-smi + torch import)
+  mnist_tutorial: false      # If true, run MNIST tutorial for GPU testing and validation
   experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:
