@@ -19,8 +19,6 @@ This script handles:
 6. Output management and retrieval
 """
 
-import logging
-import warnings
 from datetime import datetime
 from typing import Any
 
@@ -35,7 +33,10 @@ from ml_segmentation.azure_authentication import (
     validate_workspace_permissions,
 )
 from ml_segmentation.azure_compute import validate_and_refresh_compute
-from ml_segmentation.azure_core import configure_azure_logging, retry_azure_operation
+from ml_segmentation.azure_core import (
+    configure_azure_logging_and_warning,
+    retry_azure_operation,
+)
 from ml_segmentation.azure_data_assets import (
     get_data_asset,
     retrieve_and_validate_data_assets,
@@ -55,13 +56,7 @@ def main(cfg: DictConfig) -> None:
     """Submit Azure ML job with managed data assets using Command approach."""
 
     # Configure logging and warnings to reduce verbose Azure client output
-    configure_azure_logging()
-    # Quiet overly chatty urllib3 pool warnings during blob uploads
-    logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
-    # Reduce msrest serialization warnings like 'pathOnCompute is not a known attribute'
-    logging.getLogger("msrest.serialization").setLevel(logging.ERROR)
-    warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
-    warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
+    configure_azure_logging_and_warning()
 
     # 1. Initialize configuration
     ###########################################

@@ -12,17 +12,27 @@ import shutil
 import subprocess
 import sys
 import traceback
-from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
+import hydra
 from dotenv import load_dotenv
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
+
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 
 # Validate config using our Pydantic schema (repository convention)
 from ml_segmentation.schema_config import ConfigSchema
 
 
-def main() -> int:
+@hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
+def main(cfg: DictConfig) -> int:
+    # Reduce noisy Azure SDK and HTTP logs for clearer permission diagnostics
+    configure_azure_logging_and_warning()
+
+    # Initialize config the same way as in azure_submit_job.py
+    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
+    pcfg = ConfigSchema(**cfg_dict)
+
     load_dotenv()
 
     sub = os.getenv("AZURE_SUBSCRIPTION_ID")
@@ -84,23 +94,7 @@ def main() -> int:
         return 5
 
     # Additional check: does the configured compute (from config) have storage access?
-    compute_name: str | None = None
-    try:
-        # Load config from scripts/config/main.yaml relative to this script
-        cfg_path = Path(__file__).resolve().parent / "config" / "main.yaml"
-        if not cfg_path.exists():
-            raise FileNotFoundError(f"Config file not found: {cfg_path}")
-
-        cfg = OmegaConf.load(str(cfg_path))
-        cfg_obj = OmegaConf.to_object(cfg)
-        pcfg = ConfigSchema(**cast(dict[str, Any], cfg_obj))
-        compute_name = pcfg.azure_ml.compute_name
-    except Exception as e:
-        print(
-            f"[Info] Could not load compute from config (scripts/config/main.yaml): {e}.\n"
-            "Skipping compute-to-storage RBAC check."
-        )
-        return 0
+    compute_name: str | None = pcfg.azure_ml.compute_name
 
     print(f"\nChecking compute-to-storage access for compute: {compute_name} ...")
     try:
@@ -250,4 +244,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

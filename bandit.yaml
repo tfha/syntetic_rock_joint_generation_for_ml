@@ -1,0 +1,15 @@
+# Bandit configuration (YAML)
+# Exclude tests folder, scan src and scripts
+# Note: severities/confidence overridden in pre-commit args
+
+exclude_dirs:
+  - tests
+
+# You can also explicitly include dirs if desired
+# targets:
+#   - src
+#   - scripts
+
+# To skip specific tests globally, uncomment below
+# skips:
+#   - B101  # allow assert (not recommended globally)

@@ -76,7 +76,6 @@ jobs:
       - name: Install pre-commit
         run: python -m pip install pre-commit
 
-      # - name: Security checks (Bandit and Safety via pre-commit)
-      #   run: |
-      #     pre-commit run --all-files bandit
-      #     pre-commit run --all-files safety
+      - name: Security checks (Bandit via pre-commit)
+        run: |
+          pre-commit run bandit --all-files || true
