@@ -16,7 +16,7 @@ from ml_segmentation.azure_authentication import (
     validate_workspace_permissions,
 )
 from ml_segmentation.azure_compute import validate_and_refresh_compute
-from ml_segmentation.azure_core import configure_azure_logging
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 
 
 def preflight_storage_permissions(
@@ -175,7 +175,7 @@ def run_azure_diagnostic_tests(
         workspace_name: Azure ML workspace name (optional, can be from env)
     """
     # Configure Azure logging to reduce noise
-    configure_azure_logging()
+    configure_azure_logging_and_warning()
 
     # Setup environment and get console
     console, sub_id, rg, ws = setup_azure_environment_variables()

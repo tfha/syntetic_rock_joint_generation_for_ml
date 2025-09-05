@@ -26,11 +26,9 @@ The script handles:
 
 import os
 import time
-import warnings
-from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import hydra
 import mlflow
@@ -42,7 +40,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torchinfo import summary
 
-from ml_segmentation.azure_core import configure_azure_logging
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
 from ml_segmentation.data_loading import get_datasets_prefixes
 from ml_segmentation.debug_functionality import better_traceback
@@ -66,20 +64,13 @@ from ml_segmentation.utility import (
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     # Configure logging to reduce verbose Azure client output
-    configure_azure_logging()
-    warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
-    warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
+    configure_azure_logging_and_warning()
 
     # 1. Initialize MLflow and configuration
     ########################################################################
     # Setup configuration
-    cfg_container = OmegaConf.to_container(cfg, resolve=True)
-    if not isinstance(cfg_container, dict):
-        raise TypeError("Expected Hydra cfg to convert to a dict")
-    # Ensure type for pydantic parsing
-    cfg_mapping = cast(Mapping[str, Any], cfg_container)
-    cfg_dict_typed: dict[str, Any] = dict(cfg_mapping)
-    pcfg = ConfigSchema(**cfg_dict_typed)
+    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
+    pcfg = ConfigSchema(**cfg_dict)
     console = get_custom_console()
 
     # Set the experiment name based on the experiment strategy
