@@ -203,7 +203,9 @@ def validate_gpu_environment(console) -> tuple[torch.device, dict[str, Any]]:
 
     gpu_info["device_type"] = "cuda" if device.type == "cuda" else "cpu"
     gpu_info["pytorch_version"] = torch.__version__
-    gpu_info["cuda_version"] = torch.version.cuda if torch.cuda.is_available() else "None"
+    gpu_info["cuda_version"] = (
+        torch.version.cuda if torch.cuda.is_available() else "None"
+    )
 
     return device, gpu_info
 

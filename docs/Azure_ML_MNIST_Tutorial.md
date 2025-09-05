@@ -16,7 +16,7 @@ The MNIST tutorial script (`azure_mnist_tutorial.py`) is designed to:
 
 ### 🎯 **Targeted Environment**
 - **Compute Node**: Standard_NC64as_T4_v3 (64 cores, 440 GB RAM, Tesla T4 GPUs)
-- **Azure ML Environment**: `acpt-pytorch-2.2-cuda12.1:40`
+- **Azure ML Environment**: `acpt-pytorch-2.2-cuda12.1:latest`
 - **PyTorch Version**: Compatible with 2.2.x and CUDA 12.1
 - **Python Version**: 3.11
 
@@ -60,7 +60,7 @@ experiment:
   
 azure_ml:
   compute_name: "NC64as-T4-v3" # Tesla T4 compute node
-  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/version/40"
+  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"
 ```
 
 ## Architecture Details
