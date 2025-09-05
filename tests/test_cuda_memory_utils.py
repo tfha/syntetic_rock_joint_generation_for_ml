@@ -46,20 +46,26 @@ def test_configure_dataloader_for_memory():
         device=device,
     )
 
-    # Check that configuration is returned
-    assert isinstance(config, dict)
-    assert "num_workers" in config
-    assert "pin_memory" in config
-    assert "persistent_workers" in config
-
+    # Check that configuration is returned as tuple
+    assert isinstance(config, tuple)
+    assert len(config) == 3
+    
+    num_workers, pin_memory, persistent_workers = config
+    
     # Check that num_workers is adjusted for memory constraints
-    assert config["num_workers"] <= 4
+    assert num_workers <= 4
 
     # Check pin_memory is set correctly based on device
     if device.type == "cuda":
-        assert config["pin_memory"] is True
+        assert pin_memory is True
     else:
-        assert config["pin_memory"] is False
+        assert pin_memory is False
+
+    # Check persistent_workers
+    if num_workers > 0:
+        assert isinstance(persistent_workers, bool)
+    else:
+        assert persistent_workers is False
 
 
 def test_get_optimal_batch_size_cpu():

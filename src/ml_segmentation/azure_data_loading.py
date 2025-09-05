@@ -94,10 +94,18 @@ def setup_azure_dataloader(
         console: Rich console for pretty printing
         images_path: Path to the images directory
         labels_path: Path to the labels directory
-        batch_size: Batch size for the dataloaders
-        num_workers: Number of workers for data loading
-        optional_transforms: Whether to use optional data augmentation
-        splits_path: Path to the directory containing registered splits
+        batch_size: Batch size for training
+        num_workers: Number of worker processes for data loading
+        pin_memory: Whether to pin memory for faster GPU transfer. If None, automatically
+            determined based on device type
+        persistent_workers: Whether to keep workers alive between epochs. If None,
+            automatically determined based on num_workers
+        prefetch_factor: Number of batches to prefetch per worker. Controls how many
+            batches are loaded in advance. Higher values use more memory but can improve
+            performance. Default is 2 which is typically optimal for most scenarios
+        optional_transforms: Optional data augmentation transforms
+        splits_path: Path to the dataset splits configuration
+        device: Target device for tensor operations
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)

@@ -7,7 +7,6 @@ available memory, and handling CUDA errors gracefully in Azure ML environments.
 
 import logging
 import os
-from typing import Any
 
 import torch
 from rich.console import Console
@@ -120,7 +119,7 @@ def configure_dataloader_for_memory(
     pin_memory: bool | None = None,
     persistent_workers: bool | None = None,
     device: torch.device | None = None,
-) -> dict[str, Any]:
+) -> tuple[int, bool, bool]:
     """
     Configure DataLoader parameters for optimal memory usage.
 
@@ -131,7 +130,7 @@ def configure_dataloader_for_memory(
         device: Device being used
 
     Returns:
-        Dictionary of optimal DataLoader configuration
+        Tuple of (num_workers, pin_memory, persistent_workers)
     """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -158,11 +157,7 @@ def configure_dataloader_for_memory(
     if num_workers <= 1 or device.type == "cpu":
         persistent_workers = False
 
-    return {
-        "num_workers": num_workers,
-        "pin_memory": pin_memory,
-        "persistent_workers": persistent_workers,
-    }
+    return num_workers, pin_memory, persistent_workers
 
 
 def handle_cuda_oom_error(

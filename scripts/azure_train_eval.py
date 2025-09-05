@@ -46,12 +46,11 @@ from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
 from ml_segmentation.cuda_memory_utils import (
     configure_dataloader_for_memory,
-    get_optimal_batch_size,
     handle_cuda_oom_error,
     monitor_gpu_memory,
-    setup_cuda_environment,
     setup_mixed_precision_training,
 )
+from ml_segmentation.memory_management import setup_model_with_memory_optimization
 from ml_segmentation.data_loading import get_datasets_prefixes
 from ml_segmentation.debug_functionality import better_traceback
 from ml_segmentation.define_model import choose_model
@@ -78,13 +77,6 @@ def main(cfg: DictConfig) -> None:
     warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
     warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
 
-    # 0. Setup CUDA environment and memory management
-    ########################################################################
-    console = get_custom_console()
-    setup_cuda_environment(console)
-
-    # 1. Initialize MLflow and configuration
-    ########################################################################
     # Setup configuration
     cfg_container = OmegaConf.to_container(cfg, resolve=True)
     if not isinstance(cfg_container, dict):
@@ -236,11 +228,15 @@ def main(cfg: DictConfig) -> None:
     mlflow.log_param("test_prefixes", test_prefixes_list)
 
     # Get optimal dataloader configuration for memory management
-    dataloader_config = configure_dataloader_for_memory(
+    num_workers, pin_memory, persistent_workers = configure_dataloader_for_memory(
         num_workers=pcfg.experiment.num_workers,
         device=device,
     )
-    console.print(f"Optimized dataloader config: {dataloader_config}", style="info")
+    console.print(
+        f"Optimized dataloader config: num_workers={num_workers}, "
+        f"pin_memory={pin_memory}, persistent_workers={persistent_workers}",
+        style="info"
+    )
 
     # Setup dataloaders with memory-optimized settings
     train_loader, val_loader, test_loader = setup_azure_dataloader(
@@ -248,7 +244,9 @@ def main(cfg: DictConfig) -> None:
         images_path=images_path,
         labels_path=masks_path,
         batch_size=pcfg.model.batch_size,
-        **dataloader_config,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
         optional_transforms=pcfg.experiment.optional_transforms,
         splits_path=splits_path,
         device=device,
@@ -258,50 +256,27 @@ def main(cfg: DictConfig) -> None:
     ########################################################################
     console.print("Initializing model architecture...", style="info")
 
-    try:
-        model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
+    model, optimal_batch_size = setup_model_with_memory_optimization(
+        model=choose_model(pcfg.model.name, pcfg.model.params),
+        pcfg=pcfg,
+        device=device,
+        console=console,
+    )
 
-        # Check if batch size needs optimization based on available memory
-        if device.type == "cuda":
-            optimal_batch_size = get_optimal_batch_size(
-                model=model,
-                input_shape=(3, pcfg.dataset.crop_size, pcfg.dataset.crop_size),
-                device=device,
-                max_batch_size=pcfg.model.batch_size,
-            )
-
-            if optimal_batch_size < pcfg.model.batch_size:
-                console.print(
-                    f"Reducing batch size from {pcfg.model.batch_size} to {optimal_batch_size} "
-                    "based on available GPU memory",
-                    style="warning"
-                )
-                # Update batch size in configuration
-                pcfg.model.batch_size = optimal_batch_size
-                mlflow.log_param("adjusted_batch_size", optimal_batch_size)
-
-                # Recreate dataloaders with adjusted batch size
-                train_loader, val_loader, test_loader = setup_azure_dataloader(
-                    console=console,
-                    images_path=images_path,
-                    labels_path=masks_path,
-                    batch_size=optimal_batch_size,
-                    **dataloader_config,
-                    optional_transforms=pcfg.experiment.optional_transforms,
-                    splits_path=splits_path,
-                    device=device,
-                )
-
-    except RuntimeError as e:
-        if "out of memory" in str(e).lower():
-            console.print("Initial model allocation failed due to memory constraints", style="red")
-            new_batch_size = handle_cuda_oom_error(e, pcfg.model.batch_size, console)
-            raise RuntimeError(
-                f"Insufficient GPU memory. Try reducing batch_size to {new_batch_size} "
-                "or use a GPU with more memory."
-            ) from e
-        else:
-            raise
+    # If batch size was adjusted, recreate dataloaders
+    if optimal_batch_size != pcfg.model.batch_size:
+        train_loader, val_loader, test_loader = setup_azure_dataloader(
+            console=console,
+            images_path=images_path,
+            labels_path=masks_path,
+            batch_size=optimal_batch_size,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=persistent_workers,
+            optional_transforms=pcfg.experiment.optional_transforms,
+            splits_path=splits_path,
+            device=device,
+        )
 
     # Log model architecture details
     mlflow.log_param("model_architecture", pcfg.model.name)
