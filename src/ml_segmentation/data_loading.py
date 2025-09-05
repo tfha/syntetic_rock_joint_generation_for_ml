@@ -117,7 +117,8 @@ def get_dataloaders(
 
 
 def get_transforms(
-    optional_transforms: bool = False, crop_size: int = 768
+    optional_transforms: bool = False,
+    transforms_parameters: dict[str, Any] | None = None,
 ) -> dict[str, transforms.Compose]:
     """
     Using all the transforms, the effective virtual dataset size will be
@@ -127,8 +128,11 @@ def get_transforms(
     which significantly improves generalisation without increasing stored
     images.
     """
+    # Read transform parameters (future-proof: add more keys as needed)
+    params = transforms_parameters or {}
+    crop_sz: int = int(params.get("crop_size", 768))
     train_transforms_list = [
-        transforms.CenterCrop(crop_size),
+        transforms.CenterCrop(crop_sz),
         # transforms.Resize(
         #     (resize_size, resize_size), interpolation=Image.BILINEAR
         # ),
@@ -156,7 +160,7 @@ def get_transforms(
     # Apply the same center crop to the labels
     label_transform = transforms.Compose(
         [
-            transforms.CenterCrop(crop_size),  # Centre crop to match images
+            transforms.CenterCrop(crop_sz),  # Centre crop to match images
             # transforms.Resize(
             #     (resize_size, resize_size), interpolation=Image.NEAREST
             # ),

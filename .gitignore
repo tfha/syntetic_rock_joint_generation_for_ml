@@ -29,6 +29,7 @@ old
 .env.local
 *.env
 infra/azure_cli_commands.md
+infra/azure_cli_grant_blob_access_NC80adis-H100-v5.md
 
 # Data and experiments
 #######################################
