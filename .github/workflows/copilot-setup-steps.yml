@@ -79,3 +79,4 @@ jobs:
       - name: Security checks (Bandit via pre-commit)
         run: |
           pre-commit run bandit --all-files || true
+
