@@ -214,6 +214,9 @@ def main(cfg: DictConfig) -> None:
         batch_size=pcfg.model.batch_size,
         num_workers=pcfg.experiment.num_workers,
         optional_transforms=pcfg.experiment.optional_transforms,
+        transforms_parameters={
+            "crop_size": pcfg.dataset.crop_size,
+        },
         splits_path=splits_path,
         device=device,  # let function decide pin_memory
         pin_memory=None,  # auto: True on CUDA, False on CPU

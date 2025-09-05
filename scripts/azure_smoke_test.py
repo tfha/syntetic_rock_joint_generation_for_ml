@@ -159,6 +159,9 @@ def main(cfg: DictConfig) -> None:
             # Be conservative to avoid /dev/shm & worker issues on small nodes
             num_workers=0,
             optional_transforms=pcfg.experiment.optional_transforms,
+            transforms_parameters={
+                "crop_size": pcfg.dataset.crop_size,
+            },
             splits_path=splits_path if splits_path.exists() else None,
             device=device,
             pin_memory=False,

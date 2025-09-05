@@ -292,7 +292,7 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     get_job_details(ml_client, console, job_run)
 
-    console.print("✅ Azure ML job completed successfully!", style="success")
+    console.print("Azure ML job completed successfully!", style="success")
 
 
 if __name__ == "__main__":
