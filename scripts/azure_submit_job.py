@@ -88,24 +88,38 @@ def main(cfg: DictConfig) -> None:
     # Validate workspace access
     validate_workspace_permissions(ml_client, console)
 
-    # 3. Retrieve and validate data assets
+    # 3. Retrieve and validate data assets (skip for MNIST tutorial)
     ###########################################
-    images_dataset, masks_dataset, splits_dataset = retrieve_and_validate_data_assets(
-        ml_client=ml_client,
-        console=console,
-        experiment_strategy=pcfg.experiment.experiment_strategy,
-        get_data_asset_func=get_data_asset,
-    )
+    if pcfg.experiment.mnist_tutorial:
+        console.print("MNIST tutorial mode: skipping custom data assets", style="info")
+        # Create dummy dataset objects for compatibility
+        from types import SimpleNamespace
+
+        images_dataset = SimpleNamespace(id="n/a", version="n/a")
+        masks_dataset = SimpleNamespace(id="n/a", version="n/a")
+        splits_dataset = SimpleNamespace(id="n/a", version="n/a")
+    else:
+        images_dataset, masks_dataset, splits_dataset = (
+            retrieve_and_validate_data_assets(
+                ml_client=ml_client,
+                console=console,
+                experiment_strategy=pcfg.experiment.experiment_strategy,
+                get_data_asset_func=get_data_asset,
+            )
+        )
 
     # 4. Validate compute cluster and permissions
     ###########################################
     compute_cluster_name = pcfg.azure_ml.compute_name
     validate_and_refresh_compute(ml_client, console, compute_cluster_name)
 
-    # Only run preflight if we plan to mount inputs (skip for minimal smoke)
+    # Only run preflight if we plan to mount inputs (skip for minimal smoke and MNIST tutorial)
     if not (
-        pcfg.experiment.smoke_test
-        and getattr(pcfg.experiment, "smoke_test_minimal", False)
+        (
+            pcfg.experiment.smoke_test
+            and getattr(pcfg.experiment, "smoke_test_minimal", False)
+        )
+        or pcfg.experiment.mnist_tutorial
     ):
         preflight_storage_permissions(ml_client, console, compute_cluster_name)
 
@@ -113,7 +127,7 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     azure_experiment_name = pcfg.azure_ml.experiment_name
 
-    # Command to execute (smoke test or full training)
+    # Command to execute (smoke test, MNIST tutorial, or full training)
     if pcfg.experiment.smoke_test:
         if getattr(pcfg.experiment, "smoke_test_minimal", False):
             console.print(
@@ -127,6 +141,12 @@ def main(cfg: DictConfig) -> None:
                 style="warning",
             )
             train_command = "python scripts/azure_smoke_test.py"
+    elif pcfg.experiment.mnist_tutorial:
+        console.print(
+            "MNIST tutorial is set: submitting azure_mnist_tutorial.py",
+            style="info",
+        )
+        train_command = "python scripts/azure_mnist_tutorial.py"
     else:
         train_command = (
             f"python scripts/azure_train_eval.py "
@@ -135,10 +155,11 @@ def main(cfg: DictConfig) -> None:
         )
 
     # Job inputs
-    if pcfg.experiment.smoke_test and getattr(
-        pcfg.experiment, "smoke_test_minimal", False
-    ):
-        # Minimal smoke does not require dataset mounts; avoid triggering mount permissions
+    if (
+        pcfg.experiment.smoke_test
+        and getattr(pcfg.experiment, "smoke_test_minimal", False)
+    ) or pcfg.experiment.mnist_tutorial:
+        # Minimal smoke and MNIST tutorial do not require dataset mounts
         job_inputs: dict[str, Any] = {}
     else:
         job_inputs = {
@@ -184,9 +205,27 @@ def main(cfg: DictConfig) -> None:
         "splits_dataset_version": splits_dataset.version,
     }
 
+    # Add special tags for MNIST tutorial
+    if pcfg.experiment.mnist_tutorial:
+        run_metadata.update(
+            {
+                "tutorial_type": "mnist_classification",
+                "compute_validation": "gpu_testing",
+            }
+        )
+
     # 6. Create and submit job
     ###########################################
-    env_ref = f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+    # Use curated environment for MNIST tutorial, otherwise use custom environment
+    if pcfg.experiment.mnist_tutorial:
+        env_ref = pcfg.azure_ml.curated_env_name
+        console.print(
+            f"Using curated environment for MNIST tutorial: {env_ref}", style="info"
+        )
+    else:
+        env_ref = (
+            f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+        )
 
     console.print("Creating Azure ML job...", style="info")
 

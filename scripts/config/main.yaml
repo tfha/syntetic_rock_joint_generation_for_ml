@@ -75,6 +75,7 @@ experiment:
   smoke_test: false        # If true, submit a lightweight smoke test job instead of full training
   smoke_test_use_cuda: false  # If true, the smoke test will try CUDA; otherwise forces CPU
   smoke_test_minimal: false   # If true with smoke_test, run a tiny env probe (nvidia-smi + torch import)
+  mnist_tutorial: false      # If true, run MNIST tutorial for GPU testing and validation
   experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
   dataset_strategies:
     verification_box:
