@@ -19,7 +19,7 @@ from ml_segmentation.azure_authentication import (
     connect_to_azure_ml,
     setup_azure_environment_variables,
 )
-from ml_segmentation.azure_core import configure_azure_logging
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 from ml_segmentation.azure_data_assets import (
     get_data_asset,
 )
@@ -100,7 +100,7 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
 def main():
     """Main entry point for the script."""
     # Configure Azure logging
-    configure_azure_logging()
+    configure_azure_logging_and_warning()
 
     # Setup environment and load configuration
     console, subscription_id, resource_group, workspace_name = (

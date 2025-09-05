@@ -28,6 +28,7 @@ old
 .env
 .env.local
 *.env
+infra/azure_cli_commands.md
 
 # Data and experiments
 #######################################

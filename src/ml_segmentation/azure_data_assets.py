@@ -286,8 +286,11 @@ def get_azure_storage_client(
         blob_service_client: BlobServiceClient = (
             BlobServiceClient.from_connection_string(connection_string)
         )
-        # mypy: container_name is validated above, assert for type narrowing
-        assert container_name is not None
+        # mypy: container_name is validated above; ensure at runtime as well
+        if container_name is None:
+            raise ValueError(
+                "container_name must be set before connecting to Azure Blob storage"
+            )
         container_client: ContainerClient = blob_service_client.get_container_client(
             container_name
         )  # type: ignore[arg-type]

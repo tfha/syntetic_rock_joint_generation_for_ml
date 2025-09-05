@@ -13,7 +13,7 @@ from ml_segmentation.azure_authentication import (
     connect_to_azure_ml,
     setup_azure_environment_variables,
 )
-from ml_segmentation.azure_core import configure_azure_logging
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 from ml_segmentation.azure_data_assets import (
     compare_assets,
     list_data_assets,
@@ -106,7 +106,7 @@ def main(cfg: DictConfig) -> None:
         cfg: The Hydra configuration object
     """
     # Configure logging to reduce verbose Azure client output
-    configure_azure_logging()
+    configure_azure_logging_and_warning()
 
     # Initialize environment and get Azure credentials
     console, subscription_id, resource_group, workspace_name = (
