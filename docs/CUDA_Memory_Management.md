@@ -116,6 +116,59 @@ experiment:
   num_workers: 8  # can use many workers
 ```
 
+## Azure ML Compute Resources
+
+The following Azure ML compute nodes are available in the workspace:
+
+### Available Compute Nodes
+
+1. **Standard-NC6s-v3**: NVIDIA Tesla V100 — 16 GB per GPU — 1 GPU/node — total 16 GB
+2. **NC64as-T4-v3**: NVIDIA T4 — 16 GB per GPU — 4 GPUs/node — total 64 GB  
+3. **NC80adis-H100-v5**: NVIDIA H100 NVL — 94 GB per GPU — 2 GPUs/node — total 188 GB
+4. **cpu-standard (Standard_DS11_v2)**: no GPU
+
+### Recommended Configuration Mapping
+
+**Standard-NC6s-v3 (V100 - 16GB)**: Use **T4 GPU settings** due to limited 16GB VRAM
+```yaml
+model:
+  batch_size: 8
+dataset:
+  crop_size: 512
+experiment:
+  num_workers: 2
+```
+
+**NC64as-T4-v3 (T4 - 4 GPUs)**: Use **T4 GPU settings** per GPU, can leverage multiple GPUs
+```yaml
+model:
+  batch_size: 8  # per GPU, total effective batch_size: 32
+dataset:
+  crop_size: 512
+experiment:
+  num_workers: 2  # per GPU
+```
+
+**NC80adis-H100-v5 (H100 - 94GB)**: Use **enhanced A100+ settings** for maximum performance
+```yaml
+model:
+  batch_size: 64  # can use very large batch sizes
+dataset:
+  crop_size: 1024  # can use very large images
+experiment:
+  num_workers: 8  # can use many workers
+```
+
+**cpu-standard**: CPU-only training (not recommended for large models)
+```yaml
+model:
+  batch_size: 4  # small batch size for CPU
+dataset:
+  crop_size: 256  # smaller images for CPU
+experiment:
+  num_workers: 1  # single worker for CPU
+```
+
 ## Monitoring and Debugging
 
 ### GPU Memory Monitoring
