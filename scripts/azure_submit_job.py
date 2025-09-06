@@ -35,7 +35,10 @@ from ml_segmentation.azure_authentication import (
     validate_workspace_permissions,
 )
 from ml_segmentation.azure_compute import validate_and_refresh_compute
-from ml_segmentation.azure_core import configure_azure_logging, retry_azure_operation
+from ml_segmentation.azure_core import (
+    configure_azure_logging_and_warning,
+    retry_azure_operation,
+)
 from ml_segmentation.azure_data_assets import (
     get_data_asset,
     retrieve_and_validate_data_assets,
@@ -55,7 +58,7 @@ def main(cfg: DictConfig) -> None:
     """Submit Azure ML job with managed data assets using Command approach."""
 
     # Configure logging and warnings to reduce verbose Azure client output
-    configure_azure_logging()
+    configure_azure_logging_and_warning()
     # Quiet overly chatty urllib3 pool warnings during blob uploads
     logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
     # Reduce msrest serialization warnings like 'pathOnCompute is not a known attribute'
