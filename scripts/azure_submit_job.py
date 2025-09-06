@@ -119,24 +119,34 @@ def main(cfg: DictConfig) -> None:
     azure_experiment_name = pcfg.azure_ml.experiment_name
 
     # Command to execute (smoke test or full training)
+    base_command = ""
+
+    # Add package installation step if using curated environment
+    if pcfg.azure_ml.use_curated_env:
+        base_command = "python scripts/install_missing_packages.py && "
+        console.print(
+            "Using curated environment - adding package installation step",
+            style="info"
+        )
+
     if pcfg.experiment.smoke_test:
         if getattr(pcfg.experiment, "smoke_test_minimal", False):
             console.print(
                 "Smoke test (minimal) is set: submitting azure_smoke_min.py",
                 style="warning",
             )
-            train_command = "python scripts/azure_smoke_min.py"
+            train_command = f"{base_command}python scripts/azure_smoke_min.py"
         else:
             console.print(
                 "Smoke test flag is set: submitting azure_smoke_test.py",
                 style="warning",
             )
-            train_command = "python scripts/azure_smoke_test.py"
+            train_command = f"{base_command}python scripts/azure_smoke_test.py"
     else:
         # Standard training command - switch between traditional and Lightning
         # For Lightning training (recommended for stability):
         # train_command = (
-        #     f"python scripts/azure_train_eval_lightning.py "
+        #     f"{base_command}python scripts/azure_train_eval_lightning.py "
         #     f"model={pcfg.model.name} "
         #     f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
         #     f"lightning.use_lightning=true "
@@ -144,7 +154,7 @@ def main(cfg: DictConfig) -> None:
 
         # Traditional training (current default):
         train_command = (
-            f"python scripts/azure_train_eval.py "
+            f"{base_command}python scripts/azure_train_eval.py "
             f"model={pcfg.model.name} "
             f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
         )
@@ -201,7 +211,13 @@ def main(cfg: DictConfig) -> None:
 
     # 6. Create and submit job
     ###########################################
-    env_ref = f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+    # Determine which environment to use
+    if pcfg.azure_ml.use_curated_env:
+        env_ref = pcfg.azure_ml.curated_env_name
+        console.print(f"Using curated environment: {env_ref}", style="info")
+    else:
+        env_ref = f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+        console.print(f"Using custom environment: {env_ref}", style="info")
 
     console.print("Creating Azure ML job...", style="info")
 
