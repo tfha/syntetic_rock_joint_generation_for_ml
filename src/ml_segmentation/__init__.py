@@ -30,7 +30,7 @@ from .azure_compute import (
     refresh_compute_cluster,
     validate_and_refresh_compute,
 )
-from .azure_core import configure_azure_logging, retry_azure_operation
+from .azure_core import configure_azure_logging_and_warning, retry_azure_operation
 
 # Data asset management
 from .azure_data_assets import (
@@ -72,7 +72,7 @@ __author__ = "ML Segmentation Team"
 # Define what gets exported when using "from ml_segmentation import *"
 __all__ = [
     # Core utilities
-    "configure_azure_logging",
+    "configure_azure_logging_and_warning",
     "retry_azure_operation",
     # Authentication
     "connect_to_azure_ml",

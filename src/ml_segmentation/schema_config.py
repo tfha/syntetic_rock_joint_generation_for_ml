@@ -144,6 +144,14 @@ class ExperimentConfig(BaseModel):
             "only runs nvidia-smi and imports torch, without touching the rest of the codebase."
         ),
     )
+    mnist_tutorial: bool = Field(
+        False,
+        description=(
+            "If true, runs the MNIST tutorial script for GPU testing and validation. "
+            "This provides a simple, well-documented example of computer vision training "
+            "on Azure ML GPU compute nodes."
+        ),
+    )
 
 
 class DatasetConfig(BaseModel):
@@ -160,6 +168,15 @@ class DatasetConfig(BaseModel):
             "files for that dataset."
         ),
     )
+
+    @field_validator("crop_size")
+    @classmethod
+    def validate_crop_size(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("dataset.crop_size must be a positive integer")
+        if v % 32 != 0:
+            raise ValueError("dataset.crop_size must be divisible by 32")
+        return v
 
 
 class MlflowConfig(BaseModel):

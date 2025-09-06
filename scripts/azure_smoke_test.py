@@ -34,7 +34,7 @@ if use_curated:
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from ml_segmentation.azure_core import configure_azure_logging
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
 from ml_segmentation.azure_data_loading import setup_azure_dataloader
 from ml_segmentation.debug_functionality import better_traceback
 from ml_segmentation.define_model import choose_model
@@ -65,7 +65,7 @@ def resolve_aml_input(name: str) -> Path:
 
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
-    configure_azure_logging()
+    configure_azure_logging_and_warning()
     console = get_custom_console()
 
     # Prepare outputs dir
@@ -175,6 +175,9 @@ def main(cfg: DictConfig) -> None:
             # Be conservative to avoid /dev/shm & worker issues on small nodes
             num_workers=0,
             optional_transforms=pcfg.experiment.optional_transforms,
+            transforms_parameters={
+                "crop_size": pcfg.dataset.crop_size,
+            },
             splits_path=splits_path if splits_path.exists() else None,
             device=device,
             pin_memory=False,

@@ -39,6 +39,7 @@ Format and lint (keep line length = 88, see `pyproject.toml`):
 - Sort imports: `poetry run isort .`
 - Lint (auto-fix where possible): `poetry run ruff check --fix .`
 - Type check: `poetry run mypy`
+- Safety check: `pre-commit run bandit --all-files || true`
 
 Run tests:
 

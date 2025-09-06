@@ -8,6 +8,7 @@ and logging configuration.
 
 import logging
 import time
+import warnings
 from typing import Callable, TypeVar
 
 from azure.core.exceptions import AzureError, ServiceRequestError
@@ -16,20 +17,38 @@ from azure.core.exceptions import AzureError, ServiceRequestError
 T = TypeVar("T")
 
 
-def configure_azure_logging():
-    """
-    Configure logging to reduce verbose Azure client output.
+def configure_azure_logging_and_warning(
+    level: int = logging.WARNING,
+    quiet_urllib3: bool = True,
+    quiet_msrest: bool = True,
+    quiet_azure_http: bool = True,
+) -> None:
+    """Reduce noisy Azure/HTTP logs and common user warnings.
 
-    This function sets the logging level for various Azure client libraries
-    to WARNING, reducing noise in the console output. It should be called
-    at the beginning of any script that interacts with Azure services.
+    Args:
+        level: Base log level for Azure SDK loggers.
+        quiet_urllib3: Silence connection pool noise and urllib3 user warnings.
+        quiet_msrest: Silence msrest serialization warnings.
+        quiet_azure_http: Reduce Azure HTTP logging policy verbosity.
     """
-    logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
-        logging.WARNING
-    )
-    logging.getLogger("azure.identity").setLevel(logging.WARNING)
-    logging.getLogger("azure.storage").setLevel(logging.WARNING)
-    logging.getLogger("azure.ai.ml").setLevel(logging.WARNING)
+    # Base Azure SDK loggers
+    for name in ("azure", "azure.ai.ml", "azure.identity"):
+        logging.getLogger(name).setLevel(level)
+
+    if quiet_azure_http:
+        logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(
+            logging.ERROR
+        )
+
+    if quiet_urllib3:
+        logging.getLogger("urllib3").setLevel(level)
+        logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+        warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
+
+    if quiet_msrest:
+        logging.getLogger("msrest").setLevel(level)
+        logging.getLogger("msrest.serialization").setLevel(logging.ERROR)
+        warnings.filterwarnings("ignore", category=UserWarning, module="msrest")
 
 
 def retry_azure_operation(

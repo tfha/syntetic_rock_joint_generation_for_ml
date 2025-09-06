@@ -1,9 +1,10 @@
-# CUDA + cuDNN, no framework pre-installed
+# CUDA + cuDNN runtime image for production use
+# Using runtime instead of devel to reduce image size and memory footprint
 # The nvidia/cuda image keeps the base slim and lets Poetry pull exactly the wheels you pinned in pyproject.toml, matching your local set-up and avoiding hidden mismatches.
 # Note regarding base image: You can always install Python on top of a CUDA image, but adding CUDA to a Python image (e.g. python:3.11-slim) is more complex and error-prone.
 # For Azure Machine Learning, AKS, or Azure Container Instances with GPU support, starting from a CUDA image is the recommended approach for GPU workloads.
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
-
+# FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 # ---------- system + Python 3.11 ----------
 RUN apt-get update && \
     apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip build-essential git curl && \
@@ -13,7 +14,17 @@ RUN apt-get update && \
     pip install poetry
 
 ENV POETRY_VIRTUALENVS_CREATE=false \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    CUDA_VISIBLE_DEVICES="0" \
+    NVIDIA_VISIBLE_DEVICES="all" \
+    NVIDIA_DRIVER_CAPABILITIES="compute,utility" \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    NUMBA_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    VECLIB_MAXIMUM_THREADS=1 \
+    CUDA_LAUNCH_BLOCKING=0 \
+    PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:128,garbage_collection_threshold:0.6,expandable_segments:True"
 
 # ---------- project code and dependencies ----------
 WORKDIR /app

@@ -117,7 +117,8 @@ def get_dataloaders(
 
 
 def get_transforms(
-    optional_transforms: bool = False, crop_size: int = 768
+    optional_transforms: bool = False,
+    transforms_parameters: dict[str, Any] | None = None,
 ) -> dict[str, transforms.Compose]:
     """
     Using all the transforms, the effective virtual dataset size will be
@@ -127,8 +128,11 @@ def get_transforms(
     which significantly improves generalisation without increasing stored
     images.
     """
+    # Read transform parameters (future-proof: add more keys as needed)
+    params = transforms_parameters or {}
+    crop_sz: int = int(params.get("crop_size", 768))
     train_transforms_list = [
-        transforms.CenterCrop(crop_size),
+        transforms.CenterCrop(crop_sz),
         # transforms.Resize(
         #     (resize_size, resize_size), interpolation=Image.BILINEAR
         # ),
@@ -156,7 +160,7 @@ def get_transforms(
     # Apply the same center crop to the labels
     label_transform = transforms.Compose(
         [
-            transforms.CenterCrop(crop_size),  # Centre crop to match images
+            transforms.CenterCrop(crop_sz),  # Centre crop to match images
             # transforms.Resize(
             #     (resize_size, resize_size), interpolation=Image.NEAREST
             # ),
@@ -210,8 +214,10 @@ def validate_data_pre_transform(
         label_path = labels_dir / file_name
 
         # Ensure files exist
-        assert image_path.exists(), f"Image file missing: {file_name}"
-        assert label_path.exists(), f"Label file missing: {file_name}"
+        if not image_path.exists():
+            raise FileNotFoundError(f"Image file missing: {file_name}")
+        if not label_path.exists():
+            raise FileNotFoundError(f"Label file missing: {file_name}")
 
         try:
             image = Image.open(image_path)
@@ -222,9 +228,10 @@ def validate_data_pre_transform(
             ) from e
 
         # Light validation to ensure image and label can be read properly
-        assert image.size == label.size, (
-            f"Image and label sizes do not match for file: {file_name}"
-        )
+        if image.size != label.size:
+            raise ValueError(
+                f"Image and label sizes do not match for file: {file_name}"
+            )
 
 
 def validate_data_post_transform(
@@ -236,23 +243,23 @@ def validate_data_post_transform(
         f"Transformed image dimensions (HxW): {height}x{width} "
         f"are not divisible by 32 for file: {file_name}"
     )
-    assert height % 32 == 0 and width % 32 == 0, err_msg
+    if not (height % 32 == 0 and width % 32 == 0):
+        raise ValueError(err_msg)
 
     # Check if the image has correct channels
-    assert image_tensor.shape[0] == 3, (
-        f"Image does not have 3 channels for file: {file_name}"
-    )
+    if image_tensor.shape[0] != 3:
+        raise ValueError(f"Image does not have 3 channels for file: {file_name}")
 
     # Check if label tensor has a single channel
-    assert label_tensor.shape[0] == 1, (
-        f"Label does not have a single channel for file: {file_name}"
-    )
+    if label_tensor.shape[0] != 1:
+        raise ValueError(f"Label does not have a single channel for file: {file_name}")
 
     # Check if mask contains only 0 and 1 values (binary segmentation)
     unique_values = torch.unique(label_tensor)
-    assert set(unique_values.tolist()).issubset({0, 1}), (
-        f"Label contains values other than 0 and 1 for file: {file_name}"
-    )
+    if not set(unique_values.tolist()).issubset({0, 1}):
+        raise ValueError(
+            f"Label contains values other than 0 and 1 for file: {file_name}"
+        )
 
 
 def get_data_files(

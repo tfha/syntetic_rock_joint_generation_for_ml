@@ -6,6 +6,7 @@ This module provides utilities for working with Azure ML datasets.
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import mlflow
 import torch
@@ -80,6 +81,7 @@ def setup_azure_dataloader(
     batch_size: int,
     num_workers: int,
     optional_transforms: bool = False,
+    transforms_parameters: dict[str, Any] | None = None,
     splits_path: Path | None = None,
     device: torch.device | None = None,
     pin_memory: bool | None = None,
@@ -119,7 +121,10 @@ def setup_azure_dataloader(
     )
 
     # Get transformations
-    transforms_dict = get_transforms(optional_transforms=optional_transforms)
+    transforms_dict = get_transforms(
+        optional_transforms=optional_transforms,
+        transforms_parameters=transforms_parameters,
+    )
     # Use registered splits from Azure ML
     if splits_path is not None and splits_path.exists():
         console.print(f"Using registered splits from: {splits_path}", style="info")
@@ -176,13 +181,13 @@ def setup_azure_dataloader(
 
     # Create datasets
     train_dataset = SegmentationDataset(
-        images_path, labels_path, train_list, transform=transforms_dict["train"]
+        images_path, labels_path, train_list, transform=transforms_dict
     )
     val_dataset = SegmentationDataset(
-        images_path, labels_path, val_list, transform=transforms_dict["val"]
+        images_path, labels_path, val_list, transform=transforms_dict
     )
     test_dataset = SegmentationDataset(
-        images_path, labels_path, test_list, transform=transforms_dict["test"]
+        images_path, labels_path, test_list, transform=transforms_dict
     )
 
     # Resolve DataLoader performance flags

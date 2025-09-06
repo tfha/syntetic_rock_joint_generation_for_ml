@@ -130,7 +130,10 @@ def main(cfg: DictConfig) -> None:
 
     # Get transformations (must be defined before splits for later use)
     transforms_dict = get_transforms(
-        optional_transforms=pcfg.experiment.optional_transforms
+        optional_transforms=pcfg.experiment.optional_transforms,
+        transforms_parameters={
+            "crop_size": pcfg.dataset.crop_size,
+        },
     )
 
     # Determine split subfolder based on experiment_strategy

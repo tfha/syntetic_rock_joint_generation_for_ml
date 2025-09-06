@@ -12,11 +12,27 @@ import shutil
 import subprocess
 import sys
 import traceback
+from typing import Any
 
+import hydra
 from dotenv import load_dotenv
+from omegaconf import DictConfig, OmegaConf
+
+from ml_segmentation.azure_core import configure_azure_logging_and_warning
+
+# Validate config using our Pydantic schema (repository convention)
+from ml_segmentation.schema_config import ConfigSchema
 
 
-def main() -> int:
+@hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
+def main(cfg: DictConfig) -> int:
+    # Reduce noisy Azure SDK and HTTP logs for clearer permission diagnostics
+    configure_azure_logging_and_warning()
+
+    # Initialize config the same way as in azure_submit_job.py
+    cfg_dict: dict[str, Any] = OmegaConf.to_object(cfg)
+    pcfg = ConfigSchema(**cfg_dict)
+
     load_dotenv()
 
     sub = os.getenv("AZURE_SUBSCRIPTION_ID")
@@ -77,17 +93,8 @@ def main() -> int:
         traceback.print_exc()
         return 5
 
-    # Additional check: does the configured compute have storage access?
-    compute_name = (
-        os.getenv("AZURE_ML_COMPUTE")
-        or os.getenv("AZURE_COMPUTE_NAME")
-        or os.getenv("AML_COMPUTE")
-    )
-    if not compute_name:
-        print(
-            "[Info] Skipping compute-to-storage RBAC check: set AZURE_ML_COMPUTE (or AZURE_COMPUTE_NAME) to enable."
-        )
-        return 0
+    # Additional check: does the configured compute (from config) have storage access?
+    compute_name: str | None = pcfg.azure_ml.compute_name
 
     print(f"\nChecking compute-to-storage access for compute: {compute_name} ...")
     try:
@@ -237,4 +244,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
