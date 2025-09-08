@@ -166,6 +166,9 @@ def get_data_asset(
     else:
         data = ml_client.data.get(name=name, label=label)
 
+    # Attach short-form URI for Azure ML job input
+    data.short_uri = f"azureml:{data.name}:{data.version}"
+
     console.print(
         f"Retrieved data asset '{name}' (version {data.version})", style="info"
     )

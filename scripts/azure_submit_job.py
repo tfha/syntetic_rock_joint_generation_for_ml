@@ -150,10 +150,14 @@ def main(cfg: DictConfig) -> None:
         job_inputs: dict[str, Any] = {}
     else:
         job_inputs = {
-            "images_data": Input(type="uri_folder", path=images_dataset.id),
-            "masks_data": Input(type="uri_folder", path=masks_dataset.id),
-            "splits_data": Input(type="uri_folder", path=splits_dataset.id),
+            "images_data": Input(type="uri_folder", path=images_dataset.short_uri),
+            "masks_data": Input(type="uri_folder", path=masks_dataset.short_uri),
+            "splits_data": Input(type="uri_folder", path=splits_dataset.short_uri),
         }
+
+    console.print(f"images_dataset.id: {images_dataset.id}", style="info")
+    console.print(f"masks_dataset.id: {masks_dataset.id}", style="info")
+    console.print(f"splits_dataset.id: {splits_dataset.id}", style="info")
 
     # Job outputs
     job_outputs = {
