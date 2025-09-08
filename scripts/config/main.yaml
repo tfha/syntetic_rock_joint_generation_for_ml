@@ -19,7 +19,7 @@ hydra:
 
 # Azure ML specific configuration
 azure_ml:
-  compute_name: "NC64as-T4-v3"  # GPU VM size for training: NC64as-T4-v3; Standard-NC6s-v3
+  compute_name: "Standard-NC6s-v3"  # GPU VM size for training: NC64as-T4-v3; Standard-NC6s-v3
   experiment_name: "rock-segmentation" # Default experiment name
   environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
   environment_version: "2"  # Default environment version
