@@ -187,6 +187,20 @@ We illustrate the prediction mask images qualitatively in `fiftyone`, where the 
     export PATH="$HOME/.local/bin:$PATH"
     ```
 
+   Optionally: install environment locally
+
+   See pros and cons here: https://chatgpt.com/share/68bdd695-b2a4-8000-8c51-dabdb2e16d92
+
+   ```sh
+   poetry config virtualenvs.in-project true
+   ```
+
+   You must then set the .venv directory to be ignored in git to avoid committing it by mistake:
+
+   ```sh
+   echo ".venv/" >> .gitignore
+   ```
+
 4. **Install Project Dependencies**:
 
     ```sh
@@ -198,6 +212,14 @@ We illustrate the prediction mask images qualitatively in `fiftyone`, where the 
     ```sh
     poetry shell
     ```
+
+   > Poetry 2.0 and later: The `poetry shell` helper may not be available by default. Use one of the following instead:
+   >
+   > - Activate directly: `poetry env activate`
+   > - Run commands without activating: `poetry run python scripts/train_eval.py`
+   > - (Optional) Install legacy shell helper: `poetry self add poetry-plugin-shell` then use `poetry shell` as before
+   >
+   > You can always inspect the environment path with: `poetry env info --path`.
 
 6. **Install Pre-Commit Hooks**:
 

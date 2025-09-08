@@ -125,8 +125,7 @@ def main(cfg: DictConfig) -> None:
     if pcfg.azure_ml.use_curated_env:
         base_command = "python scripts/install_missing_packages.py && "
         console.print(
-            "Using curated environment - adding package installation step",
-            style="info"
+            "Using curated environment - adding package installation step", style="info"
         )
 
     if pcfg.experiment.smoke_test:
@@ -145,19 +144,19 @@ def main(cfg: DictConfig) -> None:
     else:
         # Standard training command - switch between traditional and Lightning
         # For Lightning training (recommended for stability):
-        # train_command = (
-        #     f"{base_command}python scripts/azure_train_eval_lightning.py "
-        #     f"model={pcfg.model.name} "
-        #     f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
-        #     f"lightning.use_lightning=true "
-        # )
-
-        # Traditional training (current default):
         train_command = (
-            f"{base_command}python scripts/azure_train_eval.py "
+            f"{base_command}python scripts/azure_train_eval_lightning.py "
             f"model={pcfg.model.name} "
             f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
+            f"lightning.use_lightning=true "
         )
+
+        # Traditional training (current default):
+        # train_command = (
+        #     f"{base_command}python scripts/azure_train_eval.py "
+        #     f"model={pcfg.model.name} "
+        #     f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
+        # )
 
     # Job inputs
     if pcfg.experiment.smoke_test and getattr(
@@ -216,7 +215,9 @@ def main(cfg: DictConfig) -> None:
         env_ref = pcfg.azure_ml.curated_env_name
         console.print(f"Using curated environment: {env_ref}", style="info")
     else:
-        env_ref = f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+        env_ref = (
+            f"{pcfg.azure_ml.environment_name}:{pcfg.azure_ml.environment_version}"
+        )
         console.print(f"Using custom environment: {env_ref}", style="info")
 
     console.print("Creating Azure ML job...", style="info")

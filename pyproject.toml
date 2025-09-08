@@ -37,6 +37,7 @@ python-dotenv = "^1.1.0"
 toml = "^0.10.2"
 absl-py = "1.4.0"
 pytorch-lightning = "^2.4.0"
+rpds-py = "0.27.1"  # Pinned to avoid Windows uninstall/downgrade permission issues during Poetry install
 
 [tool.poetry.group.dev.dependencies]
 tensorboard = "^2.18.0"

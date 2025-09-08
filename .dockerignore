@@ -1,1 +1,46 @@
-src/__pycache__
+# Base python ignores
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.whl
+*.egg-info/
+.eggs/
+.venv/
+.python-version
+
+# Environment / secrets (do not send to build context)
+.env
+.env.*
+
+# Large / generated artifacts not needed at runtime
+experiments/
+models/
+plots/
+data/
+notebooks/
+tensorboard_logs/
+mlruns/
+
+# Tool & cache dirs
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# Tests (omit from production image)
+tests/
+
+# Git
+.git
+.gitignore
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

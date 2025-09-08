@@ -39,7 +39,7 @@ import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import MLflowLogger, TensorBoardLogger
+from pytorch_lightning.loggers import MLFlowLogger, TensorBoardLogger
 
 from ml_segmentation.azure_core import configure_azure_logging
 from ml_segmentation.data_loading import get_datasets_prefixes
@@ -154,7 +154,12 @@ def main(cfg: DictConfig) -> None:
         console.print("Setting up data loading...", style="info")
 
         # Get dataset prefixes and paths
-        dataset_prefix_groups = get_datasets_prefixes(pcfg)
+        # Extract required arguments for dataset prefix resolution from validated config
+        dataset_prefix_groups = get_datasets_prefixes(
+            experiment_strategy=pcfg.experiment.experiment_strategy.value,
+            dataset_strategies=pcfg.experiment.dataset_strategies,
+            dataset_prefixes=pcfg.dataset.prefixes,
+        )
         train_prefixes = dataset_prefix_groups["train_prefixes"]
         test_prefixes = dataset_prefix_groups["test_prefixes"]
 
@@ -195,10 +200,9 @@ def main(cfg: DictConfig) -> None:
         ########################################################################
         console.print("Setting up Lightning trainer...", style="info")
 
-        # Setup loggers
-        loggers = []
+        # Setup loggers (generic base class list for typing compatibility)
+        loggers: list[pl.loggers.logger.Logger] = []
 
-        # TensorBoard logger
         tb_logger = TensorBoardLogger(
             save_dir=str(tensorboard_log_dir.parent),
             name="",
@@ -206,18 +210,16 @@ def main(cfg: DictConfig) -> None:
         )
         loggers.append(tb_logger)
 
-        # MLflow logger (if in Azure ML environment)
         if os.environ.get("AZUREML_RUN_ID"):
-            mlflow_logger = MLflowLogger(
+            mlflow_logger = MLFlowLogger(
                 experiment_name=experiment_name,
                 tracking_uri=mlflow.get_tracking_uri(),
             )
             loggers.append(mlflow_logger)
 
         # Setup callbacks
-        callbacks = []
+        callbacks: list[pl.callbacks.Callback] = []
 
-        # Early stopping
         early_stopping = EarlyStopping(
             monitor="val_loss",
             patience=pcfg.experiment.early_stopping_patience,
@@ -227,7 +229,6 @@ def main(cfg: DictConfig) -> None:
         )
         callbacks.append(early_stopping)
 
-        # Model checkpointing
         checkpoint_callback = ModelCheckpoint(
             dirpath=str(models_dir),
             filename="best-{epoch:02d}-{val_loss:.2f}",
@@ -239,7 +240,6 @@ def main(cfg: DictConfig) -> None:
         )
         callbacks.append(checkpoint_callback)
 
-        # Custom callbacks
         mlflow_callback = MLflowCallback(log_model=True)
         callbacks.append(mlflow_callback)
 
@@ -254,15 +254,25 @@ def main(cfg: DictConfig) -> None:
         callbacks.append(model_checkpoint_callback)
 
         # Create Lightning trainer
+        # Determine precision value (ensure it matches accepted Literal set)
+        # Restrict to Lightning accepted precision literal strings for mypy.
+        precision_value: str
+        if torch.cuda.is_available():
+            precision_cfg = pcfg.lightning.precision
+            if precision_cfg in {"16-mixed", "16", "32", "64", "bf16"}:
+                precision_value = precision_cfg
+            else:
+                precision_value = "32"
+        else:
+            precision_value = "32"
+
         trainer = pl.Trainer(
             max_epochs=pcfg.model.num_epochs,
-            accelerator="auto",  # Automatically select accelerator (GPU/CPU)
-            devices="auto",  # Automatically select number of devices
-            precision=pcfg.lightning.precision
-            if torch.cuda.is_available()
-            else "32",  # Use config precision for GPU
-            callbacks=callbacks,
-            logger=loggers,
+            accelerator="auto",
+            devices="auto",
+            precision=precision_value,  # type: ignore[arg-type]
+            callbacks=callbacks,  # type: ignore[arg-type]
+            logger=loggers,  # type: ignore[arg-type]
             enable_checkpointing=True,
             enable_progress_bar=True,
             enable_model_summary=True,
@@ -278,7 +288,6 @@ def main(cfg: DictConfig) -> None:
         ########################################################################
         console.print("Starting Lightning training...", style="info")
 
-        # Log configuration to MLflow
         if os.environ.get("AZUREML_RUN_ID"):
             mlflow.log_param("model_name", pcfg.model.name)
             mlflow.log_param("batch_size", pcfg.model.batch_size)
@@ -287,50 +296,34 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_param("experiment_strategy", pcfg.experiment.experiment_strategy)
             mlflow.log_param("framework", "pytorch_lightning")
 
-        # Train the model
         trainer.fit(lightning_module, data_module)
 
         # 8. Testing
         ########################################################################
         console.print("Running final testing...", style="info")
-
-        # Test the model
         test_results = trainer.test(lightning_module, data_module)
-
         if test_results and os.environ.get("AZUREML_RUN_ID"):
-            # Log test results to MLflow
             for metric_name, metric_value in test_results[0].items():
                 mlflow.log_metric(f"final_{metric_name}", float(metric_value))
 
         # 9. Save final artifacts
         ########################################################################
         console.print("Saving final artifacts...", style="info")
-
-        # Save final model state
         final_model_path = models_dir / "final_model.pth"
         torch.save(lightning_module.state_dict(), final_model_path)
-
         if os.environ.get("AZUREML_RUN_ID"):
             mlflow.log_artifact(str(final_model_path))
-
         console.print("Lightning training completed successfully!", style="bold green")
 
     except Exception as e:
         console.print(f"Training failed with error: {str(e)}", style="bold red")
         better_traceback()
-
-        # Log error to MLflow
         if os.environ.get("AZUREML_RUN_ID"):
             mlflow.log_param("error", str(e))
             mlflow.log_param("training_status", "failed")
         raise
-
     finally:
-        # 10. Cleanup
-        ########################################################################
         console.print("Finalizing training...", style="info")
-
-        # MLflow will be automatically ended by the context
         if os.environ.get("AZUREML_RUN_ID"):
             mlflow.log_param("training_status", "completed")
 

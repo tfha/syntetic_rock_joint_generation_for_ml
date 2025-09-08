@@ -29,11 +29,17 @@ old
 .env.local
 *.env
 
+# Python virtual environments (in-project Poetry/venv)
+.venv/
+
+
 # Data and experiments
 #######################################
 experiments/
 # Ignore data directory
 data/
+
+infra/
 
 # But don't ignore the model_ready/splits directory and its contents
 !data/model_ready/

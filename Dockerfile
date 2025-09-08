@@ -6,23 +6,43 @@ FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 # ---------- system + Python 3.11 ----------
 RUN apt-get update && \
-    apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip build-essential git curl && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3.11 python3.11-venv python3.11-dev python3-pip \
+        build-essential git curl ca-certificates && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
     python -m pip install --upgrade pip && \
-    pip install poetry
+    pip install --no-cache-dir poetry && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV POETRY_VIRTUALENVS_CREATE=false \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    MALLOC_ARENA_MAX=2 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    MPLBACKEND=Agg
 
 # ---------- project code and dependencies ----------
 WORKDIR /app
+
+# --- dependency layer (no project code yet for better caching) ---
 COPY pyproject.toml poetry.lock README.md ./
-# Copy source code first since Poetry needs it to install the package
+RUN poetry install --without dev --no-root --no-ansi --no-interaction \
+    && rm -rf ~/.cache/pip
+
+# --- project source layer ---
 COPY src/ ./src
-# does not install development libraries - PyTorch Lightning is included in main dependencies
-RUN poetry install --without dev --no-ansi --no-interaction
-# pulls torch-2.3.1+cu121 and pytorch-lightning
+RUN poetry install --without dev --no-ansi --no-interaction \
+    && rm -rf ~/.cache/pip
+
+# (Intentionally skip importing the package during build to keep the layer light
+#  and avoid triggering heavy native loads early. A runtime smoke test exists in
+#  the local build script.)
 
 ENV PYTHONPATH=/app/src
 

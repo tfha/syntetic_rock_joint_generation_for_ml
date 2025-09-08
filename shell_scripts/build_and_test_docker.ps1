@@ -142,12 +142,20 @@ if (-not $SkipTests) {
 
     foreach ($cmd in $TestCommands) {
         Write-Host "  Running: $cmd" -ForegroundColor Gray
-        $result = docker run --rm $FullImageName bash -c $cmd
+        # Capture both stdout and stderr so that Python tracebacks are visible on failure
+        $result = docker run --rm $FullImageName bash -c "$cmd" 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Host "    ✓ $result" -ForegroundColor Green
         } else {
             Write-Error "    ✗ Command failed: $cmd"
-            Write-Host "Container test failed. Check your Dockerfile and dependencies." -ForegroundColor Yellow
+            if ($result) {
+                Write-Host "    --- Begin captured output (stdout+stderr) ---" -ForegroundColor DarkYellow
+                Write-Host $result -ForegroundColor Yellow
+                Write-Host "    --- End captured output ---" -ForegroundColor DarkYellow
+            } else {
+                Write-Host "    (No output captured; command may have exited silently)" -ForegroundColor DarkYellow
+            }
+            Write-Host "Container test failed. Check traceback above and adjust dependencies/Dockerfile." -ForegroundColor Yellow
             exit 1
         }
     }

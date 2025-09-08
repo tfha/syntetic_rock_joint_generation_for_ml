@@ -44,7 +44,12 @@ class MLflowCallback(Callback):
         """Called when training starts."""
         # Log hyperparameters
         if trainer.logger is not None and hasattr(trainer.logger, "log_hyperparams"):
-            trainer.logger.log_hyperparams(pl_module.hparams)
+            # Convert to a plain dict for type compatibility with Lightning's logger API
+            try:
+                hparams_dict: dict[str, object] = dict(pl_module.hparams)  # type: ignore[arg-type]
+            except Exception:  # pragma: no cover - defensive fallback
+                hparams_dict = {}
+            trainer.logger.log_hyperparams(hparams_dict)  # type: ignore[call-arg]
 
         # Log hyperparameters to MLflow if available
         if os.environ.get("AZUREML_RUN_ID"):
@@ -130,47 +135,28 @@ class ImagePredictionCallback(Callback):
         if (trainer.current_epoch + 1) % self.save_every_n_epochs != 0:
             return
 
-        # Get validation dataloader
+        # Obtain validation dataloader (Lightning may store a list)
         val_dataloader = trainer.val_dataloaders
         if val_dataloader is None:
             return
+        if isinstance(val_dataloader, (list, tuple)):
+            if not val_dataloader:
+                return
+            val_dataloader = val_dataloader[0]
 
-        # Set model to evaluation mode
-        pl_module.eval()
-
-        device = pl_module.device
-        saved_count = 0
-
-        with torch.no_grad():
-            for batch_idx, (images, masks) in enumerate(val_dataloader):
-                if saved_count >= self.max_images:
-                    break
-
-                images = images.to(device)
-                masks = masks.to(device)
-
-                # Get predictions
-                outputs = pl_module(images)
-                preds = torch.sigmoid(outputs) > self.threshold
-
-                # Save predictions for this batch
-                try:
-                    save_image_predictions(
-                        images=images,
-                        true_masks=masks,
-                        predicted_masks=preds,
-                        save_dir=self.output_dir,
-                        epoch=trainer.current_epoch,
-                        batch_idx=batch_idx,
-                        max_images=min(self.max_images - saved_count, images.size(0)),
-                    )
-                    saved_count += min(self.max_images - saved_count, images.size(0))
-                except Exception as e:
-                    # Log error but don't fail training
-                    print(f"Warning: Failed to save predictions: {e}")
-
-        # Set model back to training mode
-        pl_module.train()
+        # Delegate to existing helper to avoid code duplication
+        try:
+            save_image_predictions(
+                model=pl_module,
+                dataloader=val_dataloader,
+                device=pl_module.device,
+                num_samples=self.max_images,
+                threshold=self.threshold,
+                save_dir=self.output_dir,
+                epoch=trainer.current_epoch,
+            )
+        except Exception as e:  # pragma: no cover - non-critical logging
+            print(f"Warning: Failed to save predictions: {e}")
 
 
 class ModelCheckpointCallback(Callback):

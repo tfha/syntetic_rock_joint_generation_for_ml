@@ -22,9 +22,9 @@ azure_ml:
   compute_name: "NC64as-T4-v3"  # GPU VM size for training: NC64as-T4-v3; Standard-NC6s-v3
   experiment_name: "rock-segmentation" # Default experiment name
   environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
-  environment_version: "1"  # Default environment version
+  environment_version: "latest"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
-  use_curated_env: true  # Whether to use a curated AzureML environment instead of custom one - recommended for Lightning
+  use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one - recommended for Lightning
   curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # PyTorch 2.2 with CUDA 12.1 - compatible with Lightning
   base_docker_image: "mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
   # base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04"  # Base docker image for custom environments with CUDA 12.4 support
@@ -69,7 +69,7 @@ experiment:
   seed: 42
   log_mlflow: true
   compare_metric: loss # metric for comparison in chosing new best model
-  num_workers: 4 # number of workers for data loading
+  num_workers: 2 # number of workers for data loading
   train_fraction: 0.8
   val_fraction: 0.1
   test_fraction: 0.1

@@ -13,6 +13,7 @@ The curated environment includes:
 This script installs the additional packages we need from curated_env_requirements.txt.
 """
 
+import importlib.util  # added
 import subprocess
 import sys
 from pathlib import Path
@@ -80,6 +81,39 @@ def install_packages_individually(requirements_file: Path) -> None:
         print(f"\n✅ Successfully installed all {len(packages)} packages!")
 
 
+def install_local_package(editable: bool = True) -> None:
+    """Install the local ml_segmentation package if not already importable."""
+    pkg_name = "ml_segmentation"
+    if importlib.util.find_spec(pkg_name) is not None:
+        print(f"✅ Local package '{pkg_name}' already importable (skip install)")
+        return
+
+    project_root = Path(__file__).resolve().parent.parent
+    if not (project_root / "pyproject.toml").exists():
+        print("⚠️  pyproject.toml not found; cannot install local package")
+        return
+
+    print(f"📦 Installing local package '{pkg_name}' from source...")
+    cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-e" if editable else ".",
+    ]
+    if editable:
+        cmd.append(project_root.as_posix())
+    else:
+        cmd[-1] = project_root.as_posix()
+
+    try:
+        subprocess.run(cmd, check=True, text=True)
+        print(f"✅ Installed local package '{pkg_name}'")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Failed to install local package '{pkg_name}': {e}")
+        print("    Check pyproject.toml or dependency conflicts.")
+
+
 def main():
     """Main entry point."""
     print("🔍 Installing additional packages for Azure ML curated environment...")
@@ -87,6 +121,8 @@ def main():
 
     try:
         install_from_requirements_file()
+        # NEW: install the local package
+        install_local_package(editable=True)
         print("\n🚀 Package installation completed!")
 
     except Exception as e:
