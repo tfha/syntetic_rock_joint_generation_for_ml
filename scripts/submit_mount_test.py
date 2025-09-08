@@ -34,6 +34,7 @@ job = command(
             type="uri_folder", path="azureml:split_verification_box:20250522.1451"
         ),
     },
+    experiment_name="mount-test-experiment",  # <-- Add this line
 )
 
 ml_client.jobs.create_or_update(job)
