@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from azure.ai.ml import Input, ManagedIdentityConfiguration, MLClient, command
+from azure.ai.ml import Input, MLClient, UserIdentityConfiguration, command
 from azure.ai.ml.constants import AssetTypes, InputOutputModes
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
@@ -24,7 +24,7 @@ job = command(
     code="./",
     command="python scripts/azure_mount_test.py",
     environment="azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/versions/41",
-    compute="NC64as-T4-v3",
+    compute="Standard-NC6s-v3",
     inputs={
         "images_data": Input(
             type=AssetTypes.URI_FOLDER,
@@ -43,7 +43,7 @@ job = command(
         ),
     },
     experiment_name="mount-test-experiment",
-    identity=ManagedIdentityConfiguration(),  # Explicitly use managed identity
+    identity=UserIdentityConfiguration(),
 )
 
 ml_client.jobs.create_or_update(job)
