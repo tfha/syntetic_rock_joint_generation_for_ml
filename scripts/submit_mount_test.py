@@ -3,7 +3,7 @@ from pathlib import Path
 
 from azure.ai.ml import Input, MLClient, UserIdentityConfiguration, command
 from azure.ai.ml.constants import AssetTypes, InputOutputModes
-from azure.identity import DefaultAzureCredential
+from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
 env_path = Path(__file__).parent.parent / ".env"
@@ -14,7 +14,7 @@ resource_group = os.environ["AZURE_RESOURCE_GROUP"]
 workspace_name = os.environ["AZURE_ML_WORKSPACE"]
 
 ml_client = MLClient(
-    DefaultAzureCredential(),
+    AzureCliCredential(),
     subscription_id=subscription_id,
     resource_group_name=resource_group,
     workspace_name=workspace_name,
@@ -29,7 +29,7 @@ job = command(
         "images_data": Input(
             type=AssetTypes.URI_FOLDER,
             path="azureml:rock_images:20250507.1543",
-            mode=InputOutputModes.RO_MOUNT,
+            mode=InputOutputModes.DOWNLOAD,  # temp to prove the asset resolves
         ),
         "masks_data": Input(
             type=AssetTypes.URI_FOLDER,
@@ -45,5 +45,8 @@ job = command(
     experiment_name="mount-test-experiment",
     identity=UserIdentityConfiguration(),
 )
+
+print("IDENTITY OBJ:", job.identity)
+print("REST HAS ID:", job._to_rest_object().identity)
 
 ml_client.jobs.create_or_update(job)
