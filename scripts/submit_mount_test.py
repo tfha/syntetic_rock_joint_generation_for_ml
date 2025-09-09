@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-from azure.ai.ml import Input, MLClient, UserIdentityConfiguration, command
+from azure.ai.ml import Input, MLClient, command
 from azure.ai.ml.constants import AssetTypes, InputOutputModes
+from azure.ai.ml.entities import UserIdentityConfiguration
 from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
