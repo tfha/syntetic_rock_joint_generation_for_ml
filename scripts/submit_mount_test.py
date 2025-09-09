@@ -47,6 +47,10 @@ job = command(
 )
 
 print("IDENTITY OBJ:", job.identity)
-print("REST HAS ID:", job._to_rest_object().identity)
+rest = job._to_rest_object()
+rest_identity = (
+    rest.get("identity") if isinstance(rest, dict) else getattr(rest, "identity", None)
+)
+print("REST HAS ID:", rest_identity)
 
 ml_client.jobs.create_or_update(job)
