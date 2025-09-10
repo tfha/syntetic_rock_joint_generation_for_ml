@@ -15,7 +15,7 @@ load_dotenv(dotenv_path=env_path)
 SUB = os.environ["AZURE_SUBSCRIPTION_ID"]
 RG = os.environ["AZURE_RESOURCE_GROUP"]
 WS = os.environ["AZURE_ML_WORKSPACE"]
-COMPUTE = os.environ.get("AZ_ML_COMPUTE", "YOUR-CLUSTER-NAME")  # real cluster name
+COMPUTE = os.environ.get("AZ_ML_COMPUTE", "Standard-NC6s-v3")  # real cluster name
 
 ml_client = MLClient(
     AzureCliCredential(), subscription_id=SUB, resource_group_name=RG, workspace_name=WS
