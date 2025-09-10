@@ -1,49 +1,44 @@
 """
-Minimal Azure ML mount test (Managed Identity path):
-- Lists /mnt/azureml and /mnt/azureml/inputs
-- Prints AZUREML_INPUT_* env vars
-- Attempts to list a few files inside each mounted input
-
-Exit code:
-  0 = inputs mounted and at least one mount has contents (or subdirs)
-  2 = /mnt/azureml/inputs missing and no AZUREML_INPUT_* present
+Azure ML mount test (Managed Identity):
+- Polls /mnt/azureml/inputs briefly to wait for mounts
+- Prints AZUREML_INPUT_* env vars and lists top-level entries
+Exit:
+  0 = saw mounts or AZUREML_INPUT_* envs
+  2 = nothing mounted and no envs
 """
 
 import os
 import sys
+import time
 from pathlib import Path
 
 
-def list_dir(path: Path, max_entries: int = 20) -> list[str]:
-    try:
-        if path.exists():
-            items = list(path.iterdir())
-            lines = [f"{len(items)} entries"]
-            for p in items[:max_entries]:
-                lines.append(f"  {p.name}/" if p.is_dir() else f"  {p.name}")
-            if len(items) > max_entries:
-                lines.append(f"  ... (+{len(items) - max_entries} more)")
-            return lines
-        return ["<does not exist>"]
-    except Exception as e:
-        return [f"<error listing: {type(e).__name__}: {e}>"]
-
-
 def main() -> int:
-    az_inputs = Path("/mnt/azureml/inputs")
     az_root = Path("/mnt/azureml")
+    az_inputs = az_root / "inputs"
 
-    print("[Azure ML] /mnt/azureml contents:")
-    for line in list_dir(az_root):
-        print(" ", line)
+    print("[Azure ML] /mnt/azureml contents (initial):")
+    try:
+        if az_root.exists():
+            for p in az_root.iterdir():
+                print("  ", p.name + ("/" if p.is_dir() else ""))
+        else:
+            print("  <does not exist>")
+    except Exception as e:
+        print("  <error listing /mnt/azureml:", e, ">")
 
-    print("\n[Azure ML] Mounted input directories:")
+    # Poll up to ~30s for /mnt/azureml/inputs to show up
+    for _i in range(30):
+        if az_inputs.exists():
+            break
+        time.sleep(1)
+
+    print("\n[Azure ML] Mounted input directories (after wait):")
     mounted_any = False
     if az_inputs.exists():
         for item in sorted(az_inputs.iterdir()):
             print(f"  {item}")
             mounted_any = True
-            # Try to peek inside mount (non-recursive)
             try:
                 inner = list(item.iterdir())
                 print(f"    {len(inner)} entries at top level")
@@ -63,10 +58,7 @@ def main() -> int:
             env_count += 1
             print(f"{k}={v}")
 
-    # Success if we either saw mounts or envs (ideally both)
-    if mounted_any or env_count > 0:
-        return 0
-    return 2
+    return 0 if (mounted_any or env_count > 0) else 2
 
 
 if __name__ == "__main__":
