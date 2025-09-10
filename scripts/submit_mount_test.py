@@ -30,9 +30,11 @@ ml_client = MLClient(
 COMPUTE = os.environ.get("AZ_ML_COMPUTE", "Standard-NC6s-v3")
 
 # Safer: use @latest once to rule out version typos; switch back to pinned versions after it works
-IMAGES = os.environ.get("AZURE_IMAGES_ASSET", "azureml:rock_images@latest")
-MASKS = os.environ.get("AZURE_MASKS_ASSET", "azureml:rock_masks@latest")
-SPLITS = os.environ.get("AZURE_SPLITS_ASSET", "azureml:split_verification_box@latest")
+IMAGES = os.environ.get("AZURE_IMAGES_ASSET", "azureml:rock_images:20250507.1543")
+MASKS = os.environ.get("AZURE_MASKS_ASSET", "azureml:rock_masks:20250507.1543")
+SPLITS = os.environ.get(
+    "AZURE_SPLITS_ASSET", "azureml:split_verification_box:20250522.1451"
+)
 
 job = command(
     code="./",
