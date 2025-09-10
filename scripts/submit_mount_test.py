@@ -3,7 +3,7 @@ from pathlib import Path
 
 from azure.ai.ml import Input, MLClient, command
 from azure.ai.ml.constants import AssetTypes, InputOutputModes
-from azure.ai.ml.entities import ManagedIdentityConfiguration
+from azure.ai.ml.entities import Data, ManagedIdentityConfiguration
 from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
@@ -24,11 +24,20 @@ ml_client = MLClient(
 print(f"Connected to workspace: {ml_client.workspace_name} (rg={RG}, sub={SUB})")
 
 
-# --- resolve assets here (fail early if wrong) ---
 def ensure_asset(name: str, version: str) -> str:
     try:
-        da = ml_client.data.get(name=name, version=version)
-        print(f"✓ asset resolved: {da.name}:{da.version}  short_uri={da.short_uri}")
+        da: Data = ml_client.data.get(name=name, version=version)  # type: ignore[assignment]
+        atype = getattr(da, "type", None)
+        print(
+            f"✓ asset resolved: {da.name}:{da.version}  "
+            f"id={getattr(da, 'id', f'{da.name}:{da.version}')}  "
+            f"type={atype}"
+        )
+        # Optional: enforce it’s a uri_folder
+        if str(atype).lower() not in {"uri_folder", "uri_file"}:
+            raise SystemExit(
+                f"[ERROR] Data asset {da.name}:{da.version} is type={atype}, expected uri_folder"
+            ) from None
         return f"azureml:{da.name}:{da.version}"
     except ResourceNotFoundError:
         raise SystemExit(
