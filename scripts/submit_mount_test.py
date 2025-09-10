@@ -29,7 +29,7 @@ ml_client = MLClient(
 
 # ⚠️ Use your *real* cluster name here (not the SKU label).
 # e.g., "nc6v3-cluster" not "Standard-NC6s-v3"
-COMPUTE = os.environ.get("AZ_ML_COMPUTE", "YOUR-CLUSTER-NAME")
+COMPUTE = os.environ.get("AZ_ML_COMPUTE", "Standard-NC6s-v3")
 
 job = command(
     code="./",
