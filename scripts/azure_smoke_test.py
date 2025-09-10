@@ -12,10 +12,11 @@ import platform
 import shutil
 import subprocess
 import sys
-import yaml
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
+
+import yaml
 
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
@@ -63,10 +64,27 @@ def resolve_aml_input(name: str) -> Path:
     return fallback
 
 
+def print_aml_input_mounts():
+    """Print the contents of /mnt/azureml/inputs for diagnostics."""
+    inputs_dir = Path("/mnt/azureml/inputs")
+    print("\n[Azure ML] Mounted input directories:")
+    if inputs_dir.exists():
+        for item in inputs_dir.iterdir():
+            print(f"  {item} (exists={item.exists()})")
+            if item.is_dir():
+                files = list(item.glob("*"))
+                print(f"    {len(files)} files/dirs inside")
+    else:
+        print("  /mnt/azureml/inputs does not exist")
+
+
 @hydra.main(config_path="config", config_name="main.yaml", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     configure_azure_logging_and_warning()
     console = get_custom_console()
+
+    # Print input mounts for diagnostics
+    print_aml_input_mounts()
 
     # Prepare outputs dir
     outputs = Path("./outputs")
@@ -141,6 +159,20 @@ def main(cfg: DictConfig) -> None:
     images_path = resolve_aml_input("images_data")
     masks_path = resolve_aml_input("masks_data")
     splits_path = resolve_aml_input("splits_data")
+
+    # Early failure if any required input is missing
+    missing = []
+    for name, path in [
+        ("images_data", images_path),
+        ("masks_data", masks_path),
+        ("splits_data", splits_path),
+    ]:
+        if not path.exists():
+            missing.append(f"{name}: {path}")
+    if missing:
+        msg = f"Missing Azure ML input directories:\n" + "\n".join(missing)
+        console.print(msg, style="danger")
+        raise FileNotFoundError(msg)
 
     lines.append(f"images_path: {images_path} exists={images_path.exists()}")
     lines.append(f"masks_path: {masks_path} exists={masks_path.exists()}")

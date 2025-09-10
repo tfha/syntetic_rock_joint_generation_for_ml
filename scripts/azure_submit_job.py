@@ -26,6 +26,7 @@ from typing import Any
 
 import hydra
 from azure.ai.ml import Input, Output, command
+from azure.ai.ml.constants import InputOutputModes
 from azure.ai.ml.entities import ManagedIdentityConfiguration
 from omegaconf import DictConfig, OmegaConf
 
@@ -134,7 +135,10 @@ def main(cfg: DictConfig) -> None:
                 "Smoke test flag is set: submitting azure_smoke_test.py",
                 style="warning",
             )
-            train_command = "python scripts/azure_smoke_test.py"
+            train_command = (
+                "python scripts/azure_smoke_test.py "
+                f"experiment.smoke_test_use_cuda={str(pcfg.experiment.smoke_test_use_cuda).lower()}"
+            )
     else:
         train_command = (
             f"python scripts/azure_train_eval.py "
@@ -150,9 +154,21 @@ def main(cfg: DictConfig) -> None:
         job_inputs: dict[str, Any] = {}
     else:
         job_inputs = {
-            "images_data": Input(type="uri_folder", path=images_dataset.short_uri),
-            "masks_data": Input(type="uri_folder", path=masks_dataset.short_uri),
-            "splits_data": Input(type="uri_folder", path=splits_dataset.short_uri),
+            "images_data": Input(
+                type="uri_folder",
+                path=images_dataset.short_uri,
+                mode=InputOutputModes.RO_MOUNT,
+            ),
+            "masks_data": Input(
+                type="uri_folder",
+                path=masks_dataset.short_uri,
+                mode=InputOutputModes.RO_MOUNT,
+            ),
+            "splits_data": Input(
+                type="uri_folder",
+                path=splits_dataset.short_uri,
+                mode=InputOutputModes.RO_MOUNT,
+            ),
         }
 
     console.print(f"images_dataset.id: {images_dataset.id}", style="info")
