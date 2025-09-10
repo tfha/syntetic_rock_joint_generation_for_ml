@@ -4,38 +4,43 @@ from pathlib import Path
 from azure.ai.ml import Input, MLClient, command
 from azure.ai.ml.constants import AssetTypes, InputOutputModes
 from azure.ai.ml.entities import ManagedIdentityConfiguration
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
-# ---------- Pre-reqs ----------
-# 1) Compute cluster has System-assigned Managed Identity enabled.
-# 2) That MI has Storage Blob Data Reader on the storage account(s) backing your datastores.
-# 3) If ADLS Gen2 (HNS=true), ensure container/path ACLs allow traverse/read for the MI.
-
+# --- env / workspace ---
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-subscription_id = os.environ["AZURE_SUBSCRIPTION_ID"]
-resource_group = os.environ["AZURE_RESOURCE_GROUP"]
-workspace_name = os.environ["AZURE_ML_WORKSPACE"]
+SUB = os.environ["AZURE_SUBSCRIPTION_ID"]
+RG = os.environ["AZURE_RESOURCE_GROUP"]
+WS = os.environ["AZURE_ML_WORKSPACE"]
+COMPUTE = os.environ.get("AZ_ML_COMPUTE", "YOUR-CLUSTER-NAME")  # real cluster name
 
 ml_client = MLClient(
-    AzureCliCredential(),
-    subscription_id=subscription_id,
-    resource_group_name=resource_group,
-    workspace_name=workspace_name,
+    AzureCliCredential(), subscription_id=SUB, resource_group_name=RG, workspace_name=WS
 )
 
-# ⚠️ Must be the real cluster name (not SKU label)
-COMPUTE = os.environ.get("AZ_ML_COMPUTE", "Standard-NC6s-v3")
+print(f"Connected to workspace: {ml_client.workspace_name} (rg={RG}, sub={SUB})")
 
-# Safer: use @latest once to rule out version typos; switch back to pinned versions after it works
-IMAGES = os.environ.get("AZURE_IMAGES_ASSET", "azureml:rock_images:20250507.1543")
-MASKS = os.environ.get("AZURE_MASKS_ASSET", "azureml:rock_masks:20250507.1543")
-SPLITS = os.environ.get(
-    "AZURE_SPLITS_ASSET", "azureml:split_verification_box:20250522.1451"
-)
 
+# --- resolve assets here (fail early if wrong) ---
+def ensure_asset(name: str, version: str) -> str:
+    try:
+        da = ml_client.data.get(name=name, version=version)
+        print(f"✓ asset resolved: {da.name}:{da.version}  short_uri={da.short_uri}")
+        return f"azureml:{da.name}:{da.version}"
+    except ResourceNotFoundError:
+        raise SystemExit(
+            f"[ERROR] Data asset not found in this workspace: {name}:{version}"
+        ) from None
+
+
+IMAGES = ensure_asset("rock_images", "20250507.1543")
+MASKS = ensure_asset("rock_masks", "20250507.1543")
+SPLITS = ensure_asset("split_verification_box", "20250522.1451")
+
+# --- job ---
 job = command(
     code="./",
     command="python scripts/azure_mount_test.py",
@@ -57,20 +62,15 @@ job = command(
 )
 
 rest = job._to_rest_object()
-rest_identity = (
-    rest.get("identity") if isinstance(rest, dict) else getattr(rest, "identity", None)
-)
-print("REST identity payload:", rest_identity)
 print(
-    "REST inputs keys:",
+    "REST identity:",
+    rest.get("identity") if isinstance(rest, dict) else getattr(rest, "identity", None),
+)
+print(
+    "REST inputs:",
     list((rest.get("inputs") or {}).keys()) if isinstance(rest, dict) else "unknown",
 )
 
 submitted = ml_client.jobs.create_or_update(job)
-print("Submitted job name:", submitted.name)
-print(
-    "Studio URL:",
-    submitted.services.get("Studio").endpoint if submitted.services else "(no svc)",
-)
-
+print("Submitted job:", submitted.name)
 ml_client.jobs.stream(submitted.name)
