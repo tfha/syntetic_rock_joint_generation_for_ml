@@ -160,13 +160,22 @@ def main(cfg: DictConfig) -> None:
     masks_path = resolve_aml_input("masks_data")
     splits_path = resolve_aml_input("splits_data")
 
-    # Early failure if any required input is missing
-    missing = []
-    for name, path in [
+    # Wait briefly for AML to finish mounting inputs (can be slightly delayed)
+    import time
+
+    required_paths = [
         ("images_data", images_path),
         ("masks_data", masks_path),
         ("splits_data", splits_path),
-    ]:
+    ]
+    for _i in range(60):
+        if all(p.exists() for _, p in required_paths):
+            break
+        time.sleep(1)
+
+    # Early failure if any required input is missing
+    missing = []
+    for name, path in required_paths:
         if not path.exists():
             missing.append(f"{name}: {path}")
     if missing:
