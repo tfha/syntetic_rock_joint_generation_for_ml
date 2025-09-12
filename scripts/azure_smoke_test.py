@@ -72,6 +72,43 @@ def print_aml_input_mounts():
         for item in inputs_dir.iterdir():
             print(f"  {item} (exists={item.exists()})")
             if item.is_dir():
+                sample = list(item.glob("*"))[:5]
+                print(f"    {len(sample)} sample entries shown")
+                for s in sample:
+                    print(f"      - {s.name}")
+    else:
+        print("  /mnt/azureml/inputs does not exist")
+
+
+def wait_for_paths(
+    paths: list[tuple[str, Path]], timeout_s: int = 60, interval_s: int = 2
+) -> None:
+    """Poll until all required paths exist or timeout.
+    Logs progress every interval to aid diagnostics inside AML.
+    """
+    import time
+
+    end = time.time() + timeout_s
+    pending = {name: p for name, p in paths if not p.exists()}
+    while pending and time.time() < end:
+        print(
+            f"[SmokeTest] Waiting for mounts: {', '.join(f'{k}=>{v}' for k, v in pending.items())}"
+        )
+        time.sleep(interval_s)
+        pending = {name: p for name, p in paths if not p.exists()}
+    if pending:
+        # Final state print for diagnostics
+        print("[SmokeTest] Mount wait timed out. Final existence state:")
+        for name, p in paths:
+            print(f"  - {name}: {p} exists={p.exists()}")
+
+    # Final listing of AML input root for visibility
+    inputs_dir = Path("/mnt/azureml/inputs")
+    print("\n[Azure ML] Mounted input directories:")
+    if inputs_dir.exists():
+        for item in inputs_dir.iterdir():
+            print(f"  {item} (exists={item.exists()})")
+            if item.is_dir():
                 files = list(item.glob("*"))
                 print(f"    {len(files)} files/dirs inside")
     else:
@@ -160,22 +197,24 @@ def main(cfg: DictConfig) -> None:
     masks_path = resolve_aml_input("masks_data")
     splits_path = resolve_aml_input("splits_data")
 
-    # Wait briefly for AML to finish mounting inputs (can be slightly delayed)
-    import time
-
-    required_paths = [
-        ("images_data", images_path),
-        ("masks_data", masks_path),
-        ("splits_data", splits_path),
-    ]
-    for _i in range(60):
-        if all(p.exists() for _, p in required_paths):
-            break
-        time.sleep(1)
+    # Wait for AML to finish mounting inputs to avoid race conditions
+    wait_for_paths(
+        [
+            ("images_data", images_path),
+            ("masks_data", masks_path),
+            ("splits_data", splits_path),
+        ],
+        timeout_s=60,
+        interval_s=2,
+    )
 
     # Early failure if any required input is missing
     missing = []
-    for name, path in required_paths:
+    for name, path in [
+        ("images_data", images_path),
+        ("masks_data", masks_path),
+        ("splits_data", splits_path),
+    ]:
         if not path.exists():
             missing.append(f"{name}: {path}")
     if missing:
