@@ -130,9 +130,9 @@ def setup_azure_dataloader(
         console.print(f"Using registered splits from: {splits_path}", style="info")
 
         # Look for train/val/test split files
-        train_file = splits_path / "train_files.json"
-        val_file = splits_path / "val_files.json"
-        test_file = splits_path / "test_files.json"  # Load splits from files
+        train_file = splits_path / "train.json"
+        val_file = splits_path / "val.json"
+        test_file = splits_path / "test.json"  # Load splits from files
         if train_file.exists() and test_file.exists():
             with open(train_file) as f:
                 train_list = json.load(f)
