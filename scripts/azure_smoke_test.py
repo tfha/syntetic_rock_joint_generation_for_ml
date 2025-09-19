@@ -54,12 +54,29 @@ def run_cmd(cmd: list[str]) -> tuple[int, str, str]:
 def resolve_aml_input(name: str) -> Path:
     """Resolve Azure ML command input path by env var or default mount.
 
-    Prefers AZUREML_INPUT_<name>. If missing, falls back to /mnt/azureml/inputs/<name>.
+    Prefer, in order:
+    - AZUREML_INPUT_<name>
+    - AZUREML_DATAREFERENCE_AZURE_ML_INPUT_<NAME> (seen in some hosted runs)
+    - AZUREML_DATAREFERENCE_<name>
+    - fallback to /mnt/azureml/inputs/<name>
     """
     env_key = f"AZUREML_INPUT_{name}"
     env_val = os.environ.get(env_key)
     if env_val:
         return Path(env_val)
+
+    # check for Azure data-capability env variants that contain direct paths
+    alt_keys = [
+        f"AZUREML_DATAREFERENCE_AZURE_ML_INPUT_{name.upper()}",
+        f"AZUREML_DATAREFERENCE_{name}",
+        f"AZUREML_DATAREFERENCE_{name.upper()}",
+    ]
+    for k in alt_keys:
+        v = os.environ.get(k)
+        if v:
+            return Path(v)
+
+    # fallback to classic mount path
     fallback = Path("/mnt/azureml/inputs") / name
     return fallback
 
