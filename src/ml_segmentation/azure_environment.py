@@ -10,7 +10,28 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import toml
+# Prefer stdlib tomllib on Python 3.11+, fallback to third-party `toml`.
+try:
+    import tomllib  # type: ignore
+
+    _HAS_TOMLLIB = True
+except Exception:
+    _HAS_TOMLLIB = False
+    import toml  # type: ignore
+
+
+def load_toml_file(path: Path) -> dict[str, Any]:
+    """Load TOML from path using tomllib (rb) or toml (r) depending on availability."""
+    if _HAS_TOMLLIB:
+        # tomllib.load expects a binary file-like object
+        with path.open("rb") as fh:
+            return tomllib.load(fh)  # type: ignore[arg-type]
+    else:
+        # third-party toml.load expects text
+        with path.open("r", encoding="utf-8") as fh:
+            return toml.load(fh)
+
+
 import yaml
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import BuildContext, Environment
