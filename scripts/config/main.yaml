@@ -24,7 +24,7 @@ azure_ml:
   environment_name: "rock-segmentation-env-py311"  # Name of the Azure ML environment
   environment_version: "2"  # Default environment version
   use_new_version: false  # Whether to create and use a new version of the environment
-  use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one
+  use_curated_env: true  # Whether to use a curated AzureML environment instead of custom one
   curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # The name of the curated environment to use if use_curated_env is true
   base_docker_image: "mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
   # base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04"  # Base docker image for custom environments with CUDA 12.4 support
