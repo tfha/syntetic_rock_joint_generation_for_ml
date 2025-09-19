@@ -155,9 +155,12 @@ def main(cfg: DictConfig) -> None:
 
     # Parse config (lightweight)
     cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-    if not isinstance(cfg_dict, dict):
-        raise TypeError("Expected Hydra cfg to be convertible to dict")
     pcfg = ConfigSchema(**cfg_dict)  # type: ignore[arg-type]
+
+    # Allow submitter to force CUDA via env var (used by azure_submit_job.py)
+    smoke_env = os.environ.get("SMOKE_USE_CUDA")
+    if smoke_env is not None:
+        pcfg.experiment.smoke_test_use_cuda = smoke_env not in ("0", "false", "False")
 
     # Optionally force CPU to avoid CUDA-related segfaults in smoke test
     if not pcfg.experiment.smoke_test_use_cuda:
