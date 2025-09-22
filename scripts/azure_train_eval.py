@@ -25,11 +25,36 @@ The script handles:
 """
 
 import os
+import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Ensure our src package is importable
+src_path = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(src_path))
+
+# If the user configured a curated Azure ML environment, run the helper that
+# installs any missing packages before importing heavy third‑party modules.
+use_curated = False
+try:
+    import yaml
+
+    cfg_path = Path("scripts/config/main.yaml")
+    if cfg_path.exists():
+        with cfg_path.open("r", encoding="utf-8") as f:
+            use_curated = (
+                yaml.safe_load(f).get("azure_ml", {}).get("use_curated_env", False)
+            )
+except Exception:
+    use_curated = False
+
+if use_curated:
+    subprocess.run([sys.executable, "scripts/install_missing_packages.py"], check=True)
+
+# Now import third-party libraries (deferred so install_missing_packages.py can run first)
 import hydra
 import mlflow
 import torch
