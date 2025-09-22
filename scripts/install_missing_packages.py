@@ -1,32 +1,47 @@
 """
 Install missing Python packages for curated Azure ML environments.
-Run this script as a job step before your main entry point.
+
+This script is intentionally small and uses the current Python interpreter's pip
+so packages are installed into the active environment (works in Azure curated
+environments where a minimal image is used).
 """
 
 import subprocess
+import sys
 
-# List only packages NOT provided by the curated environment
-REQUIRED_PACKAGES = [
+# Packages used by scripts/azure_train_eval.py and other entry scripts.
+REQUIRED_PACKAGES: list[str] = [
     "hydra-core",
     "omegaconf",
-    "rich",
+    "pyyaml",
+    "pydantic",
+    "mlflow",
+    "azure-ai-ml",
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "tensorboard",
+    "torchinfo",
     "torchmetrics",
     "segmentation-models-pytorch",
     "timm",
-    "pyyaml",
-    "pydantic",
-    "azure-ai-ml",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scikit-image",
+    "opencv-python",
+    "Pillow",
+    "matplotlib",
+    "tqdm",
     "toml",
     "strictyaml",
-    # Add any other non-ML packages your code imports
+    "rich",
 ]
 
 
 def main() -> None:
-    subprocess.run(
-        ["pip", "install", *REQUIRED_PACKAGES],
-        check=True,
-    )
+    cmd = [sys.executable, "-m", "pip", "install", *REQUIRED_PACKAGES]
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":
