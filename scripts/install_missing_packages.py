@@ -10,6 +10,7 @@ change ABI and break preinstalled compiled extensions (see numpy 2.x / multiarra
 from __future__ import annotations
 
 import importlib
+import re
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -31,6 +32,8 @@ REQUIRED_PACKAGES: list[str] = [
     # Lightweight helpers (prefer to skip heavy binaries below)
     "torchinfo",
     "torchmetrics",
+    # ensure small runtime deps for azure packages are available
+    "colorama",
     # Model helpers that are pure-python wheels or small
     "segmentation-models-pytorch",
     "timm",
@@ -220,6 +223,64 @@ def main() -> None:
                 f"pip install --no-deps failed for {no_deps_install} with exit {e.returncode}; inspect logs."
             )
             raise
+
+        # Attempt to import each no-deps package and install small missing runtime deps (if safe).
+        # Avoid installing heavy binary packages listed in HEAVY_BINARY_DISTS.
+        for pkg in no_deps_install:
+            import_name = _import_name_for_pkg(pkg)
+            attempts = 0
+            while attempts < 2:
+                attempts += 1
+                try:
+                    importlib.import_module(import_name)
+                    _print(
+                        f"Successfully imported '{import_name}' after no-deps install."
+                    )
+                    break
+                except Exception as ie:
+                    _print(f"Import of '{import_name}' failed: {ie!s}")
+                    # Try to detect a missing module name from ModuleNotFoundError or message
+                    missing_mod = None
+                    if isinstance(ie, ModuleNotFoundError):
+                        missing_mod = getattr(ie, "name", None)
+                    else:
+                        m = re.search(r"No module named '([^']+)'", str(ie))
+                        if m:
+                            missing_mod = m.group(1)
+                    if not missing_mod:
+                        _print(
+                            f"Could not determine missing module for '{import_name}'; skipping auto-install."
+                        )
+                        break
+                    # Normalize candidate dist name
+                    candidate_dist = missing_mod.replace("-", "_")
+                    # Skip heavy binaries
+                    if (
+                        candidate_dist in HEAVY_BINARY_DISTS
+                        or missing_mod in HEAVY_BINARY_DISTS
+                    ):
+                        _print(
+                            f"Missing module '{missing_mod}' looks like a heavy binary. "
+                            "Skipping runtime install; prefer building a custom image."
+                        )
+                        break
+                    _print(
+                        f"Attempting to install small runtime dependency '{missing_mod}' for '{pkg}'"
+                    )
+                    try:
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "install", missing_mod],
+                            check=True,
+                        )
+                        _print(
+                            f"Installed runtime dependency '{missing_mod}' for '{pkg}'"
+                        )
+                        # loop will attempt import again
+                    except subprocess.CalledProcessError as ie2:
+                        _print(
+                            f"Failed to install runtime dependency '{missing_mod}' (exit {ie2.returncode}); skipping."
+                        )
+                        break
 
 
 if __name__ == "__main__":
