@@ -166,17 +166,60 @@ def main() -> None:
         )
         return
 
-    _print(f"Installing missing safe packages: {to_install}")
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", *to_install], check=True
-        )
-        _print("Installation complete.")
-    except subprocess.CalledProcessError as e:
+    # Conservative set of packages known to often pull binary dependencies (numpy/scipy/torch).
+    # We will install these with --no-deps to avoid upgrading system binaries at runtime.
+    BINARY_RISK_PKGS: set[str] = {
+        "segmentation-models-pytorch",
+        "scikit-learn",
+        "scikit-image",
+        "timm",
+        "azure-ai-ml",
+    }
+
+    pure_install: list[str] = []
+    no_deps_install: list[str] = []
+    for pkg in to_install:
+        if pkg in BINARY_RISK_PKGS:
+            no_deps_install.append(pkg)
+        else:
+            pure_install.append(pkg)
+
+    if pure_install:
+        _print(f"Installing pure-Python safe packages: {pure_install}")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", *pure_install], check=True
+            )
+            _print("Pure-Python installation complete.")
+        except subprocess.CalledProcessError as e:
+            _print(
+                f"pip install failed for pure-Python packages with exit {e.returncode}; inspect logs."
+            )
+            raise
+
+    if no_deps_install:
         _print(
-            f"pip install failed with exit {e.returncode}; inspect logs for details."
+            "The following packages may pull binary dependencies. Installing them with --no-deps to avoid "
+            "upgrading compiled libraries (numpy/scipy/torch) at runtime:"
         )
-        raise
+        for p in no_deps_install:
+            _print(f"  - {p}")
+        _print(
+            "If these packages require compiled deps not present in the image, prefer building a custom image "
+            "or environment that includes the correct binary versions."
+        )
+        # Install with --no-deps to avoid triggering dependency resolution that may upgrade numpy/scipy/etc.
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--no-deps", *no_deps_install],
+                check=True,
+            )
+            _print("Installation of binary-risk packages (no-deps) complete.")
+        except subprocess.CalledProcessError as e:
+            _print(
+                f"pip install --no-deps failed for {no_deps_install} with exit {e.returncode}; inspect logs."
+            )
+            raise
 
 
 if __name__ == "__main__":
