@@ -8,68 +8,34 @@ and Azure ML environment configuration.
 import os
 import subprocess
 from pathlib import Path
-from types import ModuleType
-from typing import Any, cast
+from typing import Any
+
+# Prefer stdlib tomllib on Python 3.11+, fallback to third-party `toml`.
+try:
+    import tomllib  # type: ignore
+
+    _HAS_TOMLLIB = True
+except Exception:
+    _HAS_TOMLLIB = False
+    import toml  # type: ignore
+
+
+def load_toml_file(path: Path) -> dict[str, Any]:
+    """Load TOML from path using tomllib (rb) or toml (r) depending on availability."""
+    if _HAS_TOMLLIB:
+        # tomllib.load expects a binary file-like object
+        with path.open("rb") as fh:
+            return tomllib.load(fh)  # type: ignore[arg-type]
+    else:
+        # third-party toml.load expects text
+        with path.open("r", encoding="utf-8") as fh:
+            return toml.load(fh)
+
 
 import yaml
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import BuildContext, Environment
 from rich.console import Console
-from rich.theme import Theme
-
-# Shared semantic theme so style names like "info"/"warning"/"success"/"error" are valid.
-SEMANTIC_THEME = Theme(
-    {
-        "info": "cyan",
-        "success": "green",
-        "warning": "yellow",
-        "error": "red",
-        "bold green": "bold green",
-    }
-)
-
-# inert references to satisfy linters for imports that are only used in some environments
-if False:  # pragma: no cover - static-only usage
-    _ = BuildContext
-    _ = Environment
-
-# Prefer stdlib tomllib on Py3.11+, otherwise try tomli, then toml (PyPI).
-# Declare _toml_impl as a ModuleType for mypy, then assign the chosen module.
-_toml_impl: ModuleType
-try:
-    import tomllib as _tomllib_module  # Python 3.11+
-
-    _toml_impl = _tomllib_module
-except ImportError:
-    try:
-        import tomli as _tomli_module  # read-only TOML parser (bytes)
-
-        _toml_impl = _tomli_module
-    except ImportError:
-        import toml as _toml_module  # PyPI 'toml' (text API)
-
-        _toml_impl = _toml_module
-
-
-def _toml_load(f) -> dict[str, Any]:
-    """Unified loader: works with tomllib/tomli (binary) and toml (text)."""
-    try:
-        return _toml_impl.load(f)
-    except Exception:
-        # fallback: read text and try loads
-        s = f.read()
-        return _toml_impl.loads(s)
-
-
-def _toml_loads(s: str) -> dict[str, Any]:
-    return _toml_impl.loads(s)
-
-
-def load_toml_file(path: Path) -> dict[str, Any]:
-    """Load TOML from path using best available implementation."""
-    # tomllib/tomli expect a binary file-like object
-    with path.open("rb") as fh:
-        return _toml_load(fh)  # type: ignore[arg-type]
 
 
 def export_poetry_to_environment_yml(
@@ -123,7 +89,8 @@ def export_poetry_to_environment_yml(
     cuda_packages = set()
 
     if os.path.exists(pyproject_path):
-        pyproject_data = load_toml_file(Path(pyproject_path))
+        with open(pyproject_path) as f:
+            pyproject_data = toml.load(f)
 
         # Check for custom package sources (like PyTorch index)
         sources = pyproject_data.get("tool", {}).get("poetry", {}).get("source", [])
@@ -294,7 +261,6 @@ def export_poetry_to_environment_yml(
     if exclude_pytorch_packages:
         print("Note: PyTorch core packages excluded (assuming PyTorch base image)")
 
-    # explicit single return to satisfy mypy's control-flow analysis
     return str(output_path)
 
 
@@ -310,130 +276,75 @@ def test_environment_export(output_path: str | None = None) -> None:
         print("No pyproject.toml found. Please run this in a Poetry project directory.")
         return
 
-    # Run the export
-    export_result = export_poetry_to_environment_yml(
-        output_file=output_path or "test_environment.yml",
-        exclude_pytorch_packages=True,
-    )
+    # Run the export function
+    if output_path is None:
+        output_path = "test_environment.yml"
 
-    if not export_result:
-        print("Environment export failed. Please check the logs for details.")
-        return
+    try:
+        result_path = export_poetry_to_environment_yml(
+            output_file=output_path,
+            exclude_pytorch_packages=True,
+        )
 
-    print(f"Environment export test completed. Output: {export_result}")
+        if result_path and os.path.exists(result_path):
+            print(f"✓ Environment export test successful: {result_path}")
+
+            # Show first few lines
+            with open(result_path) as f:
+                lines = f.readlines()[:10]
+                print("Preview:")
+                for line in lines:
+                    print(f"  {line.rstrip()}")
+        else:
+            print("✗ Environment export test failed")
+
+    except Exception as e:
+        print(f"✗ Environment export test failed: {e}")
 
 
 def build_and_register_environment(
-    name: str | None = None,
-    version: str | None = None,
-    workspace_name: str | None = None,
-    pcfg: Any | None = None,
-    ml_client: MLClient | None = None,
-    console: Console | None = None,
-    **kwargs: object,
-) -> dict[str, Any]:
+    ml_client: MLClient,
+    console: Console,
+    environment_name: str,
+    dockerfile_path: str = "./Dockerfile",
+    context_path: str = "./",
+) -> Environment:
     """
-    Build and register an Azure ML environment.
-    This is a safe, minimal implementation to satisfy imports and linters.
-    The real implementation (doing Azure calls) can be used in CI/production.
+    Build and register a custom environment in Azure ML.
+
+    Args:
+        ml_client: Azure ML client
+        console: Console for logging
+        environment_name: Name for the environment
+        dockerfile_path: Path to the Dockerfile
+        context_path: Build context path
+
+    Returns:
+        Azure ML Environment object
     """
-    # Use the provided console (from scripts) when available so semantic styles work.
-    console = console or Console(theme=SEMANTIC_THEME)
+    try:
+        console.print(f"Building environment: {environment_name}", style="info")
 
-    # Resolve a sensible environment name if the caller omitted it.
-    if name is None:
-        # Prefer an explicit validated config object if provided
-        cfg = pcfg or kwargs.get("pcfg") or kwargs.get("config")
-
-        def _resolve_env_name(cfg_obj: object | None) -> str | None:
-            """Safely extract azure_ml.environment_name from opaque config objects."""
-            if cfg_obj is None:
-                return None
-            cfg_any = cast(Any, cfg_obj)
-            # attribute-style access (Hydra / pydantic)
-            try:
-                azure_ml = getattr(cfg_any, "azure_ml", None)
-                if azure_ml is not None:
-                    name_attr = getattr(azure_ml, "environment_name", None)
-                    if isinstance(name_attr, str):
-                        return name_attr
-                    if isinstance(azure_ml, dict):
-                        return azure_ml.get("environment_name")
-            except Exception:
-                pass
-            # dict-like top-level access
-            try:
-                if isinstance(cfg_any, dict):
-                    return cfg_any.get("azure_ml", {}).get("environment_name")
-            except Exception:
-                pass
-            return None
-
-        name = _resolve_env_name(cfg)
-        if name is None:
-            console.print(
-                "No environment name provided; falling back to 'rock-segmentation-env-py311'",
-                style="warning",
-            )
-            name = "rock-segmentation-env-py311"
-
-    console.print(
-        f"Preparing environment: name={name} version={version} workspace={workspace_name}",
-        style="info",
-    )
-
-    # If a pre-initialized MLClient is provided by the caller, acknowledge it.
-    # Do not automatically mutate cloud resources here; callers that pass an
-    # MLClient should implement registration logic if desired.
-    if ml_client:
-        console.print("Using provided MLClient instance.", style="info")
-    else:
-        console.print(
-            "No MLClient provided; skipping Azure ML environment registration.",
-            style="warning",
+        # Create environment with build context
+        env = Environment(
+            name=environment_name,
+            description=f"Custom environment for {environment_name}",
+            build=BuildContext(
+                path=context_path,
+                dockerfile_path=dockerfile_path,
+            ),
         )
-        return {"status": "skipped", "reason": "No MLClient provided"}
 
-    # Get the current directory and pyproject.toml path
-    cwd = Path(os.getcwd())
-    pyproject_path = cwd / "pyproject.toml"
+        # Register the environment
+        environment = ml_client.environments.create_or_update(env)
 
-    # Load pyproject.toml to get package metadata
-    if not pyproject_path.exists():
         console.print(
-            "pyproject.toml not found. Please run this in a Poetry project directory.",
-            style="error",
+            f"✓ Environment registered: {environment.name} (v{environment.version})",
+            style="success",
         )
-        return {"status": "error", "reason": "pyproject.toml not found"}
 
-    pyproject_data = load_toml_file(pyproject_path)
+        return environment
 
-    # Extract package metadata
-    package_name = pyproject_data.get("tool", {}).get("poetry", {}).get("name", name)
-    package_version = (
-        pyproject_data.get("tool", {}).get("poetry", {}).get("version", version)
-    )
-
-    # Fallback to explicit name/version if not found in pyproject.toml
-    if not package_name or not package_version:
-        console.print(
-            "Package name or version not found in pyproject.toml, using defaults.",
-            style="warning",
-        )
-        package_name = name
-        package_version = version
-
-    # Register the environment (dummy implementation)
-    result = {
-        "name": name,
-        "version": version,
-        "workspace": workspace_name,
-        "pyproject_name": pyproject_data.get("tool", {}).get("poetry", {}).get("name"),
-    }
-
-    # explicit single return to satisfy mypy's control-flow analysis
-    return result
-
-    # Defensive final return to satisfy static analyzers in all control-flow cases.
-    # (Keeps function behavior unchanged — always returns the result dict.)
-    return result
+    except Exception as e:
+        console.print(f"Failed to build environment: {str(e)}", style="error")
+        raise
