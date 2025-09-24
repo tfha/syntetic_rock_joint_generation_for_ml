@@ -1,17 +1,24 @@
 import json
 import random
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import hydra
 import torch
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from PIL import Image
 from rich.progress import track
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
 
 from ml_segmentation.schema_config import ConfigSchema
+
+if TYPE_CHECKING:
+    # For type checkers only — do not import heavy optional dependency at runtime
+    from torchvision import transforms  # type: ignore
+else:
+    try:
+        from torchvision import transforms  # type: ignore
+    except Exception:
+        transforms = None  # type: ignore
 
 
 class SegmentationDataset(Dataset):
@@ -20,7 +27,7 @@ class SegmentationDataset(Dataset):
         images_dir: str | Path,
         labels_dir: str | Path,
         file_list: list[str],
-        transform: dict[str, transforms.Compose] | None = None,
+        transform: dict[str, "transforms.Compose"] | None = None,
     ):
         self.images_dir = Path(images_dir)
         self.labels_dir = Path(labels_dir)
@@ -58,7 +65,7 @@ def get_datasets(
     train_files: list[str],
     val_files: list[str],
     test_files: list[str],
-    transform: dict[str, transforms.Compose] | None = None,
+    transform: dict[str, "transforms.Compose"] | None = None,
 ) -> tuple[SegmentationDataset, SegmentationDataset, SegmentationDataset]:
     train_dataset = SegmentationDataset(images_dir, labels_dir, train_files, transform)
     val_dataset = SegmentationDataset(images_dir, labels_dir, val_files, transform)
@@ -119,7 +126,7 @@ def get_dataloaders(
 def get_transforms(
     optional_transforms: bool = False,
     transforms_parameters: dict[str, Any] | None = None,
-) -> dict[str, transforms.Compose]:
+) -> dict[str, "transforms.Compose"]:
     """
     Using all the transforms, the effective virtual dataset size will be
     ~14.4x larger during training compared to the original 1000 images.
@@ -470,15 +477,37 @@ def get_datasets_prefixes(
     return {"train_prefixes": train_prefixes, "test_prefixes": test_prefixes}
 
 
-@hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
-def testing_functionality(cfg: DictConfig) -> None:
+# Hydra is a script-level dependency (use in scripts/). Defer/guard import so
+# library can be imported in minimal runtime images without hydra installed.
+try:
+    import hydra  # type: ignore
+except Exception:
+    hydra = None  # type: ignore
+
+
+def _require_hydra() -> "hydra":
+    """Ensure hydra is available at call-time, raise clear error otherwise."""
+    if hydra is None:
+        raise RuntimeError(
+            "hydra (hydra-core) is not installed. Install it or run this code via"
+            " the scripts/ entry points that provide config via Hydra."
+        )
+    return hydra
+
+
+def cli_main(cfg):
     cfg_dict: dict[str, Any] = cast(dict[str, Any], OmegaConf.to_object(cfg))
     pcfg = ConfigSchema(**cfg_dict)
     print(pcfg)
 
 
 if __name__ == "__main__":
-    testing_functionality()
+    # import hydra only when running the module as a script
+    from hydra import main as hydra_main
+
+    hydra_main(
+        config_path="../../scripts/config", config_name="main", version_base="1.3"
+    )(cli_main)()
 
 
 # LEGACY CODE

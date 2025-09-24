@@ -31,10 +31,26 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, cast
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from pydantic import BaseModel, Field, field_validator
 from rich.console import Console
+
+# Hydra is a script-level dependency. Defer/guard import so the library can be
+# imported in minimal runtime images without hydra installed.
+try:
+    import hydra  # type: ignore
+except Exception:  # ImportError or other import-time issues in minimal images
+    hydra = None  # type: ignore
+
+
+def _require_hydra() -> "hydra":
+    """Ensure hydra is available at call-time, raise clear error otherwise."""
+    if hydra is None:
+        raise RuntimeError(
+            "hydra (hydra-core) is not installed. Install it or run this code via the "
+            "scripts/ entry points that provide config via Hydra."
+        )
+    return hydra
 
 
 class Scheduler(BaseModel):
@@ -300,8 +316,7 @@ class ConfigSchema(BaseModel):
         return v
 
 
-@hydra.main(config_path="../../scripts/config", config_name="main", version_base="1.3")
-def testing_scheme_functionality(cfg: DictConfig) -> None:
+def _cli_main(cfg):
     cfg_dict: dict[str, Any] = cast(
         dict[str, Any], OmegaConf.to_object(cfg)
     )  # Convert OmegaConf to a regular dictionary
@@ -312,5 +327,10 @@ def testing_scheme_functionality(cfg: DictConfig) -> None:
     console.print(pcfg)
 
 
-if __name__ == "__main__":
-    testing_scheme_functionality()
+# If hydra is installed and this module is run as a script, register and run the CLI.
+if hydra is not None and __name__ == "__main__":
+    hydra_main = hydra.main(
+        config_path="../../scripts/config", config_name="main", version_base="1.3"
+    )
+    # decorate and execute the CLI entry-point
+    hydra_main(_cli_main)()
