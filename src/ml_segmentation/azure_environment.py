@@ -15,6 +15,18 @@ import yaml
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import BuildContext, Environment
 from rich.console import Console
+from rich.theme import Theme
+
+# Shared semantic theme so style names like "info"/"warning"/"success"/"error" are valid.
+SEMANTIC_THEME = Theme(
+    {
+        "info": "cyan",
+        "success": "green",
+        "warning": "yellow",
+        "error": "red",
+        "bold green": "bold green",
+    }
+)
 
 # inert references to satisfy linters for imports that are only used in some environments
 if False:  # pragma: no cover - static-only usage
@@ -317,6 +329,7 @@ def build_and_register_environment(
     workspace_name: str | None = None,
     pcfg: Any | None = None,
     ml_client: MLClient | None = None,
+    console: Console | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
     """
@@ -324,7 +337,9 @@ def build_and_register_environment(
     This is a safe, minimal implementation to satisfy imports and linters.
     The real implementation (doing Azure calls) can be used in CI/production.
     """
-    console = Console()
+    # Use the provided console (from scripts) when available so semantic styles work.
+    console = console or Console(theme=SEMANTIC_THEME)
+
     # Resolve a sensible environment name if the caller omitted it.
     if name is None:
         # Prefer an explicit validated config object if provided
