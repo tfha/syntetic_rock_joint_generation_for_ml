@@ -8,6 +8,7 @@ to handle your rock mass segmentation datasets properly.
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from rich.console import Console
+from rich.theme import Theme
 
 from ml_segmentation.azure_authentication import (
     connect_to_azure_ml,
@@ -112,6 +113,21 @@ def main(cfg: DictConfig) -> None:
     console, subscription_id, resource_group, workspace_name = (
         setup_azure_environment_variables()
     )
+
+    # Ensure the Console supports the semantic styles used across the codebase.
+    # If setup_azure_environment_variables returned a plain Console, replace it
+    # with one that provides the expected semantic color names.
+    semantic_theme = Theme(
+        {
+            "info": "cyan",
+            "success": "green",
+            "warning": "yellow",
+            "error": "red",
+            # keep any other semantic names used elsewhere
+            "bold green": "bold green",
+        }
+    )
+    console = Console(theme=semantic_theme)
 
     try:
         # Convert OmegaConf to a Python dictionary and validate with Pydantic
