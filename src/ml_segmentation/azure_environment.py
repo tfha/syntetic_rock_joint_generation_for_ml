@@ -9,7 +9,7 @@ import os
 import subprocess
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import yaml
 from azure.ai.ml import MLClient
@@ -312,9 +312,10 @@ def test_environment_export(output_path: str | None = None) -> None:
 
 
 def build_and_register_environment(
-    name: str,
+    name: str | None = None,
     version: str | None = None,
     workspace_name: str | None = None,
+    pcfg: Any | None = None,
     ml_client: MLClient | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
@@ -324,6 +325,43 @@ def build_and_register_environment(
     The real implementation (doing Azure calls) can be used in CI/production.
     """
     console = Console()
+    # Resolve a sensible environment name if the caller omitted it.
+    if name is None:
+        # Prefer an explicit validated config object if provided
+        cfg = pcfg or kwargs.get("pcfg") or kwargs.get("config")
+
+        def _resolve_env_name(cfg_obj: object | None) -> str | None:
+            """Safely extract azure_ml.environment_name from opaque config objects."""
+            if cfg_obj is None:
+                return None
+            cfg_any = cast(Any, cfg_obj)
+            # attribute-style access (Hydra / pydantic)
+            try:
+                azure_ml = getattr(cfg_any, "azure_ml", None)
+                if azure_ml is not None:
+                    name_attr = getattr(azure_ml, "environment_name", None)
+                    if isinstance(name_attr, str):
+                        return name_attr
+                    if isinstance(azure_ml, dict):
+                        return azure_ml.get("environment_name")
+            except Exception:
+                pass
+            # dict-like top-level access
+            try:
+                if isinstance(cfg_any, dict):
+                    return cfg_any.get("azure_ml", {}).get("environment_name")
+            except Exception:
+                pass
+            return None
+
+        name = _resolve_env_name(cfg)
+        if name is None:
+            console.print(
+                "No environment name provided; falling back to 'rock-segmentation-env-py311'",
+                style="warning",
+            )
+            name = "rock-segmentation-env-py311"
+
     console.print(
         f"Preparing environment: name={name} version={version} workspace={workspace_name}",
         style="info",
