@@ -257,7 +257,12 @@ def main(cfg: DictConfig) -> None:
     # Azure ML mounts input datasets to paths via env vars. Azure sets
     # AZUREML_INPUT_<NAME> where NAME is uppercased input key.
 
-    def get_input_path(input_key: str) -> Path:
+    def get_input_path(input_key: str) -> Path | None:
+        """Return the mounted path for a given Azure ML job input key.
+
+        We consider the input missing if no AZUREML_INPUT_* env var is set.
+        Returning None avoids silently falling back to the current directory.
+        """
         candidates = [
             f"AZUREML_INPUT_{input_key.upper()}",
             f"AZUREML_INPUT_{input_key}",
@@ -266,7 +271,7 @@ def main(cfg: DictConfig) -> None:
             val = os.getenv(var)
             if val:
                 return Path(val)
-        return Path("")  # will resolve to cwd; validated below
+        return None
 
     images_path = get_input_path("images_data")
     masks_path = get_input_path("masks_data")
@@ -302,9 +307,19 @@ def main(cfg: DictConfig) -> None:
                 ),
                 style="warning",
             )
+            raise ValueError(
+                f"{label} directory appears empty at '{path}'. "
+                "Verify Azure ML input binding and that it contains files."
+            )
 
     # Validate all required data inputs
     # Check images path
+    if images_path is None:
+        console.print(
+            "Missing Azure ML input 'images_data' env var.",
+            style="danger",
+        )
+        raise ValueError("Azure ML input 'images_data' is not mounted.")
     if images_path.exists():
         console.print(f"Mounted images path: {images_path}", style="info")
         mlflow.log_param("images_path", str(images_path))
@@ -318,6 +333,12 @@ def main(cfg: DictConfig) -> None:
         raise ValueError(f"Images directory does not exist: {images_path}")
 
     # Check masks path
+    if masks_path is None:
+        console.print(
+            "Missing Azure ML input 'masks_data' (AZUREML_INPUT_MASKS_DATA).",
+            style="danger",
+        )
+        raise ValueError("Azure ML input 'masks_data' is not mounted.")
     if masks_path.exists():
         console.print(f"Mounted masks path: {masks_path}", style="info")
         mlflow.log_param("masks_path", str(masks_path))
@@ -331,7 +352,7 @@ def main(cfg: DictConfig) -> None:
         raise ValueError(f"Masks directory does not exist: {masks_path}")
 
     # Check splits path
-    if splits_path and splits_path.exists():
+    if splits_path is not None and splits_path.exists():
         console.print(f"Mounted splits path: {splits_path}", style="info")
         mlflow.log_param("splits_path", str(splits_path))
     else:
@@ -700,7 +721,10 @@ def main(cfg: DictConfig) -> None:
 
             # Save best metrics to a file with more complete information
             with open(output_dir / "best_metrics.txt", "w") as f:
-                f.write(f"Best metrics achieved at epoch {best_metrics['epoch']}:\n")
+                epoch_line = (
+                    f"Best metrics achieved at epoch {best_metrics['epoch']}:\n"
+                )
+                f.write(epoch_line)
                 f.write("-" * 50 + "\n")
                 for name, value in best_metrics.items():
                     f.write(f"{name}: {value}\n")
