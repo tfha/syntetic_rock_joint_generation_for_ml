@@ -102,8 +102,16 @@ def main(cfg: DictConfig) -> None:
     experiment_name = f"rock-segmentation-{pcfg.experiment.experiment_strategy}"
     mlflow.set_experiment(experiment_name)
 
-    # Start MLflow tracking - Azure ML automatically sets up the tracking URI
-    mlflow.start_run()
+    # Start MLflow tracking only if no active run exists. In Azure ML jobs,
+    # an active run can be auto-created; attempting to start a new one triggers
+    # MlflowException about mismatched environment run IDs.
+    active = mlflow.active_run()
+    if active is None:
+        mlflow.start_run()
+        active = mlflow.active_run()
+        console.print(f"Started new MLflow run: {active.info.run_id}", style="info")
+    else:
+        console.print(f"Using existing MLflow run: {active.info.run_id}", style="info")
 
     # 2. Setup output directories for storing results and logs
     ########################################################################
