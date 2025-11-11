@@ -273,11 +273,42 @@ def main(cfg: DictConfig) -> None:
     # Allow None assignment later if splits input is missing
     splits_path: Path | None = get_input_path("splits_data")
 
+    # Diagnostic: list all AZUREML_INPUT_* env vars we can see
+    input_env_vars = {
+        k: v for k, v in os.environ.items() if k.startswith("AZUREML_INPUT_")
+    }
+    if input_env_vars:
+        console.print(
+            "Detected input mount env vars:"
+            + "\n"
+            + "\n".join(f"  {k}={v}" for k, v in input_env_vars.items()),
+            style="info",
+        )
+    else:
+        console.print(
+            "No AZUREML_INPUT_* environment variables detected. "
+            "This usually means inputs were not declared or mount failed.",
+            style="warning",
+        )
+
+    def validate_nonempty_images(path: Path, label: str) -> None:
+        # Treat '.' with zero files as missing mount rather than continuing
+        img_like = list(path.glob("*.png")) + list(path.glob("*.jpg"))
+        if len(img_like) == 0:
+            console.print(
+                (
+                    f"{label} path '{path}' contains no image files; "
+                    "check data asset or input name."
+                ),
+                style="warning",
+            )
+
     # Validate all required data inputs
     # Check images path
     if images_path.exists():
         console.print(f"Mounted images path: {images_path}", style="info")
         mlflow.log_param("images_path", str(images_path))
+        validate_nonempty_images(images_path, "Images")
     else:
         console.print(
             "Images path not found. Please ensure the 'images_data' input is "
@@ -290,6 +321,7 @@ def main(cfg: DictConfig) -> None:
     if masks_path.exists():
         console.print(f"Mounted masks path: {masks_path}", style="info")
         mlflow.log_param("masks_path", str(masks_path))
+        validate_nonempty_images(masks_path, "Masks")
     else:
         console.print(
             "Masks path not found. Please ensure the 'masks_data' input is "
