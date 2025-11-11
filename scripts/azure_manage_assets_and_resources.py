@@ -174,15 +174,26 @@ def main(cfg: DictConfig) -> None:
                         build_and_register_environment,
                     )
 
+                    # Build/register environment using config value
+                    # azure_ml.environment_name. Previously we passed an
+                    # unsupported kw arg 'pcfg'. Fix to use validated name.
+                    environment_name = pcfg.azure_ml.environment_name
                     build_and_register_environment(
-                        ml_client=ml_client, console=console, pcfg=cfg
+                        ml_client=ml_client,
+                        console=console,
+                        environment_name=environment_name,
+                        dockerfile_path="./Dockerfile",
+                        context_path="./",
                     )
                 case AzureDataAssetsCommand.LIST_ASSETS:
                     list_data_assets(ml_client, console, asset_name)
                 case AzureDataAssetsCommand.COMPARE_ASSETS:
                     if asset_name is None or version1 is None or version2 is None:
                         console.print(
-                            "asset_name, version1, and version2 must be provided for compare-assets",
+                            (
+                                "asset_name, version1, and version2 must be "
+                                "provided for compare-assets"
+                            ),
                             style="error",
                         )
                     else:
@@ -203,9 +214,9 @@ def main(cfg: DictConfig) -> None:
                     prepare_and_save_dataset_splits(
                         console,
                         images_directory=pcfg.dataset.path_images,
-                        labels_directory=pcfg.dataset.path_processed_mask_labels,
-                        experiment_strategy=pcfg.experiment.experiment_strategy,
-                        dataset_strategies=pcfg.experiment.dataset_strategies,
+                        labels_directory=(pcfg.dataset.path_processed_mask_labels),
+                        experiment_strategy=(pcfg.experiment.experiment_strategy),
+                        dataset_strategies=(pcfg.experiment.dataset_strategies),
                         dataset_prefixes=pcfg.dataset.prefixes,
                         train_fraction=pcfg.experiment.train_fraction,
                         val_fraction=pcfg.experiment.val_fraction,
@@ -247,9 +258,11 @@ def main(cfg: DictConfig) -> None:
                             prepare_and_save_dataset_splits(
                                 console,
                                 images_directory=pcfg.dataset.path_images,
-                                labels_directory=pcfg.dataset.path_processed_mask_labels,
+                                labels_directory=(
+                                    pcfg.dataset.path_processed_mask_labels
+                                ),
                                 experiment_strategy=strategy,
-                                dataset_strategies=pcfg.experiment.dataset_strategies,
+                                dataset_strategies=(pcfg.experiment.dataset_strategies),
                                 dataset_prefixes=pcfg.dataset.prefixes,
                                 train_fraction=pcfg.experiment.train_fraction,
                                 val_fraction=pcfg.experiment.val_fraction,
@@ -270,14 +283,16 @@ def main(cfg: DictConfig) -> None:
                             )
                             register_split_data_asset(ml_client, console, strategy)
                             console.print(
-                                f"Successfully processed {strategy}", style="green"
+                                f"Successfully processed {strategy}",
+                                style="green",
                             )
                         except Exception as e:
                             console.print(
-                                f"Error processing {strategy}: {str(e)}", style="red"
+                                f"Error processing {strategy}: {str(e)}",
+                                style="red",
                             )
                     console.print(
-                        "\nAll strategies processed. Check above for any errors.",
+                        ("\nAll strategies processed. Check above for any errors."),
                         style="bold green",
                     )
                 case _:
