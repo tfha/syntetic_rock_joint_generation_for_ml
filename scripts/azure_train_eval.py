@@ -52,33 +52,40 @@ except Exception:
     use_curated = False
 
 if use_curated:
-    subprocess.run([sys.executable, "scripts/install_missing_packages.py"], check=True)
+    subprocess.run(
+        [sys.executable, "scripts/install_missing_packages.py"],
+        check=True,
+    )
 
-# Now import third-party libraries (deferred so install_missing_packages.py can run first)
-import hydra
-import mlflow
-import torch
-from omegaconf import DictConfig, OmegaConf
-from segmentation_models_pytorch.losses import DiceLoss
-from torch import optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.tensorboard import SummaryWriter
-from torchinfo import summary
+# Defer heavy imports until optional curated-env installer runs first
+import hydra  # noqa: E402 (deferred until optional package install step)
+import mlflow  # noqa: E402
+import torch  # noqa: E402
+from omegaconf import DictConfig, OmegaConf  # noqa: E402
+from segmentation_models_pytorch.losses import DiceLoss  # noqa: E402
+from torch import optim  # noqa: E402
+from torch.optim.lr_scheduler import ReduceLROnPlateau  # noqa: E402
+from torch.utils.tensorboard import SummaryWriter  # noqa: E402
+from torchinfo import summary  # noqa: E402
 
-from ml_segmentation.azure_core import configure_azure_logging_and_warning
-from ml_segmentation.azure_data_loading import setup_azure_dataloader
-from ml_segmentation.data_loading import get_datasets_prefixes
-from ml_segmentation.debug_functionality import better_traceback
-from ml_segmentation.define_model import choose_model
-from ml_segmentation.schema_config import ConfigSchema
-from ml_segmentation.train_eval_funcs import (
+from ml_segmentation.azure_core import (  # noqa: E402
+    configure_azure_logging_and_warning,
+)
+from ml_segmentation.azure_data_loading import (  # noqa: E402
+    setup_azure_dataloader,
+)
+from ml_segmentation.data_loading import get_datasets_prefixes  # noqa: E402
+from ml_segmentation.debug_functionality import better_traceback  # noqa: E402
+from ml_segmentation.define_model import choose_model  # noqa: E402
+from ml_segmentation.schema_config import ConfigSchema  # noqa: E402
+from ml_segmentation.train_eval_funcs import (  # noqa: E402
     EarlyStopping,
     check_and_update_best_metrics,
     save_image_predictions,
     train_one_epoch,
     validate_one_epoch,
 )
-from ml_segmentation.utility import (
+from ml_segmentation.utility import (  # noqa: E402
     create_results_table,
     get_custom_console,
     log_metrics_to_tensorboard,
@@ -98,26 +105,93 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**cfg_dict)
     console = get_custom_console()
 
-    # Set the experiment name based on the experiment strategy
+    # Set the experiment name based on the experiment strategy unless Azure ML
+    # already supplied a run ID (in which case the experiment is pre-bound).
     experiment_name = f"rock-segmentation-{pcfg.experiment.experiment_strategy}"
-    mlflow.set_experiment(experiment_name)
 
-    # Start MLflow tracking only if no active run exists. In Azure ML jobs,
-    # an active run can be auto-created; attempting to start a new one triggers
-    # MlflowException about mismatched environment run IDs.
-    active = mlflow.active_run()
-    if active is None:
-        mlflow.start_run()
+    env_run_id = (
+        os.getenv("MLFLOW_RUN_ID") or os.getenv("AZUREML_RUN_ID") or os.getenv("RUN_ID")
+    )
+
+    # Diagnostics: show MLflow context in Azure ML job environment
+    console.print(
+        f"MLflow tracking URI: {mlflow.get_tracking_uri()}",
+        style="info",
+    )
+    console.print(
+        (
+            "Env run IDs -> MLFLOW_RUN_ID: "
+            f"{os.getenv('MLFLOW_RUN_ID')}, AZUREML_RUN_ID: "
+            f"{os.getenv('AZUREML_RUN_ID')}, RUN_ID: {os.getenv('RUN_ID')}"
+        ),
+        style="info",
+    )
+
+    if env_run_id:
+        # In managed Azure ML a run may already exist; attempt to
+        # attach to it without resetting the experiment to avoid mismatches.
         active = mlflow.active_run()
-        console.print(f"Started new MLflow run: {active.info.run_id}", style="info")
+        if active is None:
+            try:
+                mlflow.start_run(run_id=env_run_id)
+                active = mlflow.active_run()
+                console.print(
+                    f"Attached to existing MLflow run: {active.info.run_id}",
+                    style="info",
+                )
+            except Exception as e:  # Fallback: nested start
+                console.print(
+                    f"Failed to attach to env run id {env_run_id}: {e}. "
+                    "Starting nested run instead.",
+                    style="warning",
+                )
+                mlflow.start_run(nested=True)
+                active = mlflow.active_run()
+                console.print(
+                    f"Started nested MLflow run: {active.info.run_id}",
+                    style="info",
+                )
+        else:
+            console.print(
+                f"Using already active MLflow run: {active.info.run_id}",
+                style="info",
+            )
     else:
-        console.print(f"Using existing MLflow run: {active.info.run_id}", style="info")
+        # No env-provided run; set experiment then start run.
+        mlflow.set_experiment(experiment_name)
+        active = mlflow.active_run()
+        if active is None:
+            try:
+                mlflow.start_run()
+                active = mlflow.active_run()
+                console.print(
+                    f"Started new MLflow run: {active.info.run_id}",
+                    style="info",
+                )
+            except Exception as e:
+                console.print(
+                    f"Standard mlflow.start_run failed: {e}. Trying nested run.",
+                    style="warning",
+                )
+                mlflow.start_run(nested=True)
+                active = mlflow.active_run()
+                console.print(
+                    f"Started nested MLflow run: {active.info.run_id}",
+                    style="info",
+                )
+        else:
+            console.print(
+                f"Using existing MLflow run: {active.info.run_id}",
+                style="info",
+            )
 
     # 2. Setup output directories for storing results and logs
     ########################################################################
     console.print(
-        "Starting Azure ML training run with strategy:"
-        f"{pcfg.experiment.experiment_strategy}",
+        (
+            "Starting Azure ML training run with strategy: "
+            f"{pcfg.experiment.experiment_strategy}"
+        ),
         style="info",
     )  # Create standard output directories
     output_dir = Path("./outputs")
@@ -153,7 +227,10 @@ def main(cfg: DictConfig) -> None:
     hydra.core.config_store.ConfigStore.instance().store(
         name="hydra_config", node=hydra_config
     )
-    console.print(f"Hydra outputs will be saved to: {hydra_run_dir}", style="info")
+    console.print(
+        f"Hydra outputs will be saved to: {hydra_run_dir}",
+        style="info",
+    )
 
     # Create TensorBoard log directory with timestamp
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -174,9 +251,10 @@ def main(cfg: DictConfig) -> None:
     # 4. Load data from Azure ML inputs
     ########################################################################
     console.print(
-        "Loading training and testing data from Azure ML inputs...", style="info"
-    )  # In Azure ML, input datasets are mounted to paths defined in environment
-    # variables    # Get the paths from environment variables set by Azure ML
+        "Loading train/test data from Azure ML inputs...",
+        style="info",
+    )
+    # Azure ML mounts input datasets to paths via env vars
     images_path = Path(os.environ.get("AZUREML_INPUT_images_data", ""))
     masks_path = Path(os.environ.get("AZUREML_INPUT_masks_data", ""))
     splits_path = Path(os.environ.get("AZUREML_INPUT_splits_data", ""))
@@ -184,7 +262,7 @@ def main(cfg: DictConfig) -> None:
     # Validate all required data inputs
     # Check images path
     if images_path.exists():
-        console.print(f"Azure ML mounted images path: {images_path}", style="info")
+        console.print(f"Mounted images path: {images_path}", style="info")
         mlflow.log_param("images_path", str(images_path))
     else:
         console.print(
@@ -196,7 +274,7 @@ def main(cfg: DictConfig) -> None:
 
     # Check masks path
     if masks_path.exists():
-        console.print(f"Azure ML mounted masks path: {masks_path}", style="info")
+        console.print(f"Mounted masks path: {masks_path}", style="info")
         mlflow.log_param("masks_path", str(masks_path))
     else:
         console.print(
@@ -208,7 +286,7 @@ def main(cfg: DictConfig) -> None:
 
     # Check splits path
     if splits_path.exists():
-        console.print(f"Azure ML mounted splits path: {splits_path}", style="info")
+        console.print(f"Mounted splits path: {splits_path}", style="info")
         mlflow.log_param("splits_path", str(splits_path))
     else:
         console.print(
@@ -268,7 +346,11 @@ def main(cfg: DictConfig) -> None:
     try:
         with torch.no_grad():
             # Use batch size = 1 to avoid large GPU allocations during summary
-            model_stats = summary(model, input_size=(1, 3, 224, 224), verbose=0)
+            model_stats = summary(
+                model,
+                input_size=(1, 3, 224, 224),
+                verbose=0,
+            )
         with open(output_dir / "model_summary.txt", "w") as f:
             f.write(str(model_stats))
         mlflow.log_artifact(str(output_dir / "model_summary.txt"))
@@ -310,7 +392,8 @@ def main(cfg: DictConfig) -> None:
     console.print("Beginning training and validation...", style="info")
     start_time = time.time()
     best_metrics: dict[str, Any] | None = None
-    best_model_state: dict[str, Any] | None = None  # Store the state of the best model
+    # Store the state of the best model for later artifact saving
+    best_model_state: dict[str, Any] | None = None
 
     try:
         for epoch in range(pcfg.model.num_epochs):
@@ -334,10 +417,13 @@ def main(cfg: DictConfig) -> None:
             # Log training metrics
             metrics_training["learning_rate"] = optimizer.param_groups[0]["lr"]
             log_metrics_to_tensorboard(
-                writer=writer, metrics=metrics_training, prefix="Training", epoch=epoch
+                writer=writer,
+                metrics=metrics_training,
+                prefix="Training",
+                epoch=epoch,
             )
 
-            # Log to MLflow - the last value of each metric will be shown on run page
+            # Log training metrics (last value shown on run page)
             for name, value in metrics_training.items():
                 mlflow.log_metric(f"train_{name}", value, epoch)
 
@@ -371,7 +457,11 @@ def main(cfg: DictConfig) -> None:
                 save_dir = example_images_dir / f"epoch_{epoch + 1}"
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_image_predictions(
-                    model, test_loader, device, num_samples=3, save_dir=save_dir
+                    model,
+                    test_loader,
+                    device,
+                    num_samples=3,
+                    save_dir=save_dir,
                 )
 
                 # Log example images to MLflow
@@ -418,7 +508,7 @@ def main(cfg: DictConfig) -> None:
 
     finally:
         # 9. Finalize and save model artifacts
-        ########################################################################
+        # ------------------------------------------------------------------
         console.print("Finalizing training...", style="info")
 
         # Close the tensorboard writer
@@ -430,10 +520,13 @@ def main(cfg: DictConfig) -> None:
         mlflow.log_artifact(str(final_model_path))
 
         # Log model in MLflow format for easier deployment
+        final_registered_name = (
+            f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-final"
+        )
         mlflow.pytorch.log_model(
             model,
             "final_model",
-            registered_model_name=f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-final",
+            registered_model_name=final_registered_name,
         )
 
         # Save best model from best metrics tracking if available
@@ -448,10 +541,13 @@ def main(cfg: DictConfig) -> None:
 
             # Load the best model for MLflow registration
             model.load_state_dict(best_model_state["model_state_dict"])
+            best_metrics_registered_name = (
+                f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-best-metrics"
+            )
             mlflow.pytorch.log_model(
                 model,
                 "best_metrics_model",
-                registered_model_name=f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-best-metrics",
+                registered_model_name=best_metrics_registered_name,
             )
 
             # Restore the model to its current state
@@ -487,9 +583,12 @@ def main(cfg: DictConfig) -> None:
                 )
 
         # 10. Run final evaluation and generate results
-        ########################################################################
+        # --------------------------------------------------------------
         # Final test evaluation
-        console.print("Running final evaluation on test set...", style="info")
+        console.print(
+            "Running final evaluation on test set...",
+            style="info",
+        )
         final_test_metrics = validate_one_epoch(
             model=model,
             dataloader=test_loader,
@@ -497,7 +596,13 @@ def main(cfg: DictConfig) -> None:
             device=device,
             threshold=0.5,
         )
-        console.print(create_results_table(0, final_test_metrics, session="Final Test"))
+        console.print(
+            create_results_table(
+                0,
+                final_test_metrics,
+                session="Final Test",
+            )
+        )
 
         # Log final test metrics
         for name, value in final_test_metrics.items():
@@ -523,7 +628,11 @@ def main(cfg: DictConfig) -> None:
             for name, value in best_metrics.items():
                 if name != "epoch":
                     # Log as a metric with the epoch it was achieved in
-                    mlflow.log_metric(f"best_{name}", value, step=best_metrics["epoch"])
+                    mlflow.log_metric(
+                        f"best_{name}",
+                        value,
+                        step=best_metrics["epoch"],
+                    )
 
             # Also log the epoch where best metrics were achieved
             mlflow.log_metric("best_metrics_epoch", best_metrics["epoch"])

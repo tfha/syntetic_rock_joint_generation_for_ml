@@ -1,8 +1,8 @@
 """
 Manage Azure ML data assets for rock mass segmentation.
 
-This script demonstrates how to use the Azure ML data asset management functionality
-to handle your rock mass segmentation datasets properly.
+This script demonstrates how to use Azure ML data asset management to
+handle rock mass segmentation datasets properly.
 """
 
 import hydra
@@ -46,8 +46,8 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
         AzureDataAssetsCommand.REGISTER_BASE_DATASETS: (
             "Register base datasets in Azure ML"
         ),
-        AzureDataAssetsCommand.REGISTER_SPLITS: "Register dataset splits in Azure ML",
-        AzureDataAssetsCommand.GENERATE_SPLITS: "Generate dataset splits locally",
+        AzureDataAssetsCommand.REGISTER_SPLITS: ("Register dataset splits in Azure ML"),
+        AzureDataAssetsCommand.GENERATE_SPLITS: ("Generate dataset splits locally"),
         AzureDataAssetsCommand.UPLOAD_SPLITS: (
             "Upload dataset splits to Azure Blob Storage"
         ),
@@ -56,8 +56,8 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
             "generate, upload, and register splits in one operation"
         ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",
-        AzureDataAssetsCommand.COMPARE_ASSETS: "Compare two versions of a data asset",
-        AzureDataAssetsCommand.UPLOAD_DATA: "Upload local data to Azure Blob storage",
+        AzureDataAssetsCommand.COMPARE_ASSETS: ("Compare two versions of a data asset"),
+        AzureDataAssetsCommand.UPLOAD_DATA: ("Upload local data to Azure Blob storage"),
         AzureDataAssetsCommand.BUILD_ENVIRONMENT: (
             "Build and register Azure ML environment from Dockerfile"
         ),
@@ -74,7 +74,10 @@ def show_command_help(console: Console):
     # Print available commands
     console.print("Available commands:", style="info")
     for cmd in AzureDataAssetsCommand:
-        console.print(f"  {cmd.value}: {get_command_description(cmd)}", style="info")
+        console.print(
+            f"  {cmd.value}: {get_command_description(cmd)}",
+            style="info",
+        )
 
     console.print("\nUsage examples:", style="info")
     # Make long command examples more readable by splitting into multiple lines
@@ -136,7 +139,10 @@ def main(cfg: DictConfig) -> None:
         # Set random seed at the beginning to affect all operations
         seed_everything(pcfg.experiment.seed)
 
-        console.print(f"Using configuration: {pcfg.azure_data_assets}", style="info")
+        console.print(
+            f"Using configuration: {pcfg.azure_data_assets}",
+            style="info",
+        )
 
         # Get command from validated config
         command = pcfg.azure_data_assets.command
@@ -281,7 +287,11 @@ def main(cfg: DictConfig) -> None:
                                 + f"{strategy} in Azure ML...",
                                 style="yellow",
                             )
-                            register_split_data_asset(ml_client, console, strategy)
+                            register_split_data_asset(
+                                ml_client,
+                                console,
+                                strategy,
+                            )
                             console.print(
                                 f"Successfully processed {strategy}",
                                 style="green",
@@ -305,7 +315,10 @@ def main(cfg: DictConfig) -> None:
                 show_command_help(console)
             else:
                 # For other errors, show the error but still with command help
-                console.print(f"Configuration error: {error_str}", style="error")
+                console.print(
+                    f"Configuration error: {error_str}",
+                    style="error",
+                )
                 console.print(
                     "Check your configuration and try again.", style="warning"
                 )
