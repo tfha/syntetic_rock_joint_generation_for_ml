@@ -379,7 +379,7 @@ After successful local testing, register your environment with Azure ML:
 
 ```sh
 # Build and register Azure ML environment from Dockerfile
-python scripts/azure_manage_data_assets.py azure_data_assets.command=build-environment
+python scripts/azure_manage_assets_and_resources.py azure_data_assets.command=build-environment
 ```
 
 This command will:
