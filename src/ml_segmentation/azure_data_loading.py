@@ -46,7 +46,10 @@ def create_azure_datasets(
     """
     # Create datasets if they don't exist
     try:
-        images_dataset = ml_client.data.get(name=images_dataset_name, label="latest")
+        images_dataset = ml_client.data.get(
+            name=images_dataset_name,
+            label="latest",
+        )
         print(f"Images dataset '{images_dataset_name}' already exists in workspace")
     except Exception:
         print(f"Creating images dataset '{images_dataset_name}'")
@@ -59,7 +62,10 @@ def create_azure_datasets(
         images_dataset = ml_client.data.create_or_update(images_dataset)
 
     try:
-        masks_dataset = ml_client.data.get(name=masks_dataset_name, label="latest")
+        masks_dataset = ml_client.data.get(
+            name=masks_dataset_name,
+            label="latest",
+        )
         print(f"Masks dataset '{masks_dataset_name}' already exists in workspace")
     except Exception:
         print(f"Creating masks dataset '{masks_dataset_name}'")
@@ -127,12 +133,37 @@ def setup_azure_dataloader(
     )
     # Use registered splits from Azure ML
     if splits_path is not None and splits_path.exists():
-        console.print(f"Using registered splits from: {splits_path}", style="info")
+        console.print(
+            f"Using registered splits from: {splits_path}",
+            style="info",
+        )
 
-        # Look for train/val/test split files
-        train_file = splits_path / "train.json"
-        val_file = splits_path / "val.json"
-        test_file = splits_path / "test.json"  # Load splits from files
+        # Look for split files; support legacy *_files.json names as well.
+        candidates = {
+            "train": [
+                splits_path / "train.json",
+                splits_path / "train_files.json",
+            ],
+            "val": [
+                splits_path / "val.json",
+                splits_path / "val_files.json",
+            ],
+            "test": [
+                splits_path / "test.json",
+                splits_path / "test_files.json",
+            ],
+        }
+
+        def first_existing(paths: list[Path]) -> Path | None:
+            for p in paths:
+                if p.exists():
+                    return p
+            return None
+
+        train_file = first_existing(candidates["train"]) or splits_path / "train.json"
+        val_file = first_existing(candidates["val"]) or splits_path / "val.json"
+        test_file = first_existing(candidates["test"]) or splits_path / "test.json"
+
         if train_file.exists() and test_file.exists():
             with open(train_file) as f:
                 train_list = json.load(f)
@@ -146,8 +177,9 @@ def setup_azure_dataloader(
                 test_list = json.load(f)
 
             console.print(
-                f"Loaded splits from registered files: "
-                f"train={len(train_list)}, val={len(val_list)}, test={len(test_list)}",
+                "Loaded splits from registered files: "
+                f"train={len(train_list)}, val={len(val_list)}, "
+                f"test={len(test_list)}",
                 style="info",
             )
 
@@ -157,9 +189,11 @@ def setup_azure_dataloader(
                 mlflow.log_param("registered_val_samples", len(val_list))
                 mlflow.log_param("registered_test_samples", len(test_list))
         else:
+            existing = [p.name for p in splits_path.glob("*.json")]
             raise ValueError(
-                "Required split files not found in the splits directory. "
-                "Please ensure train_files.json and test_files.json are available."
+                "Required split files not found. Expected train.json or "
+                "train_files.json AND test.json or test_files.json. "
+                f"Present JSON files: {existing}"
             )
     else:
         raise ValueError(
@@ -168,8 +202,9 @@ def setup_azure_dataloader(
             "in your Azure ML job."
         )  # Log dataset splits
     console.print(
-        f"Dataset splits: train={len(train_list)}, "
-        f"val={len(val_list)}, test={len(test_list)}",
+        "Dataset splits: "
+        f"train={len(train_list)}, val={len(val_list)}, "
+        f"test={len(test_list)}",
         style="info",
     )
 
@@ -200,7 +235,8 @@ def setup_azure_dataloader(
         persistent_workers = num_workers > 0
 
     console.print(
-        f"Dataloader settings -> batch_size={batch_size}, num_workers={num_workers}, "
+        "Dataloader settings -> "
+        f"batch_size={batch_size}, num_workers={num_workers}, "
         f"pin_memory={pin_memory}, persistent_workers={persistent_workers}",
         style="info",
     )

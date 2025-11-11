@@ -254,10 +254,24 @@ def main(cfg: DictConfig) -> None:
         "Loading train/test data from Azure ML inputs...",
         style="info",
     )
-    # Azure ML mounts input datasets to paths via env vars
-    images_path = Path(os.environ.get("AZUREML_INPUT_images_data", ""))
-    masks_path = Path(os.environ.get("AZUREML_INPUT_masks_data", ""))
-    splits_path = Path(os.environ.get("AZUREML_INPUT_splits_data", ""))
+    # Azure ML mounts input datasets to paths via env vars. Azure sets
+    # AZUREML_INPUT_<NAME> where NAME is uppercased input key.
+
+    def get_input_path(input_key: str) -> Path:
+        candidates = [
+            f"AZUREML_INPUT_{input_key.upper()}",
+            f"AZUREML_INPUT_{input_key}",
+        ]
+        for var in candidates:
+            val = os.getenv(var)
+            if val:
+                return Path(val)
+        return Path("")  # will resolve to cwd; validated below
+
+    images_path = get_input_path("images_data")
+    masks_path = get_input_path("masks_data")
+    # Allow None assignment later if splits input is missing
+    splits_path: Path | None = get_input_path("splits_data")
 
     # Validate all required data inputs
     # Check images path
@@ -285,7 +299,7 @@ def main(cfg: DictConfig) -> None:
         raise ValueError(f"Masks directory does not exist: {masks_path}")
 
     # Check splits path
-    if splits_path.exists():
+    if splits_path and splits_path.exists():
         console.print(f"Mounted splits path: {splits_path}", style="info")
         mlflow.log_param("splits_path", str(splits_path))
     else:
@@ -295,6 +309,7 @@ def main(cfg: DictConfig) -> None:
             style="warning",
         )
         # We'll keep splits_path as None if it doesn't exist
+        splits_path = None
 
     # Log dataset information in MLflow
     mlflow.log_param("images_path", str(images_path))
@@ -411,7 +426,11 @@ def main(cfg: DictConfig) -> None:
                 max_batches=pcfg.experiment.sanity_check_num_batches,
             )
             console.print(
-                create_results_table(epoch, metrics_training, session="Training")
+                create_results_table(
+                    epoch,
+                    metrics_training,
+                    session="Training",
+                )
             )
 
             # Log training metrics
@@ -437,7 +456,11 @@ def main(cfg: DictConfig) -> None:
                 max_batches=pcfg.experiment.sanity_check_num_batches,
             )
             console.print(
-                create_results_table(epoch, metrics_validation, session="Validation")
+                create_results_table(
+                    epoch,
+                    metrics_validation,
+                    session="Validation",
+                )
             )
 
             # Log validation metrics
@@ -531,7 +554,10 @@ def main(cfg: DictConfig) -> None:
 
         # Save best model from best metrics tracking if available
         if best_model_state is not None:
-            console.print("Saving best model from metrics tracking...", style="info")
+            console.print(
+                "Saving best model from metrics tracking...",
+                style="info",
+            )
             best_model_path = models_dir / "best_metrics_model.pth"
             torch.save(best_model_state["model_state_dict"], best_model_path)
             mlflow.log_artifact(str(best_model_path))
@@ -560,7 +586,10 @@ def main(cfg: DictConfig) -> None:
 
         # Save best model from early stopping if available
         if early_stopping.best_model is not None:
-            console.print("Saving best model from early stopping...", style="info")
+            console.print(
+                "Saving best model from early stopping...",
+                style="info",
+            )
             model.load_state_dict(early_stopping.best_model)
             best_model_path = models_dir / "best_model.pth"
             torch.save(model.state_dict(), best_model_path)
