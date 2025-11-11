@@ -1,127 +1,96 @@
-defaults: #points to sub-configs
-  - model: unet
-  - _self_ # main overrides sub-cfg in case of duplicates
-
-
-# EXPERIMENT CONFIG
-#####################################################################
-
-path_project: C:\Users\KYC\OneDrive - NGI\Documents\PhD\Paper - Synthetic rock joint generation for ML
+defaults:
+- model: unet
+- _self_
+path_project: C:\Users\KYC\OneDrive - NGI\Documents\PhD\Paper - Synthetic rock joint
+  generation for ML
 matplotlib_config_path: ./scripts/config/figures_styles.mplstyle
-
-# NOTE: hydra configs are not passed on to cfg and don't need schema
 hydra:
   run:
     dir: ${path_project}/experiments/hydra_outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
     dir: ${path_project}/experiments/hydra_outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
     subdir: ${hydra.job.num}
-
-# Azure ML specific configuration
 azure_ml:
-  compute_name: "Standard-NC6s-v3"  # GPU VM size for training: NC64as-T4-v3; Standard-NC6s-v3
-  experiment_name: "rock-segmentation" # Default experiment name
-  environment_name: "rock-segmentation-env-curated-py310"  # Name of the Azure ML environment
-  environment_version: "1"  # Default environment version
-  use_new_version: true  # Whether to create and use a new version of the environment
-  use_curated_env: false  # Whether to use a curated AzureML environment instead of custom one
-  curated_env_name: "azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest"  # The name of the curated environment to use if use_curated_env is true
-  base_docker_image: "mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37"
-  # base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.4-ubuntu22.04"  # Base docker image for custom environments with CUDA 12.4 support
-# Alternatives:
-# CUDA 12+ options:
-#base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.5-ubuntu22.04" # CUDA 12.5 with Ubuntu 22.04
-#base_docker_image: "mcr.microsoft.com/azureml/openmpi5.0-cuda12.6-ubuntu24.04" # CUDA 12.6 with Ubuntu 24.04
-# CUDA 11+ options:
-#base_docker_image: "mcr.microsoft.com/azureml/minimal-ubuntu22.04-py39-cuda11.8-gpu-inference:latest" # CUDA 11.8 for inference
-#base_docker_image: "mcr.microsoft.com/azureml/openmpi4.1.0-cuda11.8-cudnn8-ubuntu22.04" # CUDA 11.8 with OpenMPI
-
-
-# Azure Data Assets configuration
-# Note: Credentials are loaded from .env file at runtime
+  compute_name: Standard-NC6s-v3
+  experiment_name: rock-segmentation
+  environment_name: rock-segmentation-env-curated-py310
+  environment_version: '2'
+  use_new_version: true
+  use_curated_env: true
+  curated_env_name: azureml://registries/azureml/environments/acpt-pytorch-2.2-cuda12.1/labels/latest
+  base_docker_image: mcr.microsoft.com/azureml/curated/acpt-pytorch-2.2-cuda12.1:37
 azure_data_assets:
-  # Command to execute - available options:
-  # - register-base-datasets: Register base datasets in Azure ML
-  # - register-splits: Register dataset splits in Azure ML
-  # - list-assets: List data assets in Azure ML
-  # - compare-assets: Compare two versions of a data asset
-  # - build-environment: Build the Azure ML environment in Azure ML
-  # - help: Show detailed help and best practices
-  command: register-base-datasets  # Default command to register base datasets
-  # Parameters for asset commands
-  asset_name: null  # Name of the asset to list or compare
-  version1: null    # First version for comparison
-  version2: null    # Second version for comparison
-  # Output directory for logs
+  command: register-base-datasets
+  asset_name: null
+  version1: null
+  version2: null
   output_dir: outputs/azure_data_assets/${now:%Y-%m-%d_%H-%M-%S}
-
 experiment:
   seed: 42
   log_mlflow: true
-  compare_metric: loss # metric for comparison in chosing new best model
-  num_workers: 4 # number of workers for data loading
+  compare_metric: loss
+  num_workers: 4
   train_fraction: 0.8
   val_fraction: 0.1
   test_fraction: 0.1
   early_stopping_patience: 3
-  early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
+  early_stopping_delta: 0.005
   optional_transforms: false
   overfit_check: false
-  sanity_check_num_batches: null # set to a low number to speed up training in order to check if functionality is working, e.g. 1-3
+  sanity_check_num_batches: null
   quality_control_data: false
   crossvalidation: false
   path_example_images: ${path_project}/experiments/example_images
-  download_outputs: false  # Flag to control whether to download outputs after job completion in Azure ML
-  smoke_test: false        # If true, submit a lightweight smoke test job instead of full training
-  smoke_test_use_cuda: false  # If true, the smoke test will try CUDA; otherwise forces CPU
-  smoke_test_minimal: false   # If true with smoke_test, run a tiny env probe (nvidia-smi + torch import)
-  experiment_strategy: "verification_box" # "verification_box", "verification_dfn", "main_objective_dfn_rock_slope", "main_objective_dfn_box", "main_objective_box_rock_slope", "main_objective_box_box", "dataset_size_test", "semi_supervised_learning", "one_shot_segmentation"
+  download_outputs: false
+  smoke_test: false
+  smoke_test_use_cuda: false
+  smoke_test_minimal: false
+  experiment_strategy: verification_box
   dataset_strategies:
     verification_box:
       train_datasets:
-        - "synthetic_box"
+      - synthetic_box
       test_datasets:
-        - "synthetic_box"
+      - synthetic_box
     verification_dfn:
       train_datasets:
-        - "synthetic_dfn"
+      - synthetic_dfn
       test_datasets:
-        - "synthetic_dfn"
+      - synthetic_dfn
     main_objective_dfn_rock_slope:
       train_datasets:
-        - "synthetic_dfn"
+      - synthetic_dfn
       test_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
     main_objective_dfn_box:
       train_datasets:
-        - "synthetic_dfn"
+      - synthetic_dfn
       test_datasets:
-        - "real_world_box"
+      - real_world_box
     main_objective_box_rock_slope:
       train_datasets:
-        - "synthetic_box"
+      - synthetic_box
       test_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
     main_objective_box_box:
       train_datasets:
-        - "synthetic_box"
+      - synthetic_box
       test_datasets:
-        - "real_world_box"
+      - real_world_box
     dataset_size_test:
       train_datasets:
-        - "synthetic_dfn"
+      - synthetic_dfn
       test_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
     semi_supervised_learning:
       train_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
       test_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
     one_shot_segmentation:
       train_datasets:
-        - "real_world_rock_slope"
+      - real_world_rock_slope
       test_datasets: []
-
 dataset:
   path_images: ${path_project}/Data/rockmass
   path_raw_mask_labels: ${path_project}/Data/label/raw
@@ -129,23 +98,20 @@ dataset:
   crop_size: 768
   prefixes:
     synthetic_dfn:
-      - "FracMan"
+    - FracMan
     synthetic_box:
-      - "Benchmark"
+    - Benchmark
     real_world_box:
-      - "Box"
+    - Box
     real_world_rock_slope:
-      - "Larvik"
-      - "Rv4"
-
+    - Larvik
+    - Rv4
 tensorboard:
   path: ./experiments/tensorboard_logs
-
 mlflow:
   path: ${path_project}/experiments/mlruns
-  experiment_name: null # is set when calling scripts
+  experiment_name: null
   save_model: true
-
 optuna:
   n_trials: 5
   path_results: experiments/hyperparameters
