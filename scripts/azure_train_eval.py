@@ -255,48 +255,15 @@ def main(cfg: DictConfig) -> None:
         "Loading train/test data from Azure ML inputs...",
         style="info",
     )
-    # Azure ML provides input paths via command-line arguments when using
-    # ${{inputs.name}} notation in the job command. Hydra will parse these
-    # as extra arguments, so we need to extract them from sys.argv before
-    # Hydra processes the config.
-    import sys
+    # Azure ML provides input paths via ${{inputs.name}} which get passed
+    # as Hydra config overrides (dataset.azure_*_path)
+    images_path = pcfg.dataset.azure_images_path
+    masks_path = pcfg.dataset.azure_masks_path
+    splits_path = pcfg.dataset.azure_splits_path
 
-    # Extract Azure ML input paths from command-line arguments
-    images_arg = next(
-        (
-            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
-            for i, arg in enumerate(sys.argv)
-            if "--images_path" in arg
-        ),
-        None,
-    )
-    masks_arg = next(
-        (
-            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
-            for i, arg in enumerate(sys.argv)
-            if "--masks_path" in arg
-        ),
-        None,
-    )
-    splits_arg = next(
-        (
-            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
-            for i, arg in enumerate(sys.argv)
-            if "--splits_path" in arg
-        ),
-        None,
-    )
-
-    images_path = Path(images_arg) if images_arg else None
-    masks_path = Path(masks_arg) if masks_arg else None
-    splits_path = Path(splits_arg) if splits_arg else None
-
-    console.print(f"Images path from args: {images_path}", style="info")
-    console.print(f"Masks path from args: {masks_path}", style="info")
-    console.print(f"Splits path from args: {splits_path}", style="info")
-
-    # Paths were already extracted from command-line arguments above
-    # No need for get_input_path function with command-line arg approach
+    console.print(f"Images path from config: {images_path}", style="info")
+    console.print(f"Masks path from config: {masks_path}", style="info")
+    console.print(f"Splits path from config: {splits_path}", style="info")
 
     def validate_nonempty_images(path: Path, label: str) -> None:
         # Treat '.' with zero files as missing mount rather than continuing
@@ -318,10 +285,10 @@ def main(cfg: DictConfig) -> None:
     # Check images path
     if images_path is None:
         console.print(
-            "Missing Azure ML input 'images_data' env var.",
+            "Missing Azure ML input 'images_data' - not provided via config.",
             style="danger",
         )
-        raise ValueError("Azure ML input 'images_data' is not mounted.")
+        raise ValueError("Azure ML input 'images_data' was not provided.")
     if images_path.exists():
         console.print(f"Mounted images path: {images_path}", style="info")
         mlflow.log_param("images_path", str(images_path))

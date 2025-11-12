@@ -206,6 +206,16 @@ class DatasetConfig(BaseModel):
             "files for that dataset."
         ),
     )
+    # Optional Azure ML input paths (passed via ${{inputs.*}} in job command)
+    azure_images_path: Path | None = Field(
+        None, description="Azure ML input path for images data"
+    )
+    azure_masks_path: Path | None = Field(
+        None, description="Azure ML input path for masks data"
+    )
+    azure_splits_path: Path | None = Field(
+        None, description="Azure ML input path for splits data"
+    )
 
     @field_validator("crop_size")
     @classmethod
