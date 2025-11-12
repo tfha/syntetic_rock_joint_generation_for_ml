@@ -81,7 +81,7 @@ def main(cfg: DictConfig) -> None:
     # Set job display name based on model and strategy
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
     display_name = (
-        f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-{timestamp}"
+        f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy.value}-{timestamp}"
     )
 
     # 2. Connect to Azure ML workspace and validate permissions
@@ -139,7 +139,8 @@ def main(cfg: DictConfig) -> None:
         train_command = (
             f"python scripts/azure_train_eval.py "
             f"model={pcfg.model.name} "
-            f"experiment.experiment_strategy={pcfg.experiment.experiment_strategy} "
+            f"experiment.experiment_strategy="
+            f"{pcfg.experiment.experiment_strategy.value} "
         )
 
     # Job inputs
@@ -190,7 +191,7 @@ def main(cfg: DictConfig) -> None:
     # Run metadata for tracking
     run_metadata = {
         "model_name": pcfg.model.name,
-        "strategy": pcfg.experiment.experiment_strategy,
+        "strategy": pcfg.experiment.experiment_strategy.value,
         "images_dataset_version": images_dataset.version,
         "masks_dataset_version": masks_dataset.version,
         "splits_dataset_version": splits_dataset.version,

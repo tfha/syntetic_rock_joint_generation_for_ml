@@ -98,6 +98,28 @@ class ExperimentConfig(BaseModel):
             "training and testing respectively."
         ),
     )
+
+    @field_validator("experiment_strategy", mode="before")
+    @classmethod
+    def normalize_experiment_strategy(cls, v: Any) -> str:
+        """Normalize experiment_strategy for Hydra enum representations.
+
+        Hydra may serialize enums as 'EnumClass.VALUE' strings;
+        extract the value part.
+        """
+        if isinstance(v, str) and "." in v:
+            # Handle 'ExperimentStrategy.VERIFICATION_BOX'
+            # -> 'verification_box'
+            parts = v.split(".")
+            if len(parts) == 2 and parts[0] == "ExperimentStrategy":
+                # Map uppercase enum name to lowercase value
+                enum_name = parts[1]
+                # Try to find matching enum by name
+                for member in ExperimentStrategy:
+                    if member.name == enum_name:
+                        return member.value
+        return v
+
     seed: int = Field(..., description="Random seed for reproducibility.")
     log_mlflow: bool = Field(..., description="Whether to log to mlflow or not.")
     compare_metric: str = Field(
