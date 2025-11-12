@@ -260,9 +260,11 @@ def main(cfg: DictConfig) -> None:
     def get_input_path(input_key: str) -> Path | None:
         """Return the mounted path for a given Azure ML job input key.
 
-        We consider the input missing if no AZUREML_INPUT_* env var is set.
-        Returning None avoids silently falling back to the current directory.
+        Checks both environment variables (SDK v1 style) and default mount
+        locations (SDK v2 style at inputs/<name>/).
+        Returning None if neither is found avoids silently using cwd.
         """
+        # First try environment variables (SDK v1 and some v2 configs)
         candidates = [
             f"AZUREML_INPUT_{input_key.upper()}",
             f"AZUREML_INPUT_{input_key}",
@@ -271,6 +273,16 @@ def main(cfg: DictConfig) -> None:
             val = os.getenv(var)
             if val:
                 return Path(val)
+
+        # Fallback: SDK v2 default mount at inputs/<input_key>/
+        default_mount = Path("inputs") / input_key
+        if default_mount.exists():
+            console.print(
+                f"Found input at SDK v2 default location: {default_mount}",
+                style="info",
+            )
+            return default_mount
+
         return None
 
     images_path = get_input_path("images_data")
