@@ -150,15 +150,17 @@ def main(cfg: DictConfig) -> None:
         # Minimal smoke does not require dataset mounts; avoid triggering mount permissions
         job_inputs: dict[str, Any] = {}
     else:
+        # Use download mode instead of mount - more reliable but slower
+        # Mount mode (ro_mount) is failing to create inputs/ directory
         job_inputs = {
             "images_data": Input(
-                type="uri_folder", path=images_dataset.id, mode="ro_mount"
+                type="uri_folder", path=images_dataset.id, mode="download"
             ),
             "masks_data": Input(
-                type="uri_folder", path=masks_dataset.id, mode="ro_mount"
+                type="uri_folder", path=masks_dataset.id, mode="download"
             ),
             "splits_data": Input(
-                type="uri_folder", path=splits_dataset.id, mode="ro_mount"
+                type="uri_folder", path=splits_dataset.id, mode="download"
             ),
         }
 
