@@ -142,9 +142,9 @@ def main(cfg: DictConfig) -> None:
             f"model={pcfg.model.name} "
             f"experiment.experiment_strategy="
             f"{pcfg.experiment.experiment_strategy.value} "
-            f"dataset.azure_images_path=${{{{inputs.images_data}}}} "
-            f"dataset.azure_masks_path=${{{{inputs.masks_data}}}} "
-            f"dataset.azure_splits_path=${{{{inputs.splits_data}}}}"
+            f"+dataset.azure_images_path=${{{{inputs.images_data}}}} "
+            f"+dataset.azure_masks_path=${{{{inputs.masks_data}}}} "
+            f"+dataset.azure_splits_path=${{{{inputs.splits_data}}}}"
         )
 
     # Job inputs
