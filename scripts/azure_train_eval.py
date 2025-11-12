@@ -12,6 +12,7 @@ Architecture:
 - TensorBoard integration for real-time visualization
 - Robust error handling and metrics tracking
 - Standardized output organization for models, visualizations, and logs
+- SDK v2 compatible with fallback mount path detection
 
 The script handles:
 1. Configuration setup and validation using Hydra
