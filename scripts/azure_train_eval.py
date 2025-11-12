@@ -255,94 +255,48 @@ def main(cfg: DictConfig) -> None:
         "Loading train/test data from Azure ML inputs...",
         style="info",
     )
-    # Azure ML mounts input datasets to paths via env vars. Azure sets
-    # AZUREML_INPUT_<NAME> where NAME is uppercased input key.
+    # Azure ML provides input paths via command-line arguments when using
+    # ${{inputs.name}} notation in the job command. Hydra will parse these
+    # as extra arguments, so we need to extract them from sys.argv before
+    # Hydra processes the config.
+    import sys
 
-    def get_input_path(input_key: str) -> Path | None:
-        """Return the mounted path for a given Azure ML job input key.
+    # Extract Azure ML input paths from command-line arguments
+    images_arg = next(
+        (
+            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
+            for i, arg in enumerate(sys.argv)
+            if "--images_path" in arg
+        ),
+        None,
+    )
+    masks_arg = next(
+        (
+            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
+            for i, arg in enumerate(sys.argv)
+            if "--masks_path" in arg
+        ),
+        None,
+    )
+    splits_arg = next(
+        (
+            arg.split("=")[1] if "=" in arg else sys.argv[i + 1]
+            for i, arg in enumerate(sys.argv)
+            if "--splits_path" in arg
+        ),
+        None,
+    )
 
-        Checks both environment variables (SDK v1 style) and default mount
-        locations (SDK v2 style at inputs/<name>/).
-        Returning None if neither is found avoids silently using cwd.
-        """
-        # First try environment variables (SDK v1 and some v2 configs)
-        candidates = [
-            f"AZUREML_INPUT_{input_key.upper()}",
-            f"AZUREML_INPUT_{input_key}",
-        ]
-        for var in candidates:
-            val = os.getenv(var)
-            if val:
-                console.print(
-                    f"Found {input_key} via env var {var}: {val}",
-                    style="info",
-                )
-                return Path(val)
+    images_path = Path(images_arg) if images_arg else None
+    masks_path = Path(masks_arg) if masks_arg else None
+    splits_path = Path(splits_arg) if splits_arg else None
 
-        # Fallback: SDK v2 default mount at inputs/<input_key>/
-        default_mount = Path("inputs") / input_key
-        abs_path = default_mount.absolute()
-        console.print(
-            f"Checking SDK v2 path for {input_key}: {abs_path}",
-            style="dim",
-        )
-        exists = default_mount.exists()
-        is_dir = default_mount.is_dir() if exists else "N/A"
-        console.print(
-            f"  exists={exists}, is_dir={is_dir}",
-            style="dim",
-        )
+    console.print(f"Images path from args: {images_path}", style="info")
+    console.print(f"Masks path from args: {masks_path}", style="info")
+    console.print(f"Splits path from args: {splits_path}", style="info")
 
-        if default_mount.exists():
-            console.print(
-                f"Found input at SDK v2 default location: {default_mount}",
-                style="info",
-            )
-            return default_mount
-
-        # Last resort: check current working directory for debugging
-        cwd = Path.cwd()
-        console.print(f"Current working directory: {cwd}", style="dim")
-        cwd_contents = list(cwd.iterdir())[:10]
-        console.print(f"Contents of cwd: {cwd_contents}", style="dim")
-
-        inputs_dir = Path("inputs")
-        if inputs_dir.exists():
-            inputs_contents = list(inputs_dir.iterdir())
-            console.print(
-                f"Contents of inputs/: {inputs_contents}",
-                style="dim",
-            )
-        else:
-            console.print(
-                "inputs/ directory does not exist",
-                style="warning",
-            )
-
-        return None
-
-    images_path = get_input_path("images_data")
-    masks_path = get_input_path("masks_data")
-    # Allow None assignment later if splits input is missing
-    splits_path: Path | None = get_input_path("splits_data")
-
-    # Diagnostic: list all AZUREML_INPUT_* env vars we can see
-    input_env_vars = {
-        k: v for k, v in os.environ.items() if k.startswith("AZUREML_INPUT_")
-    }
-    if input_env_vars:
-        console.print(
-            "Detected input mount env vars:"
-            + "\n"
-            + "\n".join(f"  {k}={v}" for k, v in input_env_vars.items()),
-            style="info",
-        )
-    else:
-        console.print(
-            "No AZUREML_INPUT_* environment variables detected. "
-            "This usually means inputs were not declared or mount failed.",
-            style="warning",
-        )
+    # Paths were already extracted from command-line arguments above
+    # No need for get_input_path function with command-line arg approach
 
     def validate_nonempty_images(path: Path, label: str) -> None:
         # Treat '.' with zero files as missing mount rather than continuing

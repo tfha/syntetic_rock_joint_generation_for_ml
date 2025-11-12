@@ -136,11 +136,15 @@ def main(cfg: DictConfig) -> None:
             )
             train_command = "python scripts/azure_smoke_test.py"
     else:
+        # Pass data inputs as command-line arguments for Azure ML to provide paths
         train_command = (
             f"python scripts/azure_train_eval.py "
             f"model={pcfg.model.name} "
             f"experiment.experiment_strategy="
             f"{pcfg.experiment.experiment_strategy.value} "
+            f"--images_path ${{{{inputs.images_data}}}} "
+            f"--masks_path ${{{{inputs.masks_data}}}} "
+            f"--splits_path ${{{{inputs.splits_data}}}}"
         )
 
     # Job inputs
