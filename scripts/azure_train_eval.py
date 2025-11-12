@@ -273,16 +273,51 @@ def main(cfg: DictConfig) -> None:
         for var in candidates:
             val = os.getenv(var)
             if val:
+                console.print(
+                    f"Found {input_key} via env var {var}: {val}",
+                    style="info",
+                )
                 return Path(val)
 
         # Fallback: SDK v2 default mount at inputs/<input_key>/
         default_mount = Path("inputs") / input_key
+        abs_path = default_mount.absolute()
+        console.print(
+            f"Checking SDK v2 path for {input_key}: {abs_path}",
+            style="dim",
+        )
+        exists = default_mount.exists()
+        is_dir = default_mount.is_dir() if exists else "N/A"
+        console.print(
+            f"  exists={exists}, is_dir={is_dir}",
+            style="dim",
+        )
+
         if default_mount.exists():
             console.print(
                 f"Found input at SDK v2 default location: {default_mount}",
                 style="info",
             )
             return default_mount
+
+        # Last resort: check current working directory for debugging
+        cwd = Path.cwd()
+        console.print(f"Current working directory: {cwd}", style="dim")
+        cwd_contents = list(cwd.iterdir())[:10]
+        console.print(f"Contents of cwd: {cwd_contents}", style="dim")
+
+        inputs_dir = Path("inputs")
+        if inputs_dir.exists():
+            inputs_contents = list(inputs_dir.iterdir())
+            console.print(
+                f"Contents of inputs/: {inputs_contents}",
+                style="dim",
+            )
+        else:
+            console.print(
+                "inputs/ directory does not exist",
+                style="warning",
+            )
 
         return None
 
@@ -633,8 +668,9 @@ def main(cfg: DictConfig) -> None:
 
             # Load the best model for MLflow registration
             model.load_state_dict(best_model_state["model_state_dict"])
+            strategy_name = pcfg.experiment.experiment_strategy
             best_metrics_registered_name = (
-                f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-best-metrics"
+                f"{pcfg.model.name}-{strategy_name}-best-metrics"
             )
             mlflow.pytorch.log_model(
                 model,
@@ -734,9 +770,8 @@ def main(cfg: DictConfig) -> None:
 
             # Save best metrics to a file with more complete information
             with open(output_dir / "best_metrics.txt", "w") as f:
-                epoch_line = (
-                    f"Best metrics achieved at epoch {best_metrics['epoch']}:\n"
-                )
+                best_epoch = best_metrics["epoch"]
+                epoch_line = f"Best metrics achieved at epoch {best_epoch}:\n"
                 f.write(epoch_line)
                 f.write("-" * 50 + "\n")
                 for name, value in best_metrics.items():
