@@ -151,14 +151,31 @@ def main(cfg: DictConfig) -> None:
         job_inputs: dict[str, Any] = {}
     else:
         job_inputs = {
-            "images_data": Input(type="uri_folder", path=images_dataset.short_uri),
-            "masks_data": Input(type="uri_folder", path=masks_dataset.short_uri),
-            "splits_data": Input(type="uri_folder", path=splits_dataset.short_uri),
+            "images_data": Input(
+                type="uri_folder", path=images_dataset.id, mode="ro_mount"
+            ),
+            "masks_data": Input(
+                type="uri_folder", path=masks_dataset.id, mode="ro_mount"
+            ),
+            "splits_data": Input(
+                type="uri_folder", path=splits_dataset.id, mode="ro_mount"
+            ),
         }
 
     console.print(f"images_dataset.id: {images_dataset.id}", style="info")
     console.print(f"masks_dataset.id: {masks_dataset.id}", style="info")
     console.print(f"splits_dataset.id: {splits_dataset.id}", style="info")
+
+    # Print job inputs for verification
+    if job_inputs:
+        console.print("\nJob inputs configuration:", style="info")
+        for name, input_obj in job_inputs.items():
+            console.print(
+                f"  {name}: path={input_obj.path}, mode={input_obj.mode}",
+                style="info",
+            )
+    else:
+        console.print("No job inputs (minimal smoke test)", style="warning")
 
     # Job outputs
     job_outputs = {
