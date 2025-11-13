@@ -1,6 +1,6 @@
 # default values for the UNet model
 name: unet
-num_epochs: 10
+num_epochs: 50
 batch_size: 8
 learning_rate: 0.0001
 scheduler:
