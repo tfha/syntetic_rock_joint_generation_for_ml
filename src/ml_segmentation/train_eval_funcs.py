@@ -224,6 +224,16 @@ def train_one_epoch(
             precision_metric.update(preds, masks.int())
             recall_metric.update(preds, masks.int())
 
+            # Per-class dice updates
+            background_dice_metric.update(background_preds, background_masks)
+            joint_dice_metric.update(joint_preds, joint_masks)
+            # Per-class precision updates
+            background_precision_metric.update(background_preds, background_masks)
+            joint_precision_metric.update(joint_preds, joint_masks)
+            # Per-class recall updates
+            background_recall_metric.update(background_preds, background_masks)
+            joint_recall_metric.update(joint_preds, joint_masks)
+
     ds_sized: Sized = dataloader.dataset  # type: ignore[assignment]
     epoch_loss = float(running_loss) / float(len(ds_sized))
 
