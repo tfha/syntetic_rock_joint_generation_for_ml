@@ -232,7 +232,9 @@ def setup_azure_dataloader(
         else:
             pin_memory = torch.cuda.is_available()
     if persistent_workers is None:
-        persistent_workers = num_workers > 0
+        # Disable persistent_workers by default to avoid shared memory issues in Azure ML
+        # Can be overridden by explicitly passing persistent_workers=True
+        persistent_workers = False
 
     console.print(
         "Dataloader settings -> "
