@@ -59,7 +59,7 @@ experiment:
   seed: 42
   log_mlflow: true
   compare_metric: loss # metric for comparison in chosing new best model
-  num_workers: 4 # number of workers for data loading
+  num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   train_fraction: 0.8
   val_fraction: 0.1
   test_fraction: 0.1
