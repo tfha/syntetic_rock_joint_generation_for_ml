@@ -1,6 +1,6 @@
 name: unetplusplus
 num_epochs: 50
-batch_size: 64
+batch_size: 16  # Reduced from 64 due to high memory requirements of UNet++ architecture
 learning_rate: 0.001
 scheduler:
   patience: 5
