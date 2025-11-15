@@ -468,34 +468,48 @@ def main(cfg: DictConfig) -> None:
             for name, value in metrics_training.items():
                 mlflow.log_metric(f"train_{name}", value, epoch)
 
-            # Validation
-            metrics_validation = validate_one_epoch(
-                model=model,
-                dataloader=val_loader,
-                criterion=criterion,
-                device=device,
-                threshold=0.5,
-                max_batches=pcfg.experiment.sanity_check_num_batches,
-            )
-            console.print(
-                create_results_table(
-                    epoch,
-                    metrics_validation,
-                    session="Validation",
+            # Validation (only if validation data exists)
+            if len(val_loader.dataset) > 0:
+                metrics_validation = validate_one_epoch(
+                    model=model,
+                    dataloader=val_loader,
+                    criterion=criterion,
+                    device=device,
+                    threshold=0.5,
+                    max_batches=pcfg.experiment.sanity_check_num_batches,
                 )
-            )
+                console.print(
+                    create_results_table(
+                        epoch,
+                        metrics_validation,
+                        session="Validation",
+                    )
+                )
 
-            # Log validation metrics
-            log_metrics_to_tensorboard(
-                writer=writer,
-                metrics=metrics_validation,
-                prefix="Validation",
-                epoch=epoch,
-            )
+                # Log validation metrics
+                log_metrics_to_tensorboard(
+                    writer=writer,
+                    metrics=metrics_validation,
+                    prefix="Validation",
+                    epoch=epoch,
+                )
 
-            # Log to MLflow
-            for name, value in metrics_validation.items():
-                mlflow.log_metric(f"val_{name}", value, epoch)
+                # Log to MLflow
+                for name, value in metrics_validation.items():
+                    mlflow.log_metric(f"val_{name}", value, epoch)
+
+                # Update learning rate based on validation loss
+                scheduler.step(metrics_validation["loss"])
+            else:
+                # No validation data - use training metrics instead
+                console.print(
+                    "No validation data available, using training loss "
+                    "for scheduler and early stopping",
+                    style="warning",
+                )
+                # Use training metrics as a proxy for validation
+                metrics_validation = metrics_training.copy()
+                scheduler.step(metrics_training["loss"])
 
             # Save example predictions periodically
             if (epoch + 1) % 5 == 0 or epoch == 0:
@@ -514,9 +528,6 @@ def main(cfg: DictConfig) -> None:
                     mlflow.log_artifact(
                         str(img_path), f"example_predictions/epoch_{epoch + 1}"
                     )
-
-            # Update learning rate
-            scheduler.step(metrics_validation["loss"])
 
             # Update best metrics
             training_time = time.time() - start_time

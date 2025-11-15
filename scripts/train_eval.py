@@ -375,29 +375,44 @@ def main(cfg: DictConfig) -> None:
                 writer=writer, metrics=metrics_training, prefix="Training", epoch=epoch
             )
 
-            # Validate for one epoch
-            metrics_validation = validate_one_epoch(
-                model=model,
-                dataloader=test_loader,
-                criterion=criterion,
-                device=device,
-                threshold=0.5,
-                max_batches=pcfg.experiment.sanity_check_num_batches,
-            )
+            # Validate for one epoch (only if validation/test data exists)
+            if len(test_loader.dataset) > 0:
+                metrics_validation = validate_one_epoch(
+                    model=model,
+                    dataloader=test_loader,
+                    criterion=criterion,
+                    device=device,
+                    threshold=0.5,
+                    max_batches=pcfg.experiment.sanity_check_num_batches,
+                )
 
-            console.print(
-                create_results_table(epoch, metrics_validation, session="Validation")
-            )
+                console.print(
+                    create_results_table(
+                        epoch, metrics_validation, session="Validation"
+                    )
+                )
 
-            log_metrics_to_tensorboard(
-                writer=writer,
-                metrics=metrics_validation,
-                prefix="Validation",
-                epoch=epoch,
-            )
+                log_metrics_to_tensorboard(
+                    writer=writer,
+                    metrics=metrics_validation,
+                    prefix="Validation",
+                    epoch=epoch,
+                )
+
+                # Step the scheduler
+                scheduler.step(metrics_validation["loss"])
+            else:
+                # No validation/test data - use training metrics
+                console.print(
+                    "No validation/test data available, using training loss "
+                    "for scheduler and early stopping",
+                    style="warning",
+                )
+                metrics_validation = metrics_training.copy()
+                scheduler.step(metrics_training["loss"])
 
             # Save example predictions every 3rd epoch
-            if (epoch + 1) % 3 == 0:
+            if (epoch + 1) % 3 == 0 and len(test_loader.dataset) > 0:
                 save_image_predictions(
                     model,
                     test_loader,
