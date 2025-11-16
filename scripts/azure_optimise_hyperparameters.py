@@ -223,6 +223,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
+    # Prepare inputs dictionary
+    inputs_dict = {
+        "images_data": Input(type="uri_folder", path=images_dataset.id),
+        "masks_data": Input(type="uri_folder", path=masks_dataset.id),
+    }
+
+    # Add splits dataset if available
+    if has_splits:
+        inputs_dict["splits_data"] = Input(type="uri_folder", path=splits_dataset.id)
+
     # Define the hyperparameter optimization command job
     command_job = command(
         code="./",
@@ -231,22 +241,13 @@ def main():
         compute=opt_config["compute_cluster"],
         display_name=f"hparam_opt_{model_name}",
         experiment_name=experiment_name,
-        inputs={
-            "images_data": Input(type="uri_folder", path=images_dataset.id),
-            "masks_data": Input(type="uri_folder", path=masks_dataset.id),
-        },
+        inputs=inputs_dict,
         outputs={
             "model_output": Output(type="uri_folder", path="./outputs/models"),
             "metrics_output": Output(type="uri_folder", path="./outputs/metrics"),
             "plots_output": Output(type="uri_folder", path="./outputs/plots"),
         },
     )
-
-    # Add splits dataset if available
-    if has_splits:
-        command_job.inputs["splits_data"] = Input(
-            type="uri_folder", path=splits_dataset.id
-        )
 
     # Get the search space for the specified model
     search_space = get_model_search_space(model_name)
