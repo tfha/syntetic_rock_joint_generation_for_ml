@@ -291,8 +291,8 @@ def main():
         search_space=sweep_params,
     )
 
-    # Set timeout (in seconds) - 8 hours for full optimization
-    sweep_job.limits.timeout = 28800
+    # Set timeout (in seconds) - 24 hours for full optimization
+    sweep_job.limits.timeout = 86400
 
     # Add early termination if specified
     if "early_termination" in sampling_params:
