@@ -73,6 +73,23 @@ class ModelConfig(BaseModel):
     params: dict[str, Any] = Field(..., description="Dictionary of model parameters.")
 
 
+class TransformConfig(BaseModel):
+    """Configuration for individual data augmentation transforms."""
+
+    random_crop: bool = Field(False, description="Whether to apply random cropping.")
+    horizontal_flip: bool = Field(
+        False, description="Whether to apply random horizontal flipping."
+    )
+    vertical_flip: bool = Field(
+        False, description="Whether to apply random vertical flipping."
+    )
+    color_jitter: bool = Field(
+        False, description="Whether to apply color jitter augmentation."
+    )
+    rotation: bool = Field(False, description="Whether to apply random rotation.")
+    gaussian_blur: bool = Field(False, description="Whether to apply Gaussian blur.")
+
+
 class ExperimentStrategy(str, Enum):
     VERIFICATION_BOX = "verification_box"
     VERIFICATION_DFN = "verification_dfn"
@@ -143,8 +160,12 @@ class ExperimentConfig(BaseModel):
             "improvement for early stopping."
         ),
     )
-    optional_transforms: bool = Field(
-        ..., description="Whether optional image transforms are used."
+    optional_transforms: bool | TransformConfig = Field(
+        False,
+        description=(
+            "Whether optional image transforms are used. "
+            "Can be bool (legacy) or TransformConfig for granular control."
+        ),
     )
     overfit_check: bool = Field(..., description="Whether overfit check is used.")
     sanity_check_num_batches: int | None = Field(

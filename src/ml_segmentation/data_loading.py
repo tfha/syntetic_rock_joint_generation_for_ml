@@ -124,42 +124,81 @@ def get_dataloaders(
 
 
 def get_transforms(
-    optional_transforms: bool = False,
+    optional_transforms: bool | dict[str, bool] = False,
     transforms_parameters: dict[str, Any] | None = None,
 ) -> dict[str, "transforms.Compose"]:
     """
+    Get image and label transforms with optional augmentations.
+
     Using all the transforms, the effective virtual dataset size will be
     ~14.4x larger during training compared to the original 1000 images.
     While you still only have 1000 original images saved, the model will
     effectively see about 14,400 variations of your images during training,
     which significantly improves generalisation without increasing stored
     images.
+
+    Args:
+        optional_transforms: Either bool (legacy - enables ColorJitter only) or dict with individual flags:
+            - horizontal_flip: Apply horizontal flipping
+            - vertical_flip: Apply vertical flipping
+            - color_jitter: Apply color jitter
+            - rotation: Apply random rotation
+            - gaussian_blur: Apply Gaussian blur
+        transforms_parameters: Dict with transform parameters (e.g., crop_size)
     """
     # Read transform parameters (future-proof: add more keys as needed)
     params = transforms_parameters or {}
     crop_sz: int = int(params.get("crop_size", 768))
+
+    # Parse transform flags (support both legacy bool and new dict format)
+    if isinstance(optional_transforms, bool):
+        # Legacy mode: bool=True enables only ColorJitter
+        transform_flags = {
+            "horizontal_flip": False,
+            "vertical_flip": False,
+            "color_jitter": optional_transforms,
+            "rotation": False,
+            "gaussian_blur": False,
+        }
+    else:
+        # New mode: individual control from dict
+        transform_flags = optional_transforms
+
     train_transforms_list = [
         transforms.CenterCrop(crop_sz),
         # transforms.Resize(
         #     (resize_size, resize_size), interpolation=Image.BILINEAR
         # ),
-        # transforms.RandomHorizontalFlip(),
-        # transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),  # transforms the image to a tensor in the range [0, 1]
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        ),  # normalizes the image to have a mean and standard deviation of 0.5
     ]
 
-    if optional_transforms:
-        train_transforms_list.extend(
-            [
-                # transforms.RandomRotation(15),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
-                ),
-                # transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
-            ]
+    # Add geometric transforms BEFORE ToTensor
+    if transform_flags.get("horizontal_flip", False):
+        train_transforms_list.append(transforms.RandomHorizontalFlip())
+
+    if transform_flags.get("vertical_flip", False):
+        train_transforms_list.append(transforms.RandomVerticalFlip())
+
+    if transform_flags.get("rotation", False):
+        train_transforms_list.append(transforms.RandomRotation(15))
+
+    # ToTensor converts PIL to tensor
+    train_transforms_list.append(transforms.ToTensor())
+    train_transforms_list.append(
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    )
+
+    # Color augmentations (note: ideally should be before ToTensor, but keeping after for now)
+    if transform_flags.get("color_jitter", False):
+        # ColorJitter works on tensors too, though less efficient
+        train_transforms_list.append(
+            transforms.ColorJitter(
+                brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
+            )
+        )
+
+    if transform_flags.get("gaussian_blur", False):
+        train_transforms_list.append(
+            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))
         )
 
     image_transform = transforms.Compose(train_transforms_list)

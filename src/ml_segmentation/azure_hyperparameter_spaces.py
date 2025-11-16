@@ -47,12 +47,25 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation (single flag for all optional transforms)
-        "experiment.optional_transforms": {
+        # Data augmentation - independent control (8 combos: 2^3)
+        "experiment.optional_transforms.horizontal_flip": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
+        "experiment.optional_transforms.vertical_flip": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
+        "experiment.optional_transforms.color_jitter": {
             "type": "choice",
             "values": ["true", "false"],
         },
     }
+
+
+def get_unetplusplus_search_space() -> dict[str, dict[str, Any]]:
+    """UNet++ uses the same search space as UNet."""
+    return get_unet_search_space()
 
 
 def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
@@ -66,10 +79,21 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
         # Architecture parameters
         "model.params.encoder_name": {
             "type": "choice",
-            "values": ["resnet50", "resnet101", "efficientnet-b4", "mobilenet_v2"],
+            "values": [
+                "resnet50",
+                "resnet101",
+                "efficientnet-b4",
+                "mobilenet_v2",
+            ],
         },
-        "model.params.encoder_weights": {"type": "choice", "values": ["imagenet"]},
-        "model.params.decoder_channels": {"type": "choice", "values": [128, 256]},
+        "model.params.encoder_weights": {
+            "type": "choice",
+            "values": ["imagenet"],
+        },
+        "model.params.decoder_channels": {
+            "type": "choice",
+            "values": [128, 256],
+        },
         "model.params.upsampling": {"type": "choice", "values": [4, 8]},
         # Training parameters
         "model.batch_size": {"type": "choice", "values": [4, 8, 16]},
@@ -84,8 +108,16 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation (single flag for all optional transforms)
-        "experiment.optional_transforms": {
+        # Data augmentation - independent transform control (8 combos: 2^3)
+        "experiment.optional_transforms.horizontal_flip": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
+        "experiment.optional_transforms.vertical_flip": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
+        "experiment.optional_transforms.color_jitter": {
             "type": "choice",
             "values": ["true", "false"],
         },
