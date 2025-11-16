@@ -10,14 +10,19 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import yaml
+from azure.ai.ml import MLClient
+from azure.ai.ml.entities import BuildContext, Environment
+from rich.console import Console
+
 # Prefer stdlib tomllib on Python 3.11+, fallback to third-party `toml`.
 try:
-    import tomllib  # type: ignore
+    import tomllib  # type: ignore  # noqa: F401
 
     _HAS_TOMLLIB = True
 except Exception:
     _HAS_TOMLLIB = False
-    import toml  # type: ignore
+    import toml  # type: ignore  # noqa: F401
 
 
 def load_toml_file(path: Path) -> dict[str, Any]:
@@ -30,12 +35,6 @@ def load_toml_file(path: Path) -> dict[str, Any]:
         # third-party toml.load expects text
         with path.open("r", encoding="utf-8") as fh:
             return toml.load(fh)
-
-
-import yaml
-from azure.ai.ml import MLClient
-from azure.ai.ml.entities import BuildContext, Environment
-from rich.console import Console
 
 
 def export_poetry_to_environment_yml(
@@ -84,13 +83,12 @@ def export_poetry_to_environment_yml(
         return ""
 
     # Get pyproject.toml content to analyze sources
-    pyproject_path = os.path.join(os.getcwd(), "pyproject.toml")
+    pyproject_path = Path(os.getcwd()) / "pyproject.toml"
     custom_sources = {}
     cuda_packages = set()
 
-    if os.path.exists(pyproject_path):
-        with open(pyproject_path) as f:
-            pyproject_data = toml.load(f)
+    if pyproject_path.exists():
+        pyproject_data = load_toml_file(pyproject_path)
 
         # Check for custom package sources (like PyTorch index)
         sources = pyproject_data.get("tool", {}).get("poetry", {}).get("source", [])
