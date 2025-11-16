@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any  # Only import Any as it doesn't have a built-in equivalent
 
-from azure.ai.ml import Input, Output, command
+from azure.ai.ml import Input, command
 from azure.ai.ml.entities import BuildContext, Environment
 from azure.ai.ml.sweep import BanditPolicy, Choice, Uniform
 
@@ -242,11 +242,7 @@ def main():
         display_name=f"hparam_opt_{model_name}",
         experiment_name=experiment_name,
         inputs=inputs_dict,
-        outputs={
-            "model_output": Output(type="uri_folder", path="./outputs/models"),
-            "metrics_output": Output(type="uri_folder", path="./outputs/metrics"),
-            "plots_output": Output(type="uri_folder", path="./outputs/plots"),
-        },
+        # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
 
     # Get the search space for the specified model
