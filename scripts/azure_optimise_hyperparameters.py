@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any  # Only import Any as it doesn't have a built-in equivalent
 
 from azure.ai.ml import Input, command
-from azure.ai.ml.entities import BuildContext, Environment
+from azure.ai.ml.entities import (
+    BuildContext,
+    Environment,
+    ManagedIdentityConfiguration,
+)
 from azure.ai.ml.sweep import BanditPolicy, Choice, Uniform
 
 from ml_segmentation.azure_authentication import (
@@ -223,15 +227,19 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
-    # Prepare inputs dictionary
+    # Prepare inputs dictionary (use download mode for reliability)
     inputs_dict = {
-        "images_data": Input(type="uri_folder", path=images_dataset.id),
-        "masks_data": Input(type="uri_folder", path=masks_dataset.id),
+        "images_data": Input(
+            type="uri_folder", path=images_dataset.id, mode="download"
+        ),
+        "masks_data": Input(type="uri_folder", path=masks_dataset.id, mode="download"),
     }
 
     # Add splits dataset if available
     if has_splits:
-        inputs_dict["splits_data"] = Input(type="uri_folder", path=splits_dataset.id)
+        inputs_dict["splits_data"] = Input(
+            type="uri_folder", path=splits_dataset.id, mode="download"
+        )
 
     # Define the hyperparameter optimization command job
     command_job = command(
@@ -242,6 +250,7 @@ def main():
         display_name=f"hparam_opt_{model_name}",
         experiment_name=experiment_name,
         inputs=inputs_dict,
+        identity=ManagedIdentityConfiguration(),
         # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
 
