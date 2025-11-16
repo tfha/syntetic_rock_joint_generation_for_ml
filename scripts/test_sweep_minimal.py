@@ -60,19 +60,14 @@ def main() -> None:
     )
 
     # CRITICAL: Sweep jobs don't pass inputs to child jobs!
-    # Must use environment variables instead
-    datastore_base = "azureml://datastores/workspaceblobstore/paths"
-    data_env_vars = {
-        "IMAGES_DATA_PATH": (
-            f"{datastore_base}/{images_dataset.name}/{images_dataset.version}"
-        ),
-        "MASKS_DATA_PATH": (
-            f"{datastore_base}/{masks_dataset.name}/{masks_dataset.version}"
-        ),
-        "SPLITS_DATA_PATH": (
-            f"{datastore_base}/{splits_dataset.name}/{splits_dataset.version}"
-        ),
-    }
+    # Solution: Pass data paths directly via command-line Hydra overrides
+    # Use the actual blob storage paths from data assets
+    images_uri = "azureml://datastores/workspaceblobstore/paths/rockmass"
+    masks_uri = "azureml://datastores/workspaceblobstore/paths/rockmass_masks"
+    splits_uri = (
+        "azureml://datastores/workspaceblobstore/paths/"
+        f"rock_segmentation_splits/{splits_dataset.version}"
+    )
 
     # Create minimal command with just 1 epoch
     # Azure ML sweep parameters must use underscores (not dots), but we need
@@ -85,6 +80,9 @@ def main() -> None:
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
         "+experiment.report_metrics_to_file=True "
+        f"dataset.azure_images_path={images_uri} "
+        f"dataset.azure_masks_path={masks_uri} "
+        f"dataset.azure_splits_path={splits_uri} "
         "model.params.encoder_name=${{search_space.encoder_name}} "
         "model.batch_size=${{search_space.batch_size}}"
     )
@@ -107,7 +105,6 @@ def main() -> None:
         compute="Standard-NC6s-v3",  # GPU cluster name
         display_name="sweep_test_minimal",
         experiment_name=experiment_name,
-        environment_variables=data_env_vars,  # Pass data via env vars
         identity=ManagedIdentityConfiguration(),
     )
 
