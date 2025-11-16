@@ -59,19 +59,19 @@ def main() -> None:
         style="info",
     )
 
-    # Prepare inputs using name@version format
+    # Prepare inputs using azureml asset URI format
     inputs_dict = {
         "images_data": Input(
             type="uri_folder",
-            path=f"{images_dataset.name}@{images_dataset.version}",
+            path=f"azureml:{images_dataset.name}:{images_dataset.version}",
         ),
         "masks_data": Input(
             type="uri_folder",
-            path=f"{masks_dataset.name}@{masks_dataset.version}",
+            path=f"azureml:{masks_dataset.name}:{masks_dataset.version}",
         ),
         "splits_data": Input(
             type="uri_folder",
-            path=f"{splits_dataset.name}@{splits_dataset.version}",
+            path=f"azureml:{splits_dataset.name}:{splits_dataset.version}",
         ),
     }
 

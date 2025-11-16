@@ -231,16 +231,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
-    # Prepare inputs dictionary using the retrieved dataset IDs
-    # Use the actual dataset versions we retrieved earlier
+    # Prepare inputs dictionary using azureml asset URI format
+    # Use azureml:name:version which sweep jobs handle correctly
     inputs_dict = {
         "images_data": Input(
             type="uri_folder",
-            path=images_dataset.id,
+            path=f"azureml:{images_dataset.name}:{images_dataset.version}",
         ),
         "masks_data": Input(
             type="uri_folder",
-            path=masks_dataset.id,
+            path=f"azureml:{masks_dataset.name}:{masks_dataset.version}",
         ),
     }
 
@@ -248,7 +248,7 @@ def main():
     if has_splits:
         inputs_dict["splits_data"] = Input(
             type="uri_folder",
-            path=splits_dataset.id,
+            path=f"azureml:{splits_dataset.name}:{splits_dataset.version}",
         )
 
     # Define the hyperparameter optimization command job
