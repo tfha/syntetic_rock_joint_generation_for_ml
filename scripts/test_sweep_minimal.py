@@ -61,13 +61,15 @@ def main() -> None:
 
     # CRITICAL: Sweep jobs don't pass inputs to child jobs!
     # Solution: Pass data paths directly via command-line Hydra overrides
-    # Use the actual blob storage paths from data assets
-    images_uri = "azureml://datastores/workspaceblobstore/paths/rockmass"
-    masks_uri = "azureml://datastores/workspaceblobstore/paths/rockmass_masks"
-    splits_uri = (
-        "azureml://datastores/workspaceblobstore/paths/"
-        f"rock_segmentation_splits/{splits_dataset.version}"
-    )
+    # Use the actual blob storage paths (wasbs://) from data assets
+    images_uri = images_dataset.path  # wasbs:// URI
+    masks_uri = masks_dataset.path
+    splits_uri = splits_dataset.path
+
+    console.print("\n[bold]Data blob storage URIs:[/bold]", style="info")
+    console.print(f"  Images: {images_uri}", style="info")
+    console.print(f"  Masks: {masks_uri}", style="info")
+    console.print(f"  Splits: {splits_uri}", style="info")
 
     # Create minimal command with just 1 epoch
     # Azure ML sweep parameters must use underscores (not dots), but we need
