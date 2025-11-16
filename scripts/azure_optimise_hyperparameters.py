@@ -231,16 +231,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
-    # Prepare inputs dictionary without specifying mode
-    # Sweep jobs will handle data mounting automatically
+    # Prepare inputs dictionary using the retrieved dataset IDs
+    # Use the actual dataset versions we retrieved earlier
     inputs_dict = {
         "images_data": Input(
             type="uri_folder",
-            path="azureml:rock_images@latest",
+            path=images_dataset.id,
         ),
         "masks_data": Input(
             type="uri_folder",
-            path="azureml:rock_masks@latest",
+            path=masks_dataset.id,
         ),
     }
 
@@ -248,7 +248,7 @@ def main():
     if has_splits:
         inputs_dict["splits_data"] = Input(
             type="uri_folder",
-            path="azureml:rock_segmentation_splits@latest",
+            path=splits_dataset.id,
         )
 
     # Define the hyperparameter optimization command job
