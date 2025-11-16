@@ -301,7 +301,6 @@ def main():
         "Setting up hyperparameter sweep job with Bayesian optimization...",
         style="info",
     )
-    # Pass inputs directly to sweep() to ensure download mode is preserved
     sweep_job = command_job.sweep(
         sampling_algorithm=sampling_params["sampling_algorithm"],
         goal=sampling_params["goal"],
@@ -309,7 +308,6 @@ def main():
         max_total_trials=sampling_params["max_total_trials"],
         max_concurrent_trials=sampling_params["max_concurrent_trials"],
         search_space=sweep_params,
-        inputs=inputs_dict,  # Explicitly pass inputs to preserve mode
     )
 
     # Add early termination if specified
