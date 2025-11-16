@@ -7,7 +7,7 @@ to quickly verify that the data input configuration works correctly.
 
 from datetime import datetime
 
-from azure.ai.ml import Input, command
+from azure.ai.ml import command
 from azure.ai.ml.entities import ManagedIdentityConfiguration
 from azure.ai.ml.sweep import BanditPolicy, Choice
 
@@ -59,19 +59,18 @@ def main() -> None:
         style="info",
     )
 
-    # Prepare inputs using azureml asset URI format
-    inputs_dict = {
-        "images_data": Input(
-            type="uri_folder",
-            path=f"azureml:{images_dataset.name}:{images_dataset.version}",
+    # CRITICAL: Sweep jobs don't pass inputs to child jobs!
+    # Must use environment variables instead
+    datastore_base = "azureml://datastores/workspaceblobstore/paths"
+    data_env_vars = {
+        "IMAGES_DATA_PATH": (
+            f"{datastore_base}/{images_dataset.name}/{images_dataset.version}"
         ),
-        "masks_data": Input(
-            type="uri_folder",
-            path=f"azureml:{masks_dataset.name}:{masks_dataset.version}",
+        "MASKS_DATA_PATH": (
+            f"{datastore_base}/{masks_dataset.name}/{masks_dataset.version}"
         ),
-        "splits_data": Input(
-            type="uri_folder",
-            path=f"azureml:{splits_dataset.name}:{splits_dataset.version}",
+        "SPLITS_DATA_PATH": (
+            f"{datastore_base}/{splits_dataset.name}/{splits_dataset.version}"
         ),
     }
 
@@ -108,7 +107,7 @@ def main() -> None:
         compute="Standard-NC6s-v3",  # GPU cluster name
         display_name="sweep_test_minimal",
         experiment_name=experiment_name,
-        inputs=inputs_dict,
+        environment_variables=data_env_vars,  # Pass data via env vars
         identity=ManagedIdentityConfiguration(),
     )
 
