@@ -80,9 +80,9 @@ def main() -> None:
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
         "+experiment.report_metrics_to_file=True "
-        f"dataset.azure_images_path={images_uri} "
-        f"dataset.azure_masks_path={masks_uri} "
-        f"dataset.azure_splits_path={splits_uri} "
+        f"+dataset.azure_images_path={images_uri} "
+        f"+dataset.azure_masks_path={masks_uri} "
+        f"+dataset.azure_splits_path={splits_uri} "
         "model.params.encoder_name=${{search_space.encoder_name}} "
         "model.batch_size=${{search_space.batch_size}}"
     )
