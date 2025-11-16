@@ -251,6 +251,9 @@ def main():
         experiment_name=experiment_name,
         inputs=inputs_dict,
         identity=ManagedIdentityConfiguration(),
+        environment_variables={
+            "AZUREML_COMPUTE_USE_COMMON_RUNTIME": "false"  # Force fresh code snapshot
+        },
         # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
 
