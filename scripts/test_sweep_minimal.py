@@ -42,7 +42,7 @@ def main() -> None:
     console.print("Retrieving data assets...", style="info")
     images_dataset = get_data_asset(ml_client, console, "rock_images")
     masks_dataset = get_data_asset(ml_client, console, "rock_masks")
-    splits_dataset = get_data_asset(ml_client, console, "splits")
+    splits_dataset = get_data_asset(ml_client, console, "split_verification_box")
 
     # Log dataset information
     console.print("\n[bold]Dataset Information:[/bold]", style="info")
