@@ -25,9 +25,6 @@ from ml_segmentation.azure_authentication import (
     setup_azure_environment_variables,
 )
 from ml_segmentation.azure_core import configure_azure_logging_and_warning
-from ml_segmentation.azure_data_assets import (
-    get_data_asset,
-)
 from ml_segmentation.azure_environment import export_poetry_to_environment_yml
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
@@ -150,35 +147,22 @@ def main():
 
     # Get the latest versions of our data assets
     try:
-        console.print("Retrieving latest data assets from Azure ML...", style="info")
+        console.print("Retrieving data assets from Azure ML...", style="info")
 
-        # Get base image and mask datasets
-        images_dataset = get_data_asset(ml_client, console, "rock_images")
-        masks_dataset = get_data_asset(ml_client, console, "rock_masks")
-
-        # Try to get data splits if available
-        try:
-            splits_dataset = get_data_asset(
-                ml_client, console, "rock_segmentation_splits"
-            )
-            console.print(
-                f"Using dataset splits version: {splits_dataset.version}",
-                style="info",
-            )
-            has_splits = True
-        except Exception:
-            console.print(
-                "No dataset splits found, will use strategy-based splitting",
-                style="warning",
-            )
-            has_splits = False
-
-        console.print(
-            f"Using images dataset version: {images_dataset.version}",
-            style="info",
+        # Use exact dataset names and versions from verification experiments
+        images_dataset = ml_client.data.get(name="rock_images_from_raw", version="1")
+        masks_dataset = ml_client.data.get(
+            name="joint_masks_binary_from_raw", version="1"
         )
+        splits_dataset = ml_client.data.get(
+            name="verification_experiment_train_val_test_split", version="1"
+        )
+
         console.print(
-            f"Using masks dataset version: {masks_dataset.version}",
+            f"Data assets loaded:"
+            f"\n  Images: {images_dataset.name}@{images_dataset.version}"
+            f"\n  Masks: {masks_dataset.name}@{masks_dataset.version}"
+            f"\n  Splits: {splits_dataset.name}@{splits_dataset.version}",
             style="info",
         )
 
@@ -221,7 +205,12 @@ def main():
         f"hparam_opt_{model_name}_{opt_config['experiment_strategy']}_{timestamp}"
     )
 
+    # Get the search space for the specified model
+    search_space = get_model_search_space(model_name)
+
     # Create the base training command
+    # Use ${{inputs.*}} syntax - Azure ML expands these to mounted paths
+    # Azure ML sweep parameters use underscores, map to Hydra dotted notation
     base_command = (
         f"python scripts/azure_train_eval.py "
         f"model={model_name} "
@@ -229,15 +218,11 @@ def main():
         f"experiment.experiment_strategy={opt_config['experiment_strategy']} "
         f"model.num_epochs={opt_config['epochs']} "
         f"experiment.num_workers={opt_config['num_workers']} "
-    )  # Data splits are now always used in the system
-    # No need to add any specific flags
-
-    # Add output reporting for hyperparameter optimization
-    # Use + prefix to add new config key that doesn't exist in base schema
-    base_command += " +experiment.report_metrics_to_file=True"
-
-    # Get the search space for the specified model
-    search_space = get_model_search_space(model_name)
+        f"+experiment.report_metrics_to_file=True "
+        f"+dataset.azure_images_path=${{{{inputs.images_data}}}} "
+        f"+dataset.azure_masks_path=${{{{inputs.masks_data}}}} "
+        f"+dataset.azure_splits_path=${{{{inputs.splits_data}}}} "
+    )
 
     # Add search_space parameter mappings to command
     # Azure ML uses underscore names, but Hydra needs dotted notation
@@ -246,25 +231,17 @@ def main():
         # Map Azure ML's underscore parameter back to Hydra's dotted format
         base_command += f" {param_name}=${{{{search_space.{azure_param_name}}}}}"
 
-    # Prepare inputs dictionary using azureml asset URI format
-    # Use azureml:name:version which sweep jobs handle correctly
-    inputs_dict = {
+    # Define inputs - Azure ML will mount these and expand ${{inputs.*}}
+    # Use dataset.id with mode="download" (same as verification experiments)
+    job_inputs = {
         "images_data": Input(
-            type="uri_folder",
-            path=f"azureml:{images_dataset.name}:{images_dataset.version}",
+            type="uri_folder", path=images_dataset.id, mode="download"
         ),
-        "masks_data": Input(
-            type="uri_folder",
-            path=f"azureml:{masks_dataset.name}:{masks_dataset.version}",
+        "masks_data": Input(type="uri_folder", path=masks_dataset.id, mode="download"),
+        "splits_data": Input(
+            type="uri_folder", path=splits_dataset.id, mode="download"
         ),
     }
-
-    # Add splits dataset if available
-    if has_splits:
-        inputs_dict["splits_data"] = Input(
-            type="uri_folder",
-            path=f"azureml:{splits_dataset.name}:{splits_dataset.version}",
-        )
 
     # Define the hyperparameter optimization command job
     command_job = command(
@@ -274,13 +251,9 @@ def main():
         compute=opt_config["compute_cluster"],
         display_name=f"hparam_opt_{model_name}",
         experiment_name=experiment_name,
-        inputs=inputs_dict,
+        inputs=job_inputs,
         identity=ManagedIdentityConfiguration(),
-        # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
-
-    # Get the search space for the specified model
-    search_space = get_model_search_space(model_name)
 
     # Convert the search space to Azure ML sweep parameters
     # Azure ML requires parameter names with only letters, numbers,
@@ -318,6 +291,9 @@ def main():
         search_space=sweep_params,
     )
 
+    # Set timeout (in seconds) - 8 hours for full optimization
+    sweep_job.limits.timeout = 28800
+
     # Add early termination if specified
     if "early_termination" in sampling_params:
         et_params = sampling_params["early_termination"]
@@ -353,10 +329,8 @@ def main():
         "search_space": search_space,
         "images_dataset_version": images_dataset.version,
         "masks_dataset_version": masks_dataset.version,
+        "splits_dataset_version": splits_dataset.version,
     }
-
-    if has_splits:
-        job_info["splits_dataset_version"] = splits_dataset.version
 
     # Save job info to a file for later reference
     job_info_file = job_tracking_dir / f"job_info_{model_name}_{timestamp}.json"
