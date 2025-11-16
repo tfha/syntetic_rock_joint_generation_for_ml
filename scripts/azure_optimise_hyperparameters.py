@@ -163,7 +163,8 @@ def main():
                 ml_client, console, "rock_segmentation_splits"
             )
             console.print(
-                f"Using dataset splits version: {splits_dataset.version}", style="info"
+                f"Using dataset splits version: {splits_dataset.version}",
+                style="info",
             )
             has_splits = True
         except Exception:
@@ -174,10 +175,12 @@ def main():
             has_splits = False
 
         console.print(
-            f"Using images dataset version: {images_dataset.version}", style="info"
+            f"Using images dataset version: {images_dataset.version}",
+            style="info",
         )
         console.print(
-            f"Using masks dataset version: {masks_dataset.version}", style="info"
+            f"Using masks dataset version: {masks_dataset.version}",
+            style="info",
         )
 
     except Exception as e:
@@ -298,6 +301,7 @@ def main():
         "Setting up hyperparameter sweep job with Bayesian optimization...",
         style="info",
     )
+    # Pass inputs directly to sweep() to ensure download mode is preserved
     sweep_job = command_job.sweep(
         sampling_algorithm=sampling_params["sampling_algorithm"],
         goal=sampling_params["goal"],
@@ -305,12 +309,8 @@ def main():
         max_total_trials=sampling_params["max_total_trials"],
         max_concurrent_trials=sampling_params["max_concurrent_trials"],
         search_space=sweep_params,
+        inputs=inputs_dict,  # Explicitly pass inputs to preserve mode
     )
-
-    # CRITICAL: Re-apply inputs to sweep job to ensure download
-    # mode is preserved. The .sweep() method can override input
-    # configurations, so we explicitly set them again.
-    sweep_job.inputs = inputs_dict
 
     # Add early termination if specified
     if "early_termination" in sampling_params:
@@ -376,9 +376,9 @@ def main():
         style="success",
     )
     console.print(
-        "When the job completes, you can use the 'analyze_hyperparameter_results.py'"
-        " script "
-        "to analyze the results and generate a report of the best hyperparameters.",
+        "When the job completes, you can use the "
+        "'analyze_hyperparameter_results.py' script to analyze the results "
+        "and generate a report of the best hyperparameters.",
         style="info",
     )
 
