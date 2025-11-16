@@ -105,7 +105,7 @@ def main() -> None:
     )
 
     # Define minimal search space (just 2 parameters)
-    command_job.search_space = {
+    search_space = {
         "model.encoder_name": Choice(["resnet34", "efficientnet-b0"]),
         "model.batch_size": Choice([4]),
     }
@@ -117,6 +117,7 @@ def main() -> None:
         goal="minimize",
         max_total_trials=2,
         max_concurrent_trials=2,
+        search_space=search_space,
         early_termination_policy=BanditPolicy(
             evaluation_interval=1, slack_factor=0.1, delay_evaluation=5
         ),
