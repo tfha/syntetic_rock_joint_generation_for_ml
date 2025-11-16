@@ -1,0 +1,274 @@
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/config_loa │
+│ der_impl.py:390 in _apply_overrides_to_config                                │
+│                                                                              │
+│   387 │   │   │   │   │   OmegaConf.update(cfg, key, value, merge=True, forc │
+│   388 │   │   │   │   else:                                                  │
+│   389 │   │   │   │   │   try:                                               │
+│ ❱ 390 │   │   │   │   │   │   OmegaConf.update(cfg, key, value, merge=True)  │
+│   391 │   │   │   │   │   except (ConfigAttributeError, ConfigKeyError) as e │
+│   392 │   │   │   │   │   │   raise ConfigCompositionException(              │
+│   393 │   │   │   │   │   │   │   f"Could not override '{override.key_or_gro │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/omegaconf.py:741 │
+│ in update                                                                    │
+│                                                                              │
+│    738 │   │   │                                                             │
+│    739 │   │   │   if OmegaConf.is_dict(root):                               │
+│    740 │   │   │   │   assert isinstance(last_key, str)                      │
+│ ❱  741 │   │   │   │   root.__setattr__(last_key, value)                     │
+│    742 │   │   │   elif OmegaConf.is_list(root):                             │
+│    743 │   │   │   │   assert isinstance(last_key, int)                      │
+│    744 │   │   │   │   root.__setitem__(last_key, value)                     │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:33 │
+│ 7 in __setattr__                                                             │
+│                                                                              │
+│   334 │   │   │   self.__set_impl(key, value)                                │
+│   335 │   │   except Exception as e:                                         │
+│   336 │   │   │   if isinstance(e, OmegaConfBaseException) and e._initialize │
+│ ❱ 337 │   │   │   │   raise e                                                │
+│   338 │   │   │   self._format_and_raise(key=key, value=value, cause=e)      │
+│   339 │   │   │   assert False                                               │
+│   340                                                                        │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:33 │
+│ 4 in __setattr__                                                             │
+│                                                                              │
+│   331 │   │   :return:                                                       │
+│   332 │   │   """                                                            │
+│   333 │   │   try:                                                           │
+│ ❱ 334 │   │   │   self.__set_impl(key, value)                                │
+│   335 │   │   except Exception as e:                                         │
+│   336 │   │   │   if isinstance(e, OmegaConfBaseException) and e._initialize │
+│   337 │   │   │   │   raise e                                                │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:31 │
+│ 8 in __set_impl                                                              │
+│                                                                              │
+│   315 │                                                                      │
+│   316 │   def __set_impl(self, key: DictKeyType, value: Any) -> None:        │
+│   317 │   │   key = self._validate_and_normalize_key(key)                    │
+│ ❱ 318 │   │   self._set_item_impl(key, value)                                │
+│   319 │                                                                      │
+│   320 │   # hide content while inspecting in debugger                        │
+│   321 │   def __dir__(self) -> Iterable[str]:                                │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/basecontainer.py │
+│ :549 in _set_item_impl                                                       │
+│                                                                              │
+│   546 │   │   │   finally:                                                   │
+│   547 │   │   │   │   value._set_key(old)                                    │
+│   548 │   │   else:                                                          │
+│ ❱ 549 │   │   │   self._validate_set(key, value)                             │
+│   550 │   │                                                                  │
+│   551 │   │   if self._get_flag("readonly"):                                 │
+│   552 │   │   │   raise ReadonlyConfigError("Cannot change read-only config  │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:18 │
+│ 0 in _validate_set                                                           │
+│                                                                              │
+│   177 │   │   if vk == ValueKind.MANDATORY_MISSING or value is None:         │
+│   178 │   │   │   return                                                     │
+│   179 │   │                                                                  │
+│ ❱ 180 │   │   target = self._get_node(key) if key is not None else self      │
+│   181 │   │                                                                  │
+│   182 │   │   target_has_ref_type = isinstance(                              │
+│   183 │   │   │   target, DictConfig                                         │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:47 │
+│ 5 in _get_node                                                               │
+│                                                                              │
+│   472 │   │   │   │   │   return None                                        │
+│   473 │   │                                                                  │
+│   474 │   │   if validate_access:                                            │
+│ ❱ 475 │   │   │   self._validate_get(key)                                    │
+│   476 │   │                                                                  │
+│   477 │   │   value: Optional[Node] = self.__dict__["_content"].get(key)     │
+│   478 │   │   if value is None:                                              │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/dictconfig.py:16 │
+│ 4 in _validate_get                                                           │
+│                                                                              │
+│   161 │   │   │   │   │   msg = f"Key '{key}' not in '{self._metadata.object │
+│   162 │   │   │   │   else:                                                  │
+│   163 │   │   │   │   │   msg = f"Key '{key}' is not in struct"              │
+│ ❱ 164 │   │   │   │   self._format_and_raise(                                │
+│   165 │   │   │   │   │   key=key, value=value, cause=ConfigAttributeError(m │
+│   166 │   │   │   │   )                                                      │
+│   167                                                                        │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/base.py:231 in   │
+│ _format_and_raise                                                            │
+│                                                                              │
+│   228 │   │   msg: Optional[str] = None,                                     │
+│   229 │   │   type_override: Any = None,                                     │
+│   230 │   ) -> None:                                                         │
+│ ❱ 231 │   │   format_and_raise(                                              │
+│   232 │   │   │   node=self,                                                 │
+│   233 │   │   │   key=key,                                                   │
+│   234 │   │   │   value=value,                                               │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/_utils.py:899 in │
+│ format_and_raise                                                             │
+│                                                                              │
+│    896 │   │   ex.ref_type = ref_type                                        │
+│    897 │   │   ex.ref_type_str = ref_type_str                                │
+│    898 │                                                                     │
+│ ❱  899 │   _raise(ex, cause)                                                 │
+│    900                                                                       │
+│    901                                                                       │
+│    902 def type_str(t: Any, include_module_name: bool = False) -> str:       │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/omegaconf/_utils.py:797 in │
+│ _raise                                                                       │
+│                                                                              │
+│    794 │   │   ex.__cause__ = cause                                          │
+│    795 │   else:                                                             │
+│    796 │   │   ex.__cause__ = None                                           │
+│ ❱  797 │   raise ex.with_traceback(sys.exc_info()[2])  # set env var OC_CAUS │
+│    798                                                                       │
+│    799                                                                       │
+│    800 def format_and_raise(                                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ConfigAttributeError: Key 'azure_images_path' is not in struct
+    full_key: dataset.azure_images_path
+    object_type=dict
+
+The above exception was the direct cause of the following exception:
+
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /mnt/azureml/cr/j/97f11b2b597e4d64a1687e71b0e60a8c/exe/wd/scripts/azure_trai │
+│ n_eval.py:722 in <module>                                                    │
+│                                                                              │
+│   719                                                                        │
+│   720 if __name__ == "__main__":                                             │
+│   721 │   better_traceback()                                                 │
+│ ❱ 722 │   main()                                                             │
+│   723                                                                        │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/main.py:94 in        │
+│ decorated_main                                                               │
+│                                                                              │
+│    91 │   │   │   │   else:                                                  │
+│    92 │   │   │   │   │   # no return value from run_hydra() as it may somet │
+│    93 │   │   │   │   │   # multiple times (--multirun)                      │
+│ ❱  94 │   │   │   │   │   _run_hydra(                                        │
+│    95 │   │   │   │   │   │   args=args,                                     │
+│    96 │   │   │   │   │   │   args_parser=args_parser,                       │
+│    97 │   │   │   │   │   │   task_function=task_function,                   │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/utils.py:3 │
+│ 94 in _run_hydra                                                             │
+│                                                                              │
+│   391 │   │                                                                  │
+│   392 │   │   if args.run or args.multirun:                                  │
+│   393 │   │   │   run_mode = hydra.get_mode(config_name=config_name, overrid │
+│ ❱ 394 │   │   │   _run_app(                                                  │
+│   395 │   │   │   │   run=args.run,                                          │
+│   396 │   │   │   │   multirun=args.multirun,                                │
+│   397 │   │   │   │   mode=run_mode,                                         │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/utils.py:4 │
+│ 57 in _run_app                                                               │
+│                                                                              │
+│   454 │   │   │   overrides.extend(["hydra.mode=MULTIRUN"])                  │
+│   455 │                                                                      │
+│   456 │   if mode == RunMode.RUN:                                            │
+│ ❱ 457 │   │   run_and_report(                                                │
+│   458 │   │   │   lambda: hydra.run(                                         │
+│   459 │   │   │   │   config_name=config_name,                               │
+│   460 │   │   │   │   task_function=task_function,                           │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/utils.py:2 │
+│ 23 in run_and_report                                                         │
+│                                                                              │
+│   220 │   │   return func()                                                  │
+│   221 │   except Exception as ex:                                            │
+│   222 │   │   if _is_env_set("HYDRA_FULL_ERROR") or is_under_debugger():     │
+│ ❱ 223 │   │   │   raise ex                                                   │
+│   224 │   │   else:                                                          │
+│   225 │   │   │   try:                                                       │
+│   226 │   │   │   │   if isinstance(ex, CompactHydraException):              │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/utils.py:2 │
+│ 20 in run_and_report                                                         │
+│                                                                              │
+│   217                                                                        │
+│   218 def run_and_report(func: Any) -> Any:                                  │
+│   219 │   try:                                                               │
+│ ❱ 220 │   │   return func()                                                  │
+│   221 │   except Exception as ex:                                            │
+│   222 │   │   if _is_env_set("HYDRA_FULL_ERROR") or is_under_debugger():     │
+│   223 │   │   │   raise ex                                                   │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/utils.py:4 │
+│ 58 in <lambda>                                                               │
+│                                                                              │
+│   455 │                                                                      │
+│   456 │   if mode == RunMode.RUN:                                            │
+│   457 │   │   run_and_report(                                                │
+│ ❱ 458 │   │   │   lambda: hydra.run(                                         │
+│   459 │   │   │   │   config_name=config_name,                               │
+│   460 │   │   │   │   task_function=task_function,                           │
+│   461 │   │   │   │   overrides=overrides,                                   │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/hydra.py:1 │
+│ 05 in run                                                                    │
+│                                                                              │
+│   102 │   │   overrides: List[str],                                          │
+│   103 │   │   with_log_configuration: bool = True,                           │
+│   104 │   ) -> JobReturn:                                                    │
+│ ❱ 105 │   │   cfg = self.compose_config(                                     │
+│   106 │   │   │   config_name=config_name,                                   │
+│   107 │   │   │   overrides=overrides,                                       │
+│   108 │   │   │   with_log_configuration=with_log_configuration,             │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/hydra.py:5 │
+│ 94 in compose_config                                                         │
+│                                                                              │
+│   591 │   │   :return:                                                       │
+│   592 │   │   """                                                            │
+│   593 │   │                                                                  │
+│ ❱ 594 │   │   cfg = self.config_loader.load_configuration(                   │
+│   595 │   │   │   config_name=config_name,                                   │
+│   596 │   │   │   overrides=overrides,                                       │
+│   597 │   │   │   run_mode=run_mode,                                         │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/config_loa │
+│ der_impl.py:142 in load_configuration                                        │
+│                                                                              │
+│   139 │   │   validate_sweep_overrides: bool = True,                         │
+│   140 │   ) -> DictConfig:                                                   │
+│   141 │   │   try:                                                           │
+│ ❱ 142 │   │   │   return self._load_configuration_impl(                      │
+│   143 │   │   │   │   config_name=config_name,                               │
+│   144 │   │   │   │   overrides=overrides,                                   │
+│   145 │   │   │   │   run_mode=run_mode,                                     │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/config_loa │
+│ der_impl.py:276 in _load_configuration_impl                                  │
+│                                                                              │
+│   273 │   │   OmegaConf.set_readonly(cfg.hydra, False)                       │
+│   274 │   │                                                                  │
+│   275 │   │   # Apply command line overrides after enabling strict flag      │
+│ ❱ 276 │   │   ConfigLoaderImpl._apply_overrides_to_config(config_overrides,  │
+│   277 │   │   app_overrides = []                                             │
+│   278 │   │   for override in parsed_overrides:                              │
+│   279 │   │   │   if override.is_hydra_override():                           │
+│                                                                              │
+│ /opt/conda/envs/ptca/lib/python3.10/site-packages/hydra/_internal/config_loa │
+│ der_impl.py:392 in _apply_overrides_to_config                                │
+│                                                                              │
+│   389 │   │   │   │   │   try:                                               │
+│   390 │   │   │   │   │   │   OmegaConf.update(cfg, key, value, merge=True)  │
+│   391 │   │   │   │   │   except (ConfigAttributeError, ConfigKeyError) as e │
+│ ❱ 392 │   │   │   │   │   │   raise ConfigCompositionException(              │
+│   393 │   │   │   │   │   │   │   f"Could not override '{override.key_or_gro │
+│   394 │   │   │   │   │   │   │   f"\nTo append to your config use +{overrid │
+│   395 │   │   │   │   │   │   ) from ex                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ConfigCompositionException: Could not override 'dataset.azure_images_path'.
+To append to your config use 
++dataset.azure_images_path=azureml://datastores/workspaceblobstore/paths/rockmas
+s

@@ -7,7 +7,7 @@ to quickly verify that the data input configuration works correctly.
 
 from datetime import datetime
 
-from azure.ai.ml import command
+from azure.ai.ml import Input, command
 from azure.ai.ml.entities import ManagedIdentityConfiguration
 from azure.ai.ml.sweep import BanditPolicy, Choice
 
@@ -59,21 +59,19 @@ def main() -> None:
         style="info",
     )
 
-    # CRITICAL: Sweep jobs don't pass inputs to child jobs!
-    # Solution: Pass data paths directly via command-line Hydra overrides
-    # Use the actual blob storage paths (wasbs://) from data assets
-    images_uri = images_dataset.path  # wasbs:// URI
-    masks_uri = masks_dataset.path
-    splits_uri = splits_dataset.path
-
-    console.print("\n[bold]Data blob storage URIs:[/bold]", style="info")
-    console.print(f"  Images: {images_uri}", style="info")
-    console.print(f"  Masks: {masks_uri}", style="info")
-    console.print(f"  Splits: {splits_uri}", style="info")
+    # CRITICAL: For sweep jobs, inputs must be defined on the base command
+    # job and then referenced using ${{inputs.*}} syntax in the command.
+    # Azure ML will mount these inputs and expand the variables to mounted
+    # filesystem paths.
+    console.print("\n[bold]Data asset IDs:[/bold]", style="info")
+    console.print(f"  Images: {images_dataset.id}", style="info")
+    console.print(f"  Masks: {masks_dataset.id}", style="info")
+    console.print(f"  Splits: {splits_dataset.id}", style="info")
 
     # Create minimal command with just 1 epoch
-    # Azure ML sweep parameters must use underscores (not dots), but we need
-    # to map them back to Hydra's dotted notation in the command
+    # Use ${{inputs.*}} syntax - Azure ML expands these to mounted paths
+    # Azure ML sweep parameters must use underscores (not dots), but we
+    # need to map them back to Hydra's dotted notation in the command
     base_command = (
         "python scripts/azure_train_eval.py "
         "model=unet "
@@ -82,9 +80,9 @@ def main() -> None:
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
         "+experiment.report_metrics_to_file=True "
-        f"+dataset.azure_images_path={images_uri} "
-        f"+dataset.azure_masks_path={masks_uri} "
-        f"+dataset.azure_splits_path={splits_uri} "
+        "+dataset.azure_images_path=${{inputs.images_data}} "
+        "+dataset.azure_masks_path=${{inputs.masks_data}} "
+        "+dataset.azure_splits_path=${{inputs.splits_data}} "
         "model.params.encoder_name=${{search_space.encoder_name}} "
         "model.batch_size=${{search_space.batch_size}}"
     )
@@ -95,6 +93,17 @@ def main() -> None:
     env = ml_client.environments.get(
         name="rock-segmentation-env-curated-py310", version="2"
     )
+
+    # Define inputs - Azure ML will mount these and expand ${{inputs.*}}
+    job_inputs = {
+        "images_data": Input(
+            type="uri_folder", path=images_dataset.id, mode="download"
+        ),
+        "masks_data": Input(type="uri_folder", path=masks_dataset.id, mode="download"),
+        "splits_data": Input(
+            type="uri_folder", path=splits_dataset.id, mode="download"
+        ),
+    }
 
     # Create command job
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
@@ -108,6 +117,7 @@ def main() -> None:
         display_name="sweep_test_minimal",
         experiment_name=experiment_name,
         identity=ManagedIdentityConfiguration(),
+        inputs=job_inputs,
     )
 
     # Define minimal search space (just 2 parameters)
