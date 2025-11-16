@@ -253,12 +253,17 @@ def main():
     search_space = get_model_search_space(model_name)
 
     # Convert the search space to Azure ML sweep parameters
+    # Azure ML requires parameter names with only letters, numbers, and underscores
+    # So we replace dots with underscores for the sweep, and convert back in the command
     sweep_params: dict[str, Any] = {}
     for param_name, param_config in search_space.items():
+        # Replace dots with underscores for Azure ML compatibility
+        azure_param_name = param_name.replace(".", "_")
+
         if param_config["type"] == "choice":
-            sweep_params[param_name] = Choice(param_config["values"])
+            sweep_params[azure_param_name] = Choice(param_config["values"])
         elif param_config["type"] == "uniform":
-            sweep_params[param_name] = Uniform(
+            sweep_params[azure_param_name] = Uniform(
                 min_value=param_config["min_value"], max_value=param_config["max_value"]
             )
 
