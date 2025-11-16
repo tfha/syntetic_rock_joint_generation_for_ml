@@ -231,6 +231,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
+    # Get the search space for the specified model
+    search_space = get_model_search_space(model_name)
+
+    # Add search_space parameter mappings to command
+    # Azure ML uses underscore names, but Hydra needs dotted notation
+    for param_name in search_space.keys():
+        azure_param_name = param_name.replace(".", "_")
+        # Map Azure ML's underscore parameter back to Hydra's dotted format
+        base_command += f" {param_name}=${{{{search_space.{azure_param_name}}}}}"
+
     # Prepare inputs dictionary using azureml asset URI format
     # Use azureml:name:version which sweep jobs handle correctly
     inputs_dict = {

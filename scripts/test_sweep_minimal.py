@@ -76,6 +76,8 @@ def main() -> None:
     }
 
     # Create minimal command with just 1 epoch
+    # Azure ML sweep parameters must use underscores (not dots), but we need
+    # to map them back to Hydra's dotted notation in the command
     base_command = (
         "python scripts/azure_train_eval.py "
         "model=unet "
@@ -83,7 +85,9 @@ def main() -> None:
         "experiment.experiment_strategy=verification_box "
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
-        "experiment.report_metrics_to_file=True"
+        "experiment.report_metrics_to_file=True "
+        "model.encoder_name=${{search_space.encoder_name}} "
+        "model.batch_size=${{search_space.batch_size}}"
     )
 
     # Get environment
@@ -105,9 +109,10 @@ def main() -> None:
     )
 
     # Define minimal search space (just 2 parameters)
+    # Note: Keys must use underscores (not dots) - dots not allowed in Azure ML
     search_space = {
-        "model.encoder_name": Choice(["resnet34", "efficientnet-b0"]),
-        "model.batch_size": Choice([4]),
+        "encoder_name": Choice(["resnet34", "efficientnet-b0"]),
+        "batch_size": Choice([4]),
     }
 
     # Configure sweep with just 2 trials
