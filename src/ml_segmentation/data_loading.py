@@ -150,7 +150,7 @@ def get_transforms(
     params = transforms_parameters or {}
     crop_sz: int = int(params.get("crop_size", 768))
 
-    # Parse transform flags (support both legacy bool and new dict format)
+    # Parse transform flags (support bool, dict, or Pydantic model)
     if isinstance(optional_transforms, bool):
         # Legacy mode: bool=True enables only ColorJitter
         transform_flags = {
@@ -160,9 +160,18 @@ def get_transforms(
             "rotation": False,
             "gaussian_blur": False,
         }
-    else:
-        # New mode: individual control from dict
+    elif isinstance(optional_transforms, dict):
+        # Dict mode: individual control from dict
         transform_flags = optional_transforms
+    else:
+        # Pydantic model mode: convert to dict
+        transform_flags = {
+            "horizontal_flip": optional_transforms.horizontal_flip,
+            "vertical_flip": optional_transforms.vertical_flip,
+            "color_jitter": optional_transforms.color_jitter,
+            "rotation": optional_transforms.rotation,
+            "gaussian_blur": optional_transforms.gaussian_blur,
+        }
 
     train_transforms_list = [
         transforms.CenterCrop(crop_sz),
