@@ -78,7 +78,7 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument(
         "--compute-cluster",
         type=str,
-        default="gpu-cluster",
+        default="Standard-NC6s-v3",
         help="Azure ML compute cluster name",
     )
 
