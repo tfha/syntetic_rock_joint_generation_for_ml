@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any  # No built-in equivalent
 
 from azure.ai.ml import Input, command
-from azure.ai.ml.constants import InputOutputModes
 from azure.ai.ml.entities import (
     BuildContext,
     Environment,
@@ -232,17 +231,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
-    # Prepare inputs dictionary (use download mode for reliability)
+    # Prepare inputs dictionary without specifying mode
+    # Sweep jobs will handle data mounting automatically
     inputs_dict = {
         "images_data": Input(
             type="uri_folder",
-            path=images_dataset.id,
-            mode=InputOutputModes.DOWNLOAD,
+            path="azureml:rock_images@latest",
         ),
         "masks_data": Input(
             type="uri_folder",
-            path=masks_dataset.id,
-            mode=InputOutputModes.DOWNLOAD,
+            path="azureml:rock_masks@latest",
         ),
     }
 
@@ -250,8 +248,7 @@ def main():
     if has_splits:
         inputs_dict["splits_data"] = Input(
             type="uri_folder",
-            path=splits_dataset.id,
-            mode=InputOutputModes.DOWNLOAD,
+            path="azureml:rock_segmentation_splits@latest",
         )
 
     # Define the hyperparameter optimization command job
@@ -264,10 +261,6 @@ def main():
         experiment_name=experiment_name,
         inputs=inputs_dict,
         identity=ManagedIdentityConfiguration(),
-        environment_variables={
-            # Force fresh code snapshot
-            "AZUREML_COMPUTE_USE_COMMON_RUNTIME": "false"
-        },
         # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
 
