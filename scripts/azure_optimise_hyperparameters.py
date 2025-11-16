@@ -25,6 +25,7 @@ from ml_segmentation.azure_authentication import (
     setup_azure_environment_variables,
 )
 from ml_segmentation.azure_core import configure_azure_logging_and_warning
+from ml_segmentation.azure_data_assets import get_data_asset
 from ml_segmentation.azure_environment import export_poetry_to_environment_yml
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
@@ -149,14 +150,10 @@ def main():
     try:
         console.print("Retrieving data assets from Azure ML...", style="info")
 
-        # Use exact dataset names and versions from verification experiments
-        images_dataset = ml_client.data.get(name="rock_images_from_raw", version="1")
-        masks_dataset = ml_client.data.get(
-            name="joint_masks_binary_from_raw", version="1"
-        )
-        splits_dataset = ml_client.data.get(
-            name="verification_experiment_train_val_test_split", version="1"
-        )
+        # Use get_data_asset helper to retrieve datasets by alias
+        images_dataset = get_data_asset(ml_client, console, "rock_images")
+        masks_dataset = get_data_asset(ml_client, console, "rock_masks")
+        splits_dataset = get_data_asset(ml_client, console, "split_verification_box")
 
         console.print(
             f"Data assets loaded:"
