@@ -23,11 +23,11 @@ from ml_segmentation.azure_core import configure_azure_logging_and_warning
 from ml_segmentation.azure_data_assets import (
     get_data_asset,
 )
+from ml_segmentation.azure_environment import export_poetry_to_environment_yml
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
     get_model_search_space,
 )
-from ml_segmentation.utility import export_poetry_to_environment_yml
 
 
 def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
