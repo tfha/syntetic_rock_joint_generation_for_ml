@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any  # Only import Any as it doesn't have a built-in equivalent
 
 from azure.ai.ml import Input, command
+from azure.ai.ml.constants import InputOutputModes
 from azure.ai.ml.entities import (
     BuildContext,
     Environment,
@@ -230,15 +231,23 @@ def main():
     # Prepare inputs dictionary (use download mode for reliability)
     inputs_dict = {
         "images_data": Input(
-            type="uri_folder", path=images_dataset.id, mode="download"
+            type="uri_folder",
+            path=images_dataset.id,
+            mode=InputOutputModes.DOWNLOAD,
         ),
-        "masks_data": Input(type="uri_folder", path=masks_dataset.id, mode="download"),
+        "masks_data": Input(
+            type="uri_folder",
+            path=masks_dataset.id,
+            mode=InputOutputModes.DOWNLOAD,
+        ),
     }
 
     # Add splits dataset if available
     if has_splits:
         inputs_dict["splits_data"] = Input(
-            type="uri_folder", path=splits_dataset.id, mode="download"
+            type="uri_folder",
+            path=splits_dataset.id,
+            mode=InputOutputModes.DOWNLOAD,
         )
 
     # Define the hyperparameter optimization command job
@@ -294,6 +303,10 @@ def main():
         max_concurrent_trials=sampling_params["max_concurrent_trials"],
         search_space=sweep_params,
     )
+
+    # CRITICAL: Re-apply inputs to sweep job to ensure download mode is preserved
+    # The .sweep() method can override input configurations, so we explicitly set them again
+    sweep_job.inputs = inputs_dict
 
     # Add early termination if specified
     if "early_termination" in sampling_params:
