@@ -35,7 +35,7 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
             "values": ["true", "false"],
         },
         # Training parameters
-        "model.batch_size": {"type": "choice", "values": [8, 16, 32, 64]},
+        "model.batch_size": {"type": "choice", "values": [4, 8, 16]},
         "model.learning_rate": {
             "type": "uniform",
             "min_value": 1e-5,
@@ -72,7 +72,7 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
         "model.params.decoder_channels": {"type": "choice", "values": [128, 256]},
         "model.params.upsampling": {"type": "choice", "values": [4, 8]},
         # Training parameters
-        "model.batch_size": {"type": "choice", "values": [8, 16, 32]},
+        "model.batch_size": {"type": "choice", "values": [4, 8, 16]},
         "model.learning_rate": {
             "type": "uniform",
             "min_value": 5e-6,
