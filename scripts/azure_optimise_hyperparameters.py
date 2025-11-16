@@ -50,8 +50,8 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument(
         "--experiment-strategy",
         type=str,
-        default="synthetic_to_real",
-        help="Experiment strategy (e.g., synthetic_to_real, synthetic_box)",
+        default="verification_box",
+        help="Experiment strategy (e.g., verification_box, verification_dfn)",
     )
 
     parser.add_argument(

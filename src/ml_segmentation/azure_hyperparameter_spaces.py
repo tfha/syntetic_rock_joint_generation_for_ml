@@ -32,7 +32,7 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
         },
         "model.params.decoder_use_batchnorm": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         # Training parameters
         "model.batch_size": {"type": "choice", "values": [8, 16, 32, 64]},
@@ -50,15 +50,15 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
         # Data augmentation parameters
         "experiment.optional_transforms.random_crop": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         "experiment.optional_transforms.horizontal_flip": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         "experiment.optional_transforms.vertical_flip": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
     }
 
@@ -95,19 +95,19 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
         # Data augmentation parameters
         "experiment.optional_transforms.random_crop": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         "experiment.optional_transforms.horizontal_flip": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         "experiment.optional_transforms.vertical_flip": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
         "experiment.optional_transforms.random_brightness_contrast": {
             "type": "choice",
-            "values": [True, False],
+            "values": ["true", "false"],
         },
     }
 
