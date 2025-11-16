@@ -79,12 +79,14 @@ def main() -> None:
         "experiment.experiment_strategy=verification_box "
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
+        "model.params.encoder_name=resnet34 "
+        "model.batch_size=4 "
         "+experiment.report_metrics_to_file=True "
         "+dataset.azure_images_path=${{inputs.images_data}} "
         "+dataset.azure_masks_path=${{inputs.masks_data}} "
         "+dataset.azure_splits_path=${{inputs.splits_data}} "
-        "model.params.encoder_name=${{search_space.encoder_name}} "
-        "model.batch_size=${{search_space.batch_size}}"
+        "experiment.optional_transforms.horizontal_flip=${{search_space.horizontal_flip}} "
+        "experiment.optional_transforms.color_jitter=${{search_space.color_jitter}}"
     )
 
     # Get environment - use same as verification experiments
@@ -120,19 +122,19 @@ def main() -> None:
         inputs=job_inputs,
     )
 
-    # Define minimal search space (just 2 parameters)
+    # Define minimal search space (test transform parameters)
     # Note: Keys must use underscores (not dots) - dots not allowed in Azure ML
     search_space = {
-        "encoder_name": Choice(["resnet34", "efficientnet-b0"]),
-        "batch_size": Choice([4]),
+        "horizontal_flip": Choice(["true", "false"]),
+        "color_jitter": Choice(["true", "false"]),
     }
 
     # Configure sweep with just 2 trials
     sweep_job = command_job.sweep(
-        sampling_algorithm="random",
+        sampling_algorithm="grid",  # Grid search to test all 4 combinations
         primary_metric="val_loss",
         goal="minimize",
-        max_total_trials=2,
+        max_total_trials=4,  # 2x2 = 4 combinations
         max_concurrent_trials=2,
         search_space=search_space,
         early_termination_policy=BanditPolicy(
@@ -161,7 +163,11 @@ def main() -> None:
         style="info",
     )
     console.print(
-        "\nThis test will run 2 trials with 1 epoch each.",
+        "\nThis test will run 4 trials (2x2 grid) with 1 epoch each to test transform parameters.",
+        style="info",
+    )
+    console.print(
+        "Testing: horizontal_flip=[true,false] × color_jitter=[true,false]",
         style="info",
     )
     console.print(
