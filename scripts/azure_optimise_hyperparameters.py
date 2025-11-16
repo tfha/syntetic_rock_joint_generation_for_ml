@@ -223,15 +223,10 @@ def main():
 
     # Add search_space parameter mappings to command
     # Azure ML uses underscore names, but Hydra needs dotted notation
-    # Add + prefix for optional parameters not in base config
     for param_name in search_space.keys():
         azure_param_name = param_name.replace(".", "_")
-        # Add + prefix for optional transforms (not in base config)
-        prefix = "+" if param_name.startswith("experiment.optional_") else ""
         # Map Azure ML's underscore parameter back to Hydra's dotted format
-        base_command += (
-            f" {prefix}{param_name}=${{{{search_space.{azure_param_name}}}}}"
-        )
+        base_command += f" {param_name}=${{{{search_space.{azure_param_name}}}}}"
 
     # Define inputs - Azure ML will mount these and expand ${{inputs.*}}
     # Use dataset.id with mode="download" (same as verification experiments)

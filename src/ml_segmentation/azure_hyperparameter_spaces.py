@@ -47,16 +47,8 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation parameters
-        "experiment.optional_transforms.random_crop": {
-            "type": "choice",
-            "values": ["true", "false"],
-        },
-        "experiment.optional_transforms.horizontal_flip": {
-            "type": "choice",
-            "values": ["true", "false"],
-        },
-        "experiment.optional_transforms.vertical_flip": {
+        # Data augmentation (single flag for all optional transforms)
+        "experiment.optional_transforms": {
             "type": "choice",
             "values": ["true", "false"],
         },
@@ -92,20 +84,8 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation parameters
-        "experiment.optional_transforms.random_crop": {
-            "type": "choice",
-            "values": ["true", "false"],
-        },
-        "experiment.optional_transforms.horizontal_flip": {
-            "type": "choice",
-            "values": ["true", "false"],
-        },
-        "experiment.optional_transforms.vertical_flip": {
-            "type": "choice",
-            "values": ["true", "false"],
-        },
-        "experiment.optional_transforms.random_brightness_contrast": {
+        # Data augmentation (single flag for all optional transforms)
+        "experiment.optional_transforms": {
             "type": "choice",
             "values": ["true", "false"],
         },
