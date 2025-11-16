@@ -128,9 +128,10 @@ def main() -> None:
         ),
     )
 
-    # Set timeout to 3 hours (180 min) for 2 trials with 1 epoch each
-    # Each trial might take ~30-60 min, so 180 min provides buffer
-    sweep_job.limits.timeout = 180
+    # Set timeout in SECONDS (not minutes!)
+    # 7200 seconds = 2 hours for 2 trials with 1 epoch each
+    # Each trial might take ~30-60 min, so 2 hours provides buffer
+    sweep_job.limits.timeout = 7200
 
     # Submit job
     console.print(
