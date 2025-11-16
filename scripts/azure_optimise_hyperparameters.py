@@ -82,6 +82,13 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
         help="Azure ML compute cluster name",
     )
 
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=2,
+        help="Number of data loading workers (default: 2 for Azure ML)",
+    )
+
     args = parser.parse_args()
 
     # Compile optimization config
@@ -92,6 +99,7 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
         "max_trials": args.max_trials,
         "concurrent_trials": args.concurrent_trials,
         "compute_cluster": args.compute_cluster,
+        "num_workers": args.num_workers,
     }
 
     return args.model, opt_config
@@ -208,6 +216,7 @@ def main():
         f"experiment.log_mlflow=True "
         f"experiment.experiment_strategy={opt_config['experiment_strategy']} "
         f"model.num_epochs={opt_config['epochs']} "
+        f"experiment.num_workers={opt_config['num_workers']} "
     )  # Data splits are now always used in the system
     # No need to add any specific flags
 
