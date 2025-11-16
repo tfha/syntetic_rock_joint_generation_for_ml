@@ -1,15 +1,16 @@
 """
 Hyperparameter optimization for rock mass segmentation models in Azure ML.
 
-This script submits a hyperparameter optimization job to Azure ML, using Bayesian
-optimization to find the best hyperparameters for segmentation models.
+This script submits a hyperparameter optimization job to Azure ML,
+using Bayesian optimization to find the best hyperparameters for
+segmentation models.
 """
 
 import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any  # Only import Any as it doesn't have a built-in equivalent
+from typing import Any  # No built-in equivalent
 
 from azure.ai.ml import Input, command
 from azure.ai.ml.constants import InputOutputModes
@@ -49,7 +50,7 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
         type=str,
         default="unet",
         choices=["unet", "unetplusplus", "deeplabv3plus"],
-        help="Model architecture to optimize (unet, unetplusplus, or deeplabv3plus)",
+        help="Model architecture to optimize",
     )
 
     parser.add_argument(
@@ -261,7 +262,8 @@ def main():
         inputs=inputs_dict,
         identity=ManagedIdentityConfiguration(),
         environment_variables={
-            "AZUREML_COMPUTE_USE_COMMON_RUNTIME": "false"  # Force fresh code snapshot
+            # Force fresh code snapshot
+            "AZUREML_COMPUTE_USE_COMMON_RUNTIME": "false"
         },
         # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
@@ -270,8 +272,8 @@ def main():
     search_space = get_model_search_space(model_name)
 
     # Convert the search space to Azure ML sweep parameters
-    # Azure ML requires parameter names with only letters, numbers, and underscores
-    # So we replace dots with underscores for the sweep, and convert back in the command
+    # Azure ML requires parameter names with only letters, numbers,
+    # and underscores. We replace dots with underscores for the sweep.
     sweep_params: dict[str, Any] = {}
     for param_name, param_config in search_space.items():
         # Replace dots with underscores for Azure ML compatibility
@@ -281,7 +283,8 @@ def main():
             sweep_params[azure_param_name] = Choice(param_config["values"])
         elif param_config["type"] == "uniform":
             sweep_params[azure_param_name] = Uniform(
-                min_value=param_config["min_value"], max_value=param_config["max_value"]
+                min_value=param_config["min_value"],
+                max_value=param_config["max_value"],
             )
 
     # Get Bayesian sampling parameters
@@ -304,8 +307,9 @@ def main():
         search_space=sweep_params,
     )
 
-    # CRITICAL: Re-apply inputs to sweep job to ensure download mode is preserved
-    # The .sweep() method can override input configurations, so we explicitly set them again
+    # CRITICAL: Re-apply inputs to sweep job to ensure download
+    # mode is preserved. The .sweep() method can override input
+    # configurations, so we explicitly set them again.
     sweep_job.inputs = inputs_dict
 
     # Add early termination if specified
@@ -320,12 +324,14 @@ def main():
 
     # Submit the sweep job
     console.print(
-        f"Submitting hyperparameter sweep job for {model_name}...", style="info"
+        f"Submitting hyperparameter sweep job for {model_name}...",
+        style="info",
     )
     returned_job = ml_client.create_or_update(sweep_job)
     console.print(f"Submitted job: {returned_job.name}", style="success")
     console.print(
-        f"Job URL: {returned_job.services.get('Studio').endpoint}", style="info"
+        f"Job URL: {returned_job.services.get('Studio').endpoint}",
+        style="info",
     )
 
     # Set up tracking file to save job info
@@ -351,7 +357,10 @@ def main():
     with open(job_info_file, "w") as f:
         json.dump(job_info, f, indent=2)
 
-    console.print(f"Job tracking information saved to {job_info_file}", style="info")
+    console.print(
+        f"Job tracking information saved to {job_info_file}",
+        style="info",
+    )
     console.print(
         "You can monitor the job progress in the Azure ML Studio", style="info"
     )
