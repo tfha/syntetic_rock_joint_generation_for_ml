@@ -86,7 +86,7 @@ def main() -> None:
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
         "+experiment.report_metrics_to_file=True "
-        "model.encoder_name=${{search_space.encoder_name}} "
+        "model.params.encoder_name=${{search_space.encoder_name}} "
         "model.batch_size=${{search_space.batch_size}}"
     )
 
