@@ -117,11 +117,13 @@ def main() -> None:
         goal="minimize",
         max_total_trials=2,
         max_concurrent_trials=2,
-        timeout_minutes=60,
         early_termination_policy=BanditPolicy(
             evaluation_interval=1, slack_factor=0.1, delay_evaluation=5
         ),
     )
+
+    # Set timeout separately
+    sweep_job.limits.timeout = 60
 
     # Submit job
     console.print(
