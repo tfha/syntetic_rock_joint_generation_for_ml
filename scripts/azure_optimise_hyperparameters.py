@@ -217,6 +217,22 @@ def main():
         f"hparam_opt_{model_name}_{opt_config['experiment_strategy']}_{timestamp}"
     )
 
+    # Log dataset information for debugging
+    console.print("\n[bold]Dataset Information:[/bold]", style="info")
+    console.print(
+        f"  Images: {images_dataset.name}@{images_dataset.version}",
+        style="info",
+    )
+    console.print(
+        f"  Masks: {masks_dataset.name}@{masks_dataset.version}",
+        style="info",
+    )
+    if has_splits:
+        console.print(
+            f"  Splits: {splits_dataset.name}@{splits_dataset.version}",
+            style="info",
+        )
+
     # Create the base training command
     base_command = (
         f"python scripts/azure_train_eval.py "
@@ -231,16 +247,16 @@ def main():
     # Add output reporting for hyperparameter optimization
     base_command += " experiment.report_metrics_to_file=True"
 
-    # Prepare inputs dictionary using the retrieved dataset IDs
-    # Use the actual dataset versions we retrieved earlier
+    # Prepare inputs dictionary using versioned asset names
+    # Use name@version format which sweep jobs handle correctly
     inputs_dict = {
         "images_data": Input(
             type="uri_folder",
-            path=images_dataset.id,
+            path=f"{images_dataset.name}@{images_dataset.version}",
         ),
         "masks_data": Input(
             type="uri_folder",
-            path=masks_dataset.id,
+            path=f"{masks_dataset.name}@{masks_dataset.version}",
         ),
     }
 
@@ -248,7 +264,7 @@ def main():
     if has_splits:
         inputs_dict["splits_data"] = Input(
             type="uri_folder",
-            path=splits_dataset.id,
+            path=f"{splits_dataset.name}@{splits_dataset.version}",
         )
 
     # Define the hyperparameter optimization command job
