@@ -101,7 +101,7 @@ def main() -> None:
         code="./",
         command=base_command,
         environment=env,
-        compute="gpu-cluster-nc6sv3",
+        compute="Standard-NC6s-v3",  # GPU cluster name
         display_name="sweep_test_minimal",
         experiment_name=experiment_name,
         inputs=inputs_dict,
