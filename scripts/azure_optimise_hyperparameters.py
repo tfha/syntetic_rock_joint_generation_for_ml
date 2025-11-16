@@ -200,16 +200,20 @@ def main():
         conda_file=environment_file,
     )
 
-    # Register the environment if needed
+    # Use the same environment as verification experiments
+    # From main.yaml: environment_name=rock-segmentation-env-curated-py310
+    # version=2
     try:
-        registered_env = ml_client.environments.get(
-            name="rock-segmentation-env", label="latest"
+        env = ml_client.environments.get(
+            name="rock-segmentation-env-curated-py310", version="2"
         )
-        console.print("Using existing environment", style="info")
-        env = registered_env
+        console.print(
+            "Using curated environment: rock-segmentation-env-curated-py310:2",
+            style="info",
+        )
     except Exception:
-        console.print("Registering new environment", style="info")
-        env = ml_client.environments.create_or_update(env)
+        console.print("Curated environment not found, using latest", style="warning")
+        env = ml_client.environments.get(name="rock-segmentation-env", label="latest")
 
     # Set up the command job for hyperparameter tuning
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
@@ -229,7 +233,8 @@ def main():
     # No need to add any specific flags
 
     # Add output reporting for hyperparameter optimization
-    base_command += " experiment.report_metrics_to_file=True"
+    # Use + prefix to add new config key that doesn't exist in base schema
+    base_command += " +experiment.report_metrics_to_file=True"
 
     # Get the search space for the specified model
     search_space = get_model_search_space(model_name)

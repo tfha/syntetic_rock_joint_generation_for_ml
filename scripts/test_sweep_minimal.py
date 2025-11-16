@@ -85,13 +85,17 @@ def main() -> None:
         "experiment.experiment_strategy=verification_box "
         "model.num_epochs=1 "
         "experiment.num_workers=2 "
-        "experiment.report_metrics_to_file=True "
+        "+experiment.report_metrics_to_file=True "
         "model.encoder_name=${{search_space.encoder_name}} "
         "model.batch_size=${{search_space.batch_size}}"
     )
 
-    # Get environment
-    env = ml_client.environments.get(name="rock-segmentation-env", label="latest")
+    # Get environment - use same as verification experiments
+    # From main.yaml: environment_name=rock-segmentation-env-curated-py310
+    # version=2
+    env = ml_client.environments.get(
+        name="rock-segmentation-env-curated-py310", version="2"
+    )
 
     # Create command job
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
