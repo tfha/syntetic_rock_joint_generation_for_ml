@@ -47,8 +47,8 @@ def get_model_config_from_args() -> tuple[str, dict[str, Any]]:
         "--model",
         type=str,
         default="unet",
-        choices=["unet", "deeplabv3plus"],
-        help="Model architecture to optimize (unet or deeplabv3plus)",
+        choices=["unet", "unetplusplus", "deeplabv3plus"],
+        help="Model architecture to optimize (unet, unetplusplus, or deeplabv3plus)",
     )
 
     parser.add_argument(
@@ -215,7 +215,7 @@ def main():
 
     # Create the base training command
     base_command = (
-        f"python scripts/train_eval_azure_native.py "
+        f"python scripts/azure_train_eval.py "
         f"model={model_name} "
         f"experiment.log_mlflow=True "
         f"experiment.experiment_strategy={opt_config['experiment_strategy']} "
