@@ -336,7 +336,7 @@ def main():
     )
 
     # Optionally stream the logs
-    console.print("Do you want to stream the logs? (y/n): ", style="question")
+    console.print("Do you want to stream the logs? (y/n): ", style="bold cyan")
     if input().lower() == "y":
         console.print("Streaming logs...", style="info")
         ml_client.jobs.stream(returned_job.name)
