@@ -153,7 +153,10 @@ def main():
         # Use get_data_asset helper to retrieve datasets by alias
         images_dataset = get_data_asset(ml_client, console, "rock_images")
         masks_dataset = get_data_asset(ml_client, console, "rock_masks")
-        splits_dataset = get_data_asset(ml_client, console, "split_verification_box")
+
+        # Select the correct split dataset based on experiment strategy
+        split_asset_name = f"split_{opt_config['experiment_strategy']}"
+        splits_dataset = get_data_asset(ml_client, console, split_asset_name)
 
         console.print(
             f"Data assets loaded:"
