@@ -86,9 +86,7 @@ def main() -> None:
         "+dataset.azure_masks_path=${{inputs.masks_data}} "
         "+dataset.azure_splits_path=${{inputs.splits_data}} "
         "experiment.optional_transforms.random_crop="
-        "${{search_space.random_crop}} "
-        "experiment.optional_transforms.color_jitter="
-        "${{search_space.color_jitter}}"
+        "${{search_space.random_crop}}"
     )
 
     # Get environment - use same as verification experiments
