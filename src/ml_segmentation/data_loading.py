@@ -176,12 +176,13 @@ def get_transforms(
     # Build transform lists for both image and label
     # CRITICAL: Geometric transforms must be applied to BOTH image and label
     # to maintain alignment
-    geometric_transforms_list = [
-        transforms.CenterCrop(crop_sz),
-        # transforms.Resize(
-        #     (resize_size, resize_size), interpolation=Image.BILINEAR
-        # ),
-    ]
+    geometric_transforms_list = []
+
+    # Cropping: use RandomCrop if enabled, otherwise CenterCrop
+    if transform_flags.get("random_crop", False):
+        geometric_transforms_list.append(transforms.RandomCrop(crop_sz))
+    else:
+        geometric_transforms_list.append(transforms.CenterCrop(crop_sz))
 
     # Add geometric transforms BEFORE ToTensor
     # These must be applied to BOTH image and label
@@ -194,20 +195,12 @@ def get_transforms(
     if transform_flags.get("rotation", False):
         geometric_transforms_list.append(transforms.RandomRotation(15))
 
-    if transform_flags.get("random_crop", False):
-        # Random crop must be applied to both image and label identically
-        geometric_transforms_list.append(transforms.RandomCrop(crop_sz))
-
-    # Build image transform: geometric + tensor + normalize + color augmentation
+    # Build image transform: geometric + color (on PIL) + tensor + normalize
     image_transforms_list = geometric_transforms_list.copy()
-    image_transforms_list.append(transforms.ToTensor())
-    image_transforms_list.append(
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    )
 
-    # Color augmentations (only for images, not labels)
+    # Color augmentations (apply to PIL image BEFORE ToTensor)
     if transform_flags.get("color_jitter", False):
-        # ColorJitter works on tensors too, though less efficient
+        # ColorJitter works on PIL images (0-255 range)
         # brightness=0.4 allows range [0.6, 1.4] of original brightness
         # This enables darker images to simulate varying lighting conditions
         image_transforms_list.append(
@@ -220,6 +213,12 @@ def get_transforms(
         image_transforms_list.append(
             transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))
         )
+
+    # Convert to tensor and normalize (after color augmentations)
+    image_transforms_list.append(transforms.ToTensor())
+    image_transforms_list.append(
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    )
 
     image_transform = transforms.Compose(image_transforms_list)
 
