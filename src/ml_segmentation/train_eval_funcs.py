@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from PIL import Image
 from rich.console import Console
@@ -174,6 +175,11 @@ def train_one_epoch(
         with amp_ctx:
             # Forward pass
             outputs = model(images)
+            # Resize outputs to match mask dimensions (fixes DeepLabV3+ upsampling issue)
+            if outputs.shape[-2:] != masks.shape[-2:]:
+                outputs = F.interpolate(
+                    outputs, size=masks.shape[-2:], mode="bilinear", align_corners=False
+                )
             loss = criterion(outputs, masks)
 
         # Backward pass and optimization
@@ -305,6 +311,14 @@ def validate_one_epoch(
             with amp_ctx:
                 # Forward pass
                 outputs = model(images)
+                # Resize outputs to match mask dimensions (fixes DeepLabV3+ upsampling issue)
+                if outputs.shape[-2:] != masks.shape[-2:]:
+                    outputs = F.interpolate(
+                        outputs,
+                        size=masks.shape[-2:],
+                        mode="bilinear",
+                        align_corners=False,
+                    )
                 loss = criterion(outputs, masks)
 
             running_loss += loss.item() * images.size(0)
