@@ -47,7 +47,17 @@ class SegmentationDataset(Dataset):
 
         # Apply transformations if any, else convert to tensors
         if self.transform is not None:
+            # CRITICAL: Seed the random state to ensure geometric transforms
+            # (RandomHorizontalFlip, RandomVerticalFlip, etc.) make the SAME
+            # random decision for both image and label, maintaining alignment
+            seed = torch.randint(0, 2**32, (1,)).item()
+
+            # Apply image transforms with seeded random state
+            torch.manual_seed(seed)
             image = self.transform["image"](image)
+
+            # Apply label transforms with SAME seeded random state
+            torch.manual_seed(seed)
             label = self.transform["label"](label)
         else:
             image = transforms.ToTensor()(image)
