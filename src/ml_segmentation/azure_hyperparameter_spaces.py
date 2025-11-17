@@ -148,30 +148,39 @@ def get_model_search_space(model_name: str) -> dict[str, dict[str, Any]]:
 
 
 def get_bayesian_sampling_params(
-    max_total_trials: int = 30,
+    max_total_trials: int = 200,
     max_concurrent_trials: int = 4,
-    early_termination_delay: int = 15,
-    early_termination_patience: int = 5,
+    delay_evaluation: int = 15,
+    slack_factor: float = 0.15,
+    evaluation_interval: int = 1,
 ) -> dict[str, Any]:
     """
     Get the Bayesian sampling parameters for hyperparameter tuning.
 
+    Uses Azure ML BanditPolicy for early termination with the following behavior:
+    - Trials run for at least delay_evaluation epochs before termination is considered
+    - After delay, checks every evaluation_interval epochs
+    - Terminates if metric < best_metric × (1 - slack_factor) for maximization goals
+
     Args:
         max_total_trials: Maximum number of trials to run
         max_concurrent_trials: Maximum number of trials to run concurrently
-        early_termination_delay: Number of intervals before applying early termination
-        early_termination_patience: Number of intervals to wait before early termination
+        delay_evaluation: Number of intervals to delay first policy evaluation.
+            Prevents premature termination during warm-up phase. Default=15 epochs.
+        slack_factor: Ratio slack allowed vs best run. Trials with metric <
+            best_metric × (1 - slack_factor) are terminated. Default=0.15 (15% slack).
+        evaluation_interval: Frequency for applying policy (in epochs). Default=1.
 
     Returns:
-        Dictionary with Bayesian sampling parameters
+        Dictionary with Bayesian sampling parameters and BanditPolicy configuration
     """
     return {
         "sampling_algorithm": "bayesian",
         "early_termination": {
             "type": "bandit",
-            "evaluation_interval": 1,
-            "delay_evaluation": early_termination_delay,
-            "slack_factor": 0.15,  # More lenient for augmentation trials
+            "evaluation_interval": evaluation_interval,
+            "delay_evaluation": delay_evaluation,
+            "slack_factor": slack_factor,
         },
         "primary_metric": "val_dice_score",
         "goal": "maximize",
