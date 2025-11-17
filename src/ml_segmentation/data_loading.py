@@ -178,9 +178,19 @@ def get_transforms(
     # to maintain alignment
     geometric_transforms_list = []
 
-    # Cropping: use RandomCrop if enabled, otherwise CenterCrop
+    # Cropping: use RandomResizedCrop if enabled, otherwise CenterCrop
     if transform_flags.get("random_crop", False):
-        geometric_transforms_list.append(transforms.RandomCrop(crop_sz))
+        # RandomResizedCrop: crop random portion (65-100% area) then resize
+        # scale=(0.65, 1.0): crop 65-100% of image area
+        # ratio=(1.0, 1.0): keep square aspect ratio for rock images
+        geometric_transforms_list.append(
+            transforms.RandomResizedCrop(
+                size=crop_sz,
+                scale=(0.65, 1.0),  # Crop 65-100% of original image area
+                ratio=(1.0, 1.0),  # Maintain square aspect ratio
+                interpolation=transforms.InterpolationMode.BILINEAR,
+            )
+        )
     else:
         geometric_transforms_list.append(transforms.CenterCrop(crop_sz))
 
