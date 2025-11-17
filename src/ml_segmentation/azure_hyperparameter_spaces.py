@@ -24,12 +24,7 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
             "type": "choice",
             "values": ["resnet34", "resnet50", "efficientnet-b0", "efficientnet-b3"],
         },
-        "model.params.encoder_weights": {
-            "type": "choice",
-            "values": [
-                "imagenet"
-            ],  # Starting with pretrained weights is usually better
-        },
+        # encoder_weights is fixed to "imagenet" in base config, not tuned
         "model.params.decoder_use_batchnorm": {
             "type": "choice",
             "values": ["true", "false"],
@@ -90,10 +85,7 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
                 "mobilenet_v2",
             ],
         },
-        "model.params.encoder_weights": {
-            "type": "choice",
-            "values": ["imagenet"],
-        },
+        # encoder_weights is fixed to "imagenet" in base config, not tuned
         "model.params.decoder_channels": {
             "type": "choice",
             "values": [128, 256],
@@ -158,8 +150,8 @@ def get_model_search_space(model_name: str) -> dict[str, dict[str, Any]]:
 def get_bayesian_sampling_params(
     max_total_trials: int = 30,
     max_concurrent_trials: int = 4,
-    early_termination_delay: int = 10,
-    early_termination_patience: int = 3,
+    early_termination_delay: int = 15,
+    early_termination_patience: int = 5,
 ) -> dict[str, Any]:
     """
     Get the Bayesian sampling parameters for hyperparameter tuning.
@@ -179,7 +171,7 @@ def get_bayesian_sampling_params(
             "type": "bandit",
             "evaluation_interval": 1,
             "delay_evaluation": early_termination_delay,
-            "slack_factor": 0.1,
+            "slack_factor": 0.15,  # More lenient for augmentation trials
         },
         "primary_metric": "val_dice_score",
         "goal": "maximize",
