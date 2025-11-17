@@ -154,6 +154,7 @@ def get_transforms(
     if isinstance(optional_transforms, bool):
         # Legacy mode: bool=True enables only ColorJitter
         transform_flags = {
+            "random_crop": False,
             "horizontal_flip": False,
             "vertical_flip": False,
             "color_jitter": optional_transforms,
@@ -166,6 +167,7 @@ def get_transforms(
     else:
         # Pydantic model mode: convert to dict
         transform_flags = {
+            "random_crop": optional_transforms.random_crop,
             "horizontal_flip": optional_transforms.horizontal_flip,
             "vertical_flip": optional_transforms.vertical_flip,
             "color_jitter": optional_transforms.color_jitter,
