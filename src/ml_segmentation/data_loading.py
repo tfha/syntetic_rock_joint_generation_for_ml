@@ -173,7 +173,10 @@ def get_transforms(
             "gaussian_blur": optional_transforms.gaussian_blur,
         }
 
-    train_transforms_list = [
+    # Build transform lists for both image and label
+    # CRITICAL: Geometric transforms must be applied to BOTH image and label
+    # to maintain alignment
+    geometric_transforms_list = [
         transforms.CenterCrop(crop_sz),
         # transforms.Resize(
         #     (resize_size, resize_size), interpolation=Image.BILINEAR
@@ -181,47 +184,50 @@ def get_transforms(
     ]
 
     # Add geometric transforms BEFORE ToTensor
+    # These must be applied to BOTH image and label
     if transform_flags.get("horizontal_flip", False):
-        train_transforms_list.append(transforms.RandomHorizontalFlip())
+        geometric_transforms_list.append(transforms.RandomHorizontalFlip())
 
     if transform_flags.get("vertical_flip", False):
-        train_transforms_list.append(transforms.RandomVerticalFlip())
+        geometric_transforms_list.append(transforms.RandomVerticalFlip())
 
     if transform_flags.get("rotation", False):
-        train_transforms_list.append(transforms.RandomRotation(15))
+        geometric_transforms_list.append(transforms.RandomRotation(15))
 
-    # ToTensor converts PIL to tensor
-    train_transforms_list.append(transforms.ToTensor())
-    train_transforms_list.append(
+    if transform_flags.get("random_crop", False):
+        # Random crop must be applied to both image and label identically
+        geometric_transforms_list.append(transforms.RandomCrop(crop_sz))
+
+    # Build image transform: geometric + tensor + normalize + color augmentation
+    image_transforms_list = geometric_transforms_list.copy()
+    image_transforms_list.append(transforms.ToTensor())
+    image_transforms_list.append(
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     )
 
-    # Color augmentations (note: ideally should be before ToTensor, but keeping after for now)
+    # Color augmentations (only for images, not labels)
     if transform_flags.get("color_jitter", False):
         # ColorJitter works on tensors too, though less efficient
-        train_transforms_list.append(
+        # brightness=0.4 allows range [0.6, 1.4] of original brightness
+        # This enables darker images to simulate varying lighting conditions
+        image_transforms_list.append(
             transforms.ColorJitter(
-                brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
+                brightness=0.4, contrast=0.4, saturation=0.3, hue=0.15
             )
         )
 
     if transform_flags.get("gaussian_blur", False):
-        train_transforms_list.append(
+        image_transforms_list.append(
             transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))
         )
 
-    image_transform = transforms.Compose(train_transforms_list)
+    image_transform = transforms.Compose(image_transforms_list)
 
-    # Apply the same center crop to the labels
-    label_transform = transforms.Compose(
-        [
-            transforms.CenterCrop(crop_sz),  # Centre crop to match images
-            # transforms.Resize(
-            #     (resize_size, resize_size), interpolation=Image.NEAREST
-            # ),
-            transforms.ToTensor(),
-        ]
-    )
+    # Build label transform: same geometric transforms + ToTensor (NO normalization/color)
+    label_transforms_list = geometric_transforms_list.copy()
+    label_transforms_list.append(transforms.ToTensor())
+
+    label_transform = transforms.Compose(label_transforms_list)
 
     return {"image": image_transform, "label": label_transform}
 

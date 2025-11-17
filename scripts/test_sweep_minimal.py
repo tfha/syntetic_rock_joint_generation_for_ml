@@ -85,8 +85,10 @@ def main() -> None:
         "+dataset.azure_images_path=${{inputs.images_data}} "
         "+dataset.azure_masks_path=${{inputs.masks_data}} "
         "+dataset.azure_splits_path=${{inputs.splits_data}} "
-        "experiment.optional_transforms.horizontal_flip=${{search_space.horizontal_flip}} "
-        "experiment.optional_transforms.color_jitter=${{search_space.color_jitter}}"
+        "experiment.optional_transforms.random_crop="
+        "${{search_space.random_crop}} "
+        "experiment.optional_transforms.color_jitter="
+        "${{search_space.color_jitter}}"
     )
 
     # Get environment - use same as verification experiments
@@ -125,7 +127,7 @@ def main() -> None:
     # Define minimal search space (test transform parameters)
     # Note: Keys must use underscores (not dots) - dots not allowed in Azure ML
     search_space = {
-        "horizontal_flip": Choice(["true", "false"]),
+        "random_crop": Choice(["true", "false"]),
         "color_jitter": Choice(["true", "false"]),
     }
 
@@ -167,7 +169,7 @@ def main() -> None:
         style="info",
     )
     console.print(
-        "Testing: horizontal_flip=[true,false] × color_jitter=[true,false]",
+        "Testing: random_crop=[true,false] × color_jitter=[true,false]",
         style="info",
     )
     console.print(

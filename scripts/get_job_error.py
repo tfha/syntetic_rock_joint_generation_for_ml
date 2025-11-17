@@ -30,13 +30,13 @@ print(f"Type: {job.type}")
 
 # Get properties
 if hasattr(job, "properties") and job.properties:
-    print(f"\nProperties:")
+    print("\nProperties:")
     for key, value in job.properties.items():
         print(f"  {key}: {value}")
 
 # Get error details
 if hasattr(job, "error") and job.error:
-    print(f"\nError:")
+    print("\nError:")
     if isinstance(job.error, dict):
         for key, value in job.error.items():
             print(f"  {key}: {value}")
@@ -49,7 +49,7 @@ try:
     ml_client.jobs.stream(job.name)
 except Exception as e:
     print(f"Could not stream logs: {e}")
-    
+
     # Try to get output logs
     print("\nTrying alternative method to get logs...")
     try:

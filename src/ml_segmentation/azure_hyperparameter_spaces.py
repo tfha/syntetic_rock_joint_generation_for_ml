@@ -47,7 +47,11 @@ def get_unet_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation - independent control (8 combos: 2^3)
+        # Data augmentation - independent control (16 combos: 2^4)
+        "experiment.optional_transforms.random_crop": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
         "experiment.optional_transforms.horizontal_flip": {
             "type": "choice",
             "values": ["true", "false"],
@@ -108,7 +112,11 @@ def get_deeplabv3plus_search_space() -> dict[str, dict[str, Any]]:
             "max_value": 0.5,
         },
         "model.scheduler.patience": {"type": "choice", "values": [3, 5, 7]},
-        # Data augmentation - independent transform control (8 combos: 2^3)
+        # Data augmentation - independent transform control (16 combos: 2^4)
+        "experiment.optional_transforms.random_crop": {
+            "type": "choice",
+            "values": ["true", "false"],
+        },
         "experiment.optional_transforms.horizontal_flip": {
             "type": "choice",
             "values": ["true", "false"],
