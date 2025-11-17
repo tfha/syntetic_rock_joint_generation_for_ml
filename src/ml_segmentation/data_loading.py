@@ -179,6 +179,8 @@ def get_transforms(
     geometric_transforms_list = []
 
     # Cropping: use RandomResizedCrop if enabled, otherwise CenterCrop
+    # CenterCrop ensures fixed size (768x768) when images are larger
+    # or have varying dimensions. If images are already 768x768, it's a no-op
     if transform_flags.get("random_crop", False):
         # RandomResizedCrop: crop random portion (65-100% area) then resize
         # scale=(0.65, 1.0): crop 65-100% of image area
@@ -192,6 +194,8 @@ def get_transforms(
             )
         )
     else:
+        # CenterCrop: extract center region if images are larger than crop_sz
+        # This is NOT redundant if original images are e.g. 800x800 or variable
         geometric_transforms_list.append(transforms.CenterCrop(crop_sz))
 
     # Add geometric transforms BEFORE ToTensor

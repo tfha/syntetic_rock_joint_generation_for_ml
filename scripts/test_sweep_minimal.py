@@ -124,14 +124,13 @@ def main() -> None:
         inputs=job_inputs,
     )
 
-    # Define minimal search space (test transform parameters)
+    # Define minimal search space (test random_crop only)
     # Note: Keys must use underscores (not dots) - dots not allowed in Azure ML
     search_space = {
         "random_crop": Choice(["true", "false"]),
-        "color_jitter": Choice(["true", "false"]),
     }
 
-    # Configure sweep with just 2 trials
+    # Configure sweep with just 2 trials (random_crop on/off)
     sweep_job = command_job.sweep(
         sampling_algorithm="grid",  # Grid search to test all 4 combinations
         primary_metric="val_loss",
@@ -165,11 +164,11 @@ def main() -> None:
         style="info",
     )
     console.print(
-        "\nThis test will run 4 trials (2x2 grid) with 1 epoch each to test transform parameters.",
+        "\nThis test will run 2 trials with 1 epoch each to test RandomResizedCrop.",
         style="info",
     )
     console.print(
-        "Testing: random_crop=[true,false] × color_jitter=[true,false]",
+        "Testing: random_crop=[true,false]",
         style="info",
     )
     console.print(
