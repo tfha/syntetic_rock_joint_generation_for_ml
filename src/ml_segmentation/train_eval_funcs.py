@@ -540,9 +540,6 @@ def save_image_predictions(
                 mask_np: np.ndarray = 1 - masks[b].detach().cpu().numpy()  # invert
                 pred_np: np.ndarray = 1 - preds[b].detach().cpu().numpy()  # invert
 
-                # Calculate image statistics for original image
-                img_stats = calculate_image_statistics(images[b])
-
                 fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
                 img_to_display = img_np.transpose(1, 2, 0)
@@ -551,15 +548,7 @@ def save_image_predictions(
                 )
 
                 axes[0].imshow(img_to_display)
-                # Add statistics to title
-                title = (
-                    "Original Image\n"
-                    f"B:{img_stats['brightness']:.3f} "
-                    f"C:{img_stats['contrast']:.3f} "
-                    f"S:{img_stats['saturation']:.3f} "
-                    f"H:{img_stats['hue']:.3f}"
-                )
-                axes[0].set_title(title, fontsize=9)
+                axes[0].set_title("Original Image")
                 axes[1].imshow(mask_np[0], cmap="gray")
                 axes[1].set_title("True Mask")
                 axes[2].imshow(pred_np[0], cmap="gray")
