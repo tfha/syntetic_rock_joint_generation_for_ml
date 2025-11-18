@@ -427,6 +427,8 @@ def main(cfg: DictConfig) -> None:
 
     # Initialize metrics tracking for CSV export
     metrics_history = []
+    # Track if metrics CSV was already logged to avoid duplicate uploads
+    metrics_csv_logged = False
 
     # 8. Execute training and validation loop
     ########################################################################
@@ -529,6 +531,22 @@ def main(cfg: DictConfig) -> None:
 
             # Save example predictions periodically
             if (epoch + 1) % 5 == 0 or epoch == 0:
+                # Save training set predictions with augmentation visualization
+                train_pred_dir = example_images_dir / f"epoch_{epoch + 1}" / "training"
+                train_pred_dir.mkdir(parents=True, exist_ok=True)
+                console.print(
+                    f"Saving training set predictions with augmentation (epoch {epoch + 1})",
+                    style="info",
+                )
+                save_image_predictions(
+                    model,
+                    train_loader,
+                    device,
+                    num_samples=10,
+                    save_dir=train_pred_dir,
+                    show_original=True,  # Show augmentation visualization
+                )
+
                 # Always save test set predictions
                 test_pred_dir = example_images_dir / f"epoch_{epoch + 1}" / "test"
                 test_pred_dir.mkdir(parents=True, exist_ok=True)
@@ -584,22 +602,6 @@ def main(cfg: DictConfig) -> None:
                     "Saved best model state from metrics update", style="info"
                 )
 
-            # Save metrics CSV periodically (every 5 epochs)
-            if (epoch + 1) % 5 == 0 or epoch == 0:
-                active_run = mlflow.active_run()
-                run_name = active_run.info.run_name if active_run else "unknown_run"
-                metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
-                console.print(
-                    f"Saving metrics CSV after epoch {epoch + 1}",
-                    style="info",
-                )
-                with open(metrics_csv_path, "w", newline="") as f:
-                    writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
-                    writer_csv.writeheader()
-                    writer_csv.writerows(metrics_history)
-                # Log to metrics folder
-                mlflow.log_artifact(str(metrics_csv_path), "metrics")
-
             # Check early stopping condition
             if not pcfg.experiment.sanity_check_num_batches:
                 early_stopping(metrics_validation["loss"], model)
@@ -627,26 +629,33 @@ def main(cfg: DictConfig) -> None:
 
         # Save metrics history to CSV
         if metrics_history:
-            # Get run name from MLflow active run
-            active_run = mlflow.active_run()
-            run_name = active_run.info.run_name if active_run else "unknown_run"
-            metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
-            console.print(
-                f"Creating metrics CSV with {len(metrics_history)} rows",
-                style="info",
-            )
-            with open(metrics_csv_path, "w", newline="") as f:
-                writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
-                writer_csv.writeheader()
-                writer_csv.writerows(metrics_history)
-            console.print(
-                f"Saved metrics CSV to {metrics_csv_path} "
-                f"(size: {metrics_csv_path.stat().st_size} bytes)",
-                style="info",
-            )
-            # Log to metrics folder for better organization in Azure ML
-            mlflow.log_artifact(str(metrics_csv_path), "metrics")
-            console.print("Logged metrics CSV to MLflow artifacts", style="info")
+            # Only log if not already logged during periodic saves
+            if not metrics_csv_logged:
+                # Get run name from MLflow active run
+                active_run = mlflow.active_run()
+                run_name = active_run.info.run_name if active_run else "unknown_run"
+                metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
+                console.print(
+                    f"Creating metrics CSV with {len(metrics_history)} rows",
+                    style="info",
+                )
+                with open(metrics_csv_path, "w", newline="") as f:
+                    writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
+                    writer_csv.writeheader()
+                    writer_csv.writerows(metrics_history)
+                console.print(
+                    f"Saved metrics CSV to {metrics_csv_path} "
+                    f"(size: {metrics_csv_path.stat().st_size} bytes)",
+                    style="info",
+                )
+                # Log to metrics folder for better organization in Azure ML
+                mlflow.log_artifact(str(metrics_csv_path), "metrics")
+                console.print("Logged metrics CSV to MLflow artifacts", style="info")
+            else:
+                console.print(
+                    "Metrics CSV already logged during periodic saves",
+                    style="info",
+                )
         else:
             console.print(
                 "No metrics history to save (training may have failed early)",
