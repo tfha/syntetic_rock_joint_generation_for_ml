@@ -334,10 +334,6 @@ def main(cfg: DictConfig) -> None:
         # We'll keep splits_path as None if it doesn't exist
         splits_path = None
 
-    # Log dataset information in MLflow
-    mlflow.log_param("images_path", str(images_path))
-    mlflow.log_param("masks_path", str(masks_path))
-
     # 5. Prepare dataset prefixes and dataloaders
     ########################################################################
     # Get prefixes for dataset filtering based on experiment strategy
