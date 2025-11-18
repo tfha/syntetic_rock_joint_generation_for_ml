@@ -591,12 +591,27 @@ def main(cfg: DictConfig) -> None:
             active_run = mlflow.active_run()
             run_name = active_run.info.run_name if active_run else "unknown_run"
             metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
+            console.print(
+                f"Creating metrics CSV with {len(metrics_history)} rows",
+                style="info",
+            )
             with open(metrics_csv_path, "w", newline="") as f:
                 writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
                 writer_csv.writeheader()
                 writer_csv.writerows(metrics_history)
-            mlflow.log_artifact(str(metrics_csv_path))
-            console.print(f"Saved metrics to {metrics_csv_path}", style="info")
+            console.print(
+                f"Saved metrics CSV to {metrics_csv_path} "
+                f"(size: {metrics_csv_path.stat().st_size} bytes)",
+                style="info",
+            )
+            # Log to metrics folder for better organization in Azure ML
+            mlflow.log_artifact(str(metrics_csv_path), "metrics")
+            console.print("Logged metrics CSV to MLflow artifacts", style="info")
+        else:
+            console.print(
+                "No metrics history to save (training may have failed early)",
+                style="warning",
+            )
 
         # Save end-of-training predictions on validation set (if not empty)
         if len(val_loader.dataset) > 0:
