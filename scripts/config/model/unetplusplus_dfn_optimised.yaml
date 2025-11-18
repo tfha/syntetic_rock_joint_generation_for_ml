@@ -1,6 +1,6 @@
 # Optimized UNet++ configuration for DFN strategy
 # Based on hyperparameter optimization job: hparam_opt_unetplusplus_3
-name: unetplusplus
+name: unetplusplus_dfn_optimised
 num_epochs: 50
 batch_size: 8
 learning_rate: 0.0003446449720177375
