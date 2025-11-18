@@ -127,8 +127,14 @@ def setup_azure_dataloader(
     )
 
     # Get transformations
-    transforms_dict = get_transforms(
+    # Training uses augmentation, validation/test use only basic transforms
+    train_transforms = get_transforms(
         optional_transforms=optional_transforms,
+        transforms_parameters=transforms_parameters,
+    )
+    # Val/test: disable all augmentations, keep only resize/crop and normalize
+    val_test_transforms = get_transforms(
+        optional_transforms=False,  # Disable all augmentations
         transforms_parameters=transforms_parameters,
     )
     # Use registered splits from Azure ML
@@ -216,13 +222,13 @@ def setup_azure_dataloader(
 
     # Create datasets
     train_dataset = SegmentationDataset(
-        images_path, labels_path, train_list, transform=transforms_dict
+        images_path, labels_path, train_list, transform=train_transforms
     )
     val_dataset = SegmentationDataset(
-        images_path, labels_path, val_list, transform=transforms_dict
+        images_path, labels_path, val_list, transform=val_test_transforms
     )
     test_dataset = SegmentationDataset(
-        images_path, labels_path, test_list, transform=transforms_dict
+        images_path, labels_path, test_list, transform=val_test_transforms
     )
 
     # Resolve DataLoader performance flags

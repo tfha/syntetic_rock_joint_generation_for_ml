@@ -219,7 +219,9 @@ def get_transforms(
         geometric_transforms_list.append(transforms.RandomVerticalFlip())
 
     if transform_flags.get("rotation", False):
-        geometric_transforms_list.append(transforms.RandomRotation(15))
+        # Use white fill (255) to match rock color
+        # Prevents black boundaries from being learned as joints
+        geometric_transforms_list.append(transforms.RandomRotation(15, fill=255))
 
     # Build image transform: geometric + color (on PIL) + tensor + normalize
     image_transforms_list = geometric_transforms_list.copy()
@@ -345,6 +347,57 @@ def validate_data_post_transform(
     if not set(unique_values.tolist()).issubset({0, 1}):
         raise ValueError(
             f"Label contains values other than 0 and 1 for file: {file_name}"
+        )
+
+    # Check for black boundaries in image (rotation artifacts)
+    # Sample border pixels (top, bottom, left, right edges)
+    border_thickness = 5
+    top_border = image_tensor[:, :border_thickness, :]
+    bottom_border = image_tensor[:, -border_thickness:, :]
+    left_border = image_tensor[:, :, :border_thickness]
+    right_border = image_tensor[:, :, -border_thickness:]
+
+    # Concatenate all borders and check mean value
+    # After normalization, black (0) becomes around -2.1, white becomes around 2.6
+    all_borders = torch.cat(
+        [
+            top_border.flatten(),
+            bottom_border.flatten(),
+            left_border.flatten(),
+            right_border.flatten(),
+        ]
+    )
+    border_mean = all_borders.mean().item()
+
+    # If border mean is very negative (close to normalized black), warn
+    if border_mean < -1.5:  # Threshold for detecting black boundaries
+        raise ValueError(
+            f"Image has black boundaries (mean={border_mean:.2f}) "
+            f"for file: {file_name}. Check rotation fill parameter."
+        )
+
+    # Check for black boundaries in label mask
+    # (should be white=1 after rotation)
+    label_top = label_tensor[:, :border_thickness, :]
+    label_bottom = label_tensor[:, -border_thickness:, :]
+    label_left = label_tensor[:, :, :border_thickness]
+    label_right = label_tensor[:, :, -border_thickness:]
+
+    label_borders = torch.cat(
+        [
+            label_top.flatten(),
+            label_bottom.flatten(),
+            label_left.flatten(),
+            label_right.flatten(),
+        ]
+    )
+    label_border_mean = label_borders.mean().item()
+
+    # Label borders should be mostly 1 (white/rock) not 0 (black/joint)
+    if label_border_mean < 0.5:  # More black than white on borders
+        raise ValueError(
+            f"Label mask has black boundaries (mean={label_border_mean:.2f}) "
+            f"for file: {file_name}. Check rotation fill parameter."
         )
 
 
