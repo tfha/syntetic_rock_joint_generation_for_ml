@@ -1,7 +1,7 @@
 # Optimized DeepLabV3+ configuration for DFN strategy
 # Based on hyperparameter optimization job: hparam_opt_deeplabv3plus_1
 name: deeplabv3plus_dfn_optimised
-num_epochs: 50
+num_epochs: 1
 batch_size: 4
 learning_rate: 0.00022823922876536484
 scheduler:
