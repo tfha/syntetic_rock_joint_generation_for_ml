@@ -12,12 +12,17 @@ def choose_model(model_name: str, params: dict[str, Any]) -> nn.Module:
 
     Args:
         model_name (str): The name of the model to choose.
+                         Supports base names and optimized variants
+                         (e.g., 'unet_dfn_optimised').
 
     Returns:
         nn.Module: The chosen model.
 
     """
-    match model_name:
+    # Extract base model name (remove _dfn_optimised or other suffixes)
+    base_name = model_name.split("_dfn_")[0] if "_dfn_" in model_name else model_name
+
+    match base_name:
         case "unet":
             model = smp.Unet(**params)
         case "deeplabv3plus":
@@ -27,7 +32,8 @@ def choose_model(model_name: str, params: dict[str, Any]) -> nn.Module:
         case "FraSegNetVGG19":
             model = FraSegNetVGG19(**params)
         case _:
-            raise ValueError(f"Model {model_name} not recognized.")
+            msg = f"Model {model_name} (base: {base_name}) not recognized."
+            raise ValueError(msg)
     return model
 
 
