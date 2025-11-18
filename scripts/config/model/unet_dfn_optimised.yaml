@@ -1,0 +1,20 @@
+# Optimized UNet configuration for DFN strategy
+# Based on hyperparameter optimization job: hparam_opt_unet_0
+name: unet
+num_epochs: 50
+batch_size: 12
+learning_rate: 0.0009103232325125028
+scheduler:
+  patience: 3
+  gamma: 0.15044077634965683
+params:
+  encoder_name: resnet34
+  encoder_weights: imagenet # use `imagenet` pre-trained weights for encoder initialization
+  in_channels: 3            # model input channels (1 for gray-scale images, 3 for RGB, etc.
+  classes: 1                # model output channels (number of classes in your dataset)
+  encoder_depth: 5
+  decoder_use_batchnorm: true
+  decoder_channels: [256, 128, 64, 32, 16]
+  decoder_attention_type: null
+  activation: null
+  aux_params: null

@@ -1,0 +1,23 @@
+# Optimized DeepLabV3+ configuration for DFN strategy
+# Based on hyperparameter optimization job: hparam_opt_deeplabv3plus_1
+name: deeplabv3plus
+num_epochs: 50
+batch_size: 4
+learning_rate: 0.00022823922876536484
+scheduler:
+  patience: 7
+  gamma: 0.15641781177591452
+params:
+  encoder_name: 'efficientnet-b4'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  encoder_output_stride: 16
+  decoder_channels: 256
+  decoder_atrous_rates: [12, 24, 36]
+  decoder_aspp_separable: true
+  decoder_aspp_dropout: 0.5
+  in_channels: 3
+  classes: 1
+  activation: null
+  upsampling: 8
+  aux_params: null

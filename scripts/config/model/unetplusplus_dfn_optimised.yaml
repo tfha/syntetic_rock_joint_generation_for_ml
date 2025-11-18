@@ -1,0 +1,25 @@
+# Optimized UNet++ configuration for DFN strategy
+# Based on hyperparameter optimization job: hparam_opt_unetplusplus_3
+name: unetplusplus
+num_epochs: 50
+batch_size: 8
+learning_rate: 0.0003446449720177375
+scheduler:
+  patience: 5
+  gamma: 0.30805354228725124
+params:
+  encoder_name: 'efficientnet-b0'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  decoder_use_batchnorm: true
+  decoder_channels:
+    - 256
+    - 128
+    - 64
+    - 32
+    - 16
+  decoder_attention_type: null
+  in_channels: 3
+  classes: 1
+  activation: null
+  aux_params: null
