@@ -25,6 +25,7 @@ The script handles:
 8. Clean output organization for artifacts and logs
 """
 
+import csv
 import os
 import subprocess
 import sys
@@ -424,6 +425,9 @@ def main(cfg: DictConfig) -> None:
         delta=pcfg.experiment.early_stopping_delta,
     )
 
+    # Initialize metrics tracking for CSV export
+    metrics_history = []
+
     # 8. Execute training and validation loop
     ########################################################################
     console.print("Beginning training and validation...", style="info")
@@ -468,6 +472,11 @@ def main(cfg: DictConfig) -> None:
             for name, value in metrics_training.items():
                 mlflow.log_metric(f"train_{name}", value, epoch)
 
+            # Store training metrics for CSV export
+            epoch_metrics = {"epoch": epoch}
+            for name, value in metrics_training.items():
+                epoch_metrics[f"train_{name}"] = value
+
             # Validation (only if validation data exists)
             if len(val_loader.dataset) > 0:
                 metrics_validation = validate_one_epoch(
@@ -498,6 +507,10 @@ def main(cfg: DictConfig) -> None:
                 for name, value in metrics_validation.items():
                     mlflow.log_metric(f"val_{name}", value, epoch)
 
+                # Store validation metrics for CSV export
+                for name, value in metrics_validation.items():
+                    epoch_metrics[f"val_{name}"] = value
+
                 # Update learning rate based on validation loss
                 scheduler.step(metrics_validation["loss"])
             else:
@@ -510,6 +523,9 @@ def main(cfg: DictConfig) -> None:
                 # Use training metrics as a proxy for validation
                 metrics_validation = metrics_training.copy()
                 scheduler.step(metrics_training["loss"])
+
+            # Append metrics for this epoch to history
+            metrics_history.append(epoch_metrics)
 
             # Save example predictions periodically
             if (epoch + 1) % 5 == 0 or epoch == 0:
@@ -567,6 +583,19 @@ def main(cfg: DictConfig) -> None:
 
         # Close the tensorboard writer
         writer.close()
+
+        # Save metrics history to CSV
+        if metrics_history:
+            # Get run name from MLflow active run
+            active_run = mlflow.active_run()
+            run_name = active_run.info.run_name if active_run else "unknown_run"
+            metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
+            with open(metrics_csv_path, "w", newline="") as f:
+                writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
+                writer_csv.writeheader()
+                writer_csv.writerows(metrics_history)
+            mlflow.log_artifact(str(metrics_csv_path))
+            console.print(f"Saved metrics to {metrics_csv_path}", style="info")
 
         # Save end-of-training predictions on validation set (if not empty)
         if len(val_loader.dataset) > 0:
