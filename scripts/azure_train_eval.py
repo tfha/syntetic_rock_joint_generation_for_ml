@@ -527,18 +527,42 @@ def main(cfg: DictConfig) -> None:
             # Append metrics for this epoch to history
             metrics_history.append(epoch_metrics)
 
-            # Save example predictions periodically (use train_loader to show augmentation)
+            # Save example predictions periodically
             if (epoch + 1) % 5 == 0 or epoch == 0:
-                save_dir = example_images_dir / f"epoch_{epoch + 1}"
-                save_dir.mkdir(parents=True, exist_ok=True)
+                # Always save test set predictions
+                test_pred_dir = example_images_dir / f"epoch_{epoch + 1}" / "test"
+                test_pred_dir.mkdir(parents=True, exist_ok=True)
+                console.print(
+                    f"Saving test set predictions (epoch {epoch + 1})",
+                    style="info",
+                )
                 save_image_predictions(
                     model,
-                    train_loader,
+                    test_loader,
                     device,
                     num_samples=10,
-                    save_dir=save_dir,
-                    show_original=True,
+                    save_dir=test_pred_dir,
+                    show_original=False,
                 )
+
+                # Save validation predictions if available
+                if len(val_loader.dataset) > 0:
+                    val_pred_dir = (
+                        example_images_dir / f"epoch_{epoch + 1}" / "validation"
+                    )
+                    val_pred_dir.mkdir(parents=True, exist_ok=True)
+                    console.print(
+                        f"Saving validation set predictions (epoch {epoch + 1})",
+                        style="info",
+                    )
+                    save_image_predictions(
+                        model,
+                        val_loader,
+                        device,
+                        num_samples=10,
+                        save_dir=val_pred_dir,
+                        show_original=False,
+                    )
 
             # Update best metrics
             training_time = time.time() - start_time
@@ -559,6 +583,22 @@ def main(cfg: DictConfig) -> None:
                 console.print(
                     "Saved best model state from metrics update", style="info"
                 )
+
+            # Save metrics CSV periodically (every 5 epochs)
+            if (epoch + 1) % 5 == 0 or epoch == 0:
+                active_run = mlflow.active_run()
+                run_name = active_run.info.run_name if active_run else "unknown_run"
+                metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
+                console.print(
+                    f"Saving metrics CSV after epoch {epoch + 1}",
+                    style="info",
+                )
+                with open(metrics_csv_path, "w", newline="") as f:
+                    writer_csv = csv.DictWriter(f, fieldnames=metrics_history[0].keys())
+                    writer_csv.writeheader()
+                    writer_csv.writerows(metrics_history)
+                # Log to metrics folder
+                mlflow.log_artifact(str(metrics_csv_path), "metrics")
 
             # Check early stopping condition
             if not pcfg.experiment.sanity_check_num_batches:
