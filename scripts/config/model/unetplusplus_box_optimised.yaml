@@ -1,0 +1,25 @@
+# Optimized UNet++ configuration for Box strategy
+# Based on hyperparameter optimization for main_objective_box_box experiment
+name: unetplusplus_box_optimised
+num_epochs: 50
+batch_size: 8
+learning_rate: 0.00021630696119922458
+scheduler:
+  patience: 7
+  gamma: 0.17266117536641068
+params:
+  encoder_name: 'efficientnet-b0'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  decoder_use_batchnorm: true
+  decoder_channels:
+    - 256
+    - 128
+    - 64
+    - 32
+    - 16
+  decoder_attention_type: null
+  in_channels: 3
+  classes: 1
+  activation: null
+  aux_params: null

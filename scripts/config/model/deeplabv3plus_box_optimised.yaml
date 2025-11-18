@@ -1,0 +1,23 @@
+# Optimized DeepLabV3+ configuration for Box strategy
+# Based on hyperparameter optimization for main_objective_box_box experiment
+name: deeplabv3plus_box_optimised
+num_epochs: 50
+batch_size: 12
+learning_rate: 0.000307900758856154
+scheduler:
+  patience: 7
+  gamma: 0.1659300043229529
+params:
+  encoder_name: 'mobilenet_v2'
+  encoder_depth: 5
+  encoder_weights: 'imagenet'
+  encoder_output_stride: 16
+  decoder_channels: 128
+  decoder_atrous_rates: [12, 24, 36]
+  decoder_aspp_separable: true
+  decoder_aspp_dropout: 0.5
+  in_channels: 3
+  classes: 1
+  activation: null
+  upsampling: 4
+  aux_params: null
