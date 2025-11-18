@@ -519,15 +519,9 @@ def main(cfg: DictConfig) -> None:
                     model,
                     test_loader,
                     device,
-                    num_samples=3,
+                    num_samples=10,
                     save_dir=save_dir,
                 )
-
-                # Log example images to MLflow
-                for img_path in save_dir.glob("*.png"):
-                    mlflow.log_artifact(
-                        str(img_path), f"example_predictions/epoch_{epoch + 1}"
-                    )
 
             # Update best metrics
             training_time = time.time() - start_time
@@ -573,6 +567,21 @@ def main(cfg: DictConfig) -> None:
 
         # Close the tensorboard writer
         writer.close()
+
+        # Save end-of-training predictions on validation set (if not empty)
+        if len(val_loader.dataset) > 0:
+            end_of_training_dir = plots_dir / "end_of_training"
+            end_of_training_dir.mkdir(parents=True, exist_ok=True)
+            save_image_predictions(
+                model,
+                val_loader,
+                device,
+                num_samples=10,
+                save_dir=end_of_training_dir,
+            )
+            mlflow.log_artifacts(
+                str(end_of_training_dir), "end_of_training_predictions"
+            )
 
         # Save final model
         final_model_path = models_dir / "final_model.pth"
@@ -682,7 +691,7 @@ def main(cfg: DictConfig) -> None:
             model,
             test_loader,
             device,
-            num_samples=5,
+            num_samples=10,
             save_dir=final_predictions_dir,
         )
 
