@@ -153,12 +153,14 @@ def train_one_epoch(
     joint_precision_metric = Precision(task="binary").to(device)
     joint_recall_metric = Recall(task="binary").to(device)
 
-    for batch_idx, (images, masks) in enumerate(
+    for batch_idx, batch_data in enumerate(
         track(dataloader, description="Training", total=len(dataloader))
     ):
         if max_batches is not None and batch_idx >= max_batches:
             break
 
+        # Handle both 2-tuple (images, masks) and 3-tuple (images, masks, original)
+        images, masks = batch_data[0], batch_data[1]
         images, masks = images.to(device), masks.to(device)
 
         optimizer.zero_grad()  # Zero the parameter gradients
@@ -262,12 +264,14 @@ def validate_one_epoch(
     joint_recall_metric = Recall(task="binary").to(device)
 
     with torch.no_grad():
-        for batch_idx, (images, masks) in enumerate(
+        for batch_idx, batch_data in enumerate(
             track(dataloader, description="Validation", total=len(dataloader))
         ):
             if max_batches is not None and batch_idx >= max_batches:
                 break
 
+            # Handle both 2-tuple (images, masks) and 3-tuple (images, masks, original)
+            images, masks = batch_data[0], batch_data[1]
             images, masks = images.to(device), masks.to(device)
 
             amp_ctx = (
