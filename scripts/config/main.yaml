@@ -66,12 +66,12 @@ experiment:
   early_stopping_patience: 3
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
   optional_transforms:
-    random_crop: false
-    horizontal_flip: false
-    vertical_flip: false
-    color_jitter: false
-    rotation: false
-    gaussian_blur: false
+    random_crop: true
+    horizontal_flip: true
+    vertical_flip: true
+    color_jitter: true
+    rotation: true
+    gaussian_blur: true
   overfit_check: false
   sanity_check_num_batches: null # set to a low number to speed up training in order to check if functionality is working, e.g. 1-3
   quality_control_data: false
