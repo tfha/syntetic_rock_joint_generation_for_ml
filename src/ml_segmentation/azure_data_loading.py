@@ -222,7 +222,11 @@ def setup_azure_dataloader(
 
     # Create datasets
     train_dataset = SegmentationDataset(
-        images_path, labels_path, train_list, transform=train_transforms
+        images_path,
+        labels_path,
+        train_list,
+        transform=train_transforms,
+        return_original=True,
     )
     val_dataset = SegmentationDataset(
         images_path, labels_path, val_list, transform=val_test_transforms

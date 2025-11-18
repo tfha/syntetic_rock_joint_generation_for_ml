@@ -473,7 +473,7 @@ def main(cfg: DictConfig) -> None:
                 mlflow.log_metric(f"train_{name}", value, epoch)
 
             # Store training metrics for CSV export
-            epoch_metrics = {"epoch": epoch}
+            epoch_metrics: dict[str, int | float] = {"epoch": epoch}
             for name, value in metrics_training.items():
                 epoch_metrics[f"train_{name}"] = value
 
@@ -527,16 +527,17 @@ def main(cfg: DictConfig) -> None:
             # Append metrics for this epoch to history
             metrics_history.append(epoch_metrics)
 
-            # Save example predictions periodically
+            # Save example predictions periodically (use train_loader to show augmentation)
             if (epoch + 1) % 5 == 0 or epoch == 0:
                 save_dir = example_images_dir / f"epoch_{epoch + 1}"
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_image_predictions(
                     model,
-                    test_loader,
+                    train_loader,
                     device,
                     num_samples=10,
                     save_dir=save_dir,
+                    show_original=True,
                 )
 
             # Update best metrics

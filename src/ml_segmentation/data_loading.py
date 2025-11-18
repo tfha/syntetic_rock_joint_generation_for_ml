@@ -28,22 +28,33 @@ class SegmentationDataset(Dataset):
         labels_dir: str | Path,
         file_list: list[str],
         transform: dict[str, "transforms.Compose"] | None = None,
+        return_original: bool = False,
     ):
         self.images_dir = Path(images_dir)
         self.labels_dir = Path(labels_dir)
         self.file_list = file_list
         self.transform = transform
+        self.return_original = return_original
 
     def __len__(self) -> int:
         return len(self.file_list)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(
+        self, idx: int
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ):
         image_path = self.images_dir / self.file_list[idx]
         label_path = self.labels_dir / self.file_list[idx]
 
         # Load image and label
         image = Image.open(image_path).convert("RGB")
         label = Image.open(label_path)
+
+        # Store original image if requested
+        if self.return_original:
+            original_image = transforms.ToTensor()(image)
 
         # Apply transformations if any, else convert to tensors
         if self.transform is not None:
@@ -66,6 +77,8 @@ class SegmentationDataset(Dataset):
         # Invert label to match the segmentation model's requirements
         label = 1 - label
 
+        if self.return_original:
+            return image, label, original_image
         return image, label
 
 

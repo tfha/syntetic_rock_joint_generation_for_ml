@@ -79,11 +79,13 @@ def check_and_update_best_metrics(
             "epoch": epoch + 1,
             "loss": metrics["loss"],
             "iou": metrics["iou"],
-            "iou_background": metrics["iou_background"],
             "iou_joints": metrics["iou_joints"],
             "dice": metrics["dice"],
+            "dice_joints": metrics["dice_joints"],
             "precision": metrics["precision"],
+            "precision_joints": metrics["precision_joints"],
             "recall": metrics["recall"],
+            "recall_joints": metrics["recall_joints"],
             "training_time": training_time,
         }
         console = Console()
@@ -459,6 +461,7 @@ def save_image_predictions(
     save_dir: Path = Path("plots/predictions"),
     epoch: int | None = None,
     exp_tag: str | None = None,
+    show_original: bool = False,
 ) -> None:
     """
     Save predictions from the model as images.
@@ -474,13 +477,23 @@ def save_image_predictions(
         epoch (int, optional): Current epoch number for filename. Defaults to None.
         exp_tag (str, optional): Experiment tag/timestamp for filename. Defaults to
         None.
+        show_original (bool, optional): Show original non-augmented image.
+        Defaults to False.
     """
     model.eval()
     save_dir.mkdir(parents=True, exist_ok=True)
 
     collected = 0
     with torch.no_grad():
-        for images, masks in dataloader:
+        for batch in dataloader:
+            # Handle both 2-tuple and 3-tuple returns from dataset
+            if len(batch) == 3:
+                images, masks, originals = batch
+                originals = originals.to(device)
+            else:
+                images, masks = batch
+                originals = None
+
             images, masks = images.to(device), masks.to(device)
             preds = torch.sigmoid(model(images)) > threshold
 
@@ -494,19 +507,42 @@ def save_image_predictions(
                 mask_np: np.ndarray = 1 - masks[b].detach().cpu().numpy()  # invert
                 pred_np: np.ndarray = 1 - preds[b].detach().cpu().numpy()  # invert
 
-                fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+                # Determine number of columns based on show_original
+                num_cols = 4 if (show_original and originals is not None) else 3
+                fig, axes = plt.subplots(1, num_cols, figsize=(5 * num_cols, 5))
 
+                col_idx = 0
+
+                # Show original non-augmented image if available
+                if show_original and originals is not None:
+                    orig_np: np.ndarray = originals[b].detach().cpu().numpy()
+                    orig_to_display = orig_np.transpose(1, 2, 0)
+                    orig_to_display = (orig_to_display - orig_to_display.min()) / (
+                        orig_to_display.max() - orig_to_display.min() + 1e-8
+                    )
+                    axes[col_idx].imshow(orig_to_display)
+                    axes[col_idx].set_title("Original (No Aug)")
+                    col_idx += 1
+
+                # Show augmented image
                 img_to_display = img_np.transpose(1, 2, 0)
                 img_to_display = (img_to_display - img_to_display.min()) / (
                     img_to_display.max() - img_to_display.min() + 1e-8
                 )
+                axes[col_idx].imshow(img_to_display)
+                axes[col_idx].set_title(
+                    "Augmented Image" if show_original else "Original Image"
+                )
+                col_idx += 1
 
-                axes[0].imshow(img_to_display)
-                axes[0].set_title("Original Image")
-                axes[1].imshow(mask_np[0], cmap="gray")
-                axes[1].set_title("True Mask")
-                axes[2].imshow(pred_np[0], cmap="gray")
-                axes[2].set_title("Predicted Mask")
+                # Show true mask
+                axes[col_idx].imshow(mask_np[0], cmap="gray")
+                axes[col_idx].set_title("True Mask")
+                col_idx += 1
+
+                # Show predicted mask
+                axes[col_idx].imshow(pred_np[0], cmap="gray")
+                axes[col_idx].set_title("Predicted Mask")
 
                 for ax in axes:
                     ax.axis("off")
