@@ -47,7 +47,17 @@ class SegmentationDataset(Dataset):
 
         # Apply transformations if any, else convert to tensors
         if self.transform is not None:
+            # CRITICAL: Seed the random state to ensure geometric transforms
+            # (RandomHorizontalFlip, RandomVerticalFlip, etc.) make the SAME
+            # random decision for both image and label, maintaining alignment
+            seed = torch.randint(0, 2**32, (1,)).item()
+
+            # Apply image transforms with seeded random state
+            torch.manual_seed(seed)
             image = self.transform["image"](image)
+
+            # Apply label transforms with SAME seeded random state
+            torch.manual_seed(seed)
             label = self.transform["label"](label)
         else:
             image = transforms.ToTensor()(image)
@@ -124,56 +134,125 @@ def get_dataloaders(
 
 
 def get_transforms(
-    optional_transforms: bool = False,
+    optional_transforms: bool | dict[str, bool] = False,
     transforms_parameters: dict[str, Any] | None = None,
 ) -> dict[str, "transforms.Compose"]:
     """
+    Get image and label transforms with optional augmentations.
+
     Using all the transforms, the effective virtual dataset size will be
     ~14.4x larger during training compared to the original 1000 images.
     While you still only have 1000 original images saved, the model will
     effectively see about 14,400 variations of your images during training,
     which significantly improves generalisation without increasing stored
     images.
+
+    Args:
+        optional_transforms: Either bool (legacy - enables ColorJitter only) or dict with individual flags:
+            - horizontal_flip: Apply horizontal flipping
+            - vertical_flip: Apply vertical flipping
+            - color_jitter: Apply color jitter
+            - rotation: Apply random rotation
+            - gaussian_blur: Apply Gaussian blur
+        transforms_parameters: Dict with transform parameters (e.g., crop_size)
     """
     # Read transform parameters (future-proof: add more keys as needed)
     params = transforms_parameters or {}
     crop_sz: int = int(params.get("crop_size", 768))
-    train_transforms_list = [
-        transforms.CenterCrop(crop_sz),
-        # transforms.Resize(
-        #     (resize_size, resize_size), interpolation=Image.BILINEAR
-        # ),
-        # transforms.RandomHorizontalFlip(),
-        # transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),  # transforms the image to a tensor in the range [0, 1]
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        ),  # normalizes the image to have a mean and standard deviation of 0.5
-    ]
 
-    if optional_transforms:
-        train_transforms_list.extend(
-            [
-                # transforms.RandomRotation(15),
-                transforms.ColorJitter(
-                    brightness=0.1, contrast=0.3, saturation=0.2, hue=0.1
-                ),
-                # transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0)),
-            ]
+    # Parse transform flags (support bool, dict, or Pydantic model)
+    if isinstance(optional_transforms, bool):
+        # Legacy mode: bool=True enables only ColorJitter
+        transform_flags = {
+            "random_crop": False,
+            "horizontal_flip": False,
+            "vertical_flip": False,
+            "color_jitter": optional_transforms,
+            "rotation": False,
+            "gaussian_blur": False,
+        }
+    elif isinstance(optional_transforms, dict):
+        # Dict mode: individual control from dict
+        transform_flags = optional_transforms
+    else:
+        # Pydantic model mode: convert to dict
+        transform_flags = {
+            "random_crop": optional_transforms.random_crop,
+            "horizontal_flip": optional_transforms.horizontal_flip,
+            "vertical_flip": optional_transforms.vertical_flip,
+            "color_jitter": optional_transforms.color_jitter,
+            "rotation": optional_transforms.rotation,
+            "gaussian_blur": optional_transforms.gaussian_blur,
+        }
+
+    # Build transform lists for both image and label
+    # CRITICAL: Geometric transforms must be applied to BOTH image and label
+    # to maintain alignment
+    geometric_transforms_list = []
+
+    # Cropping: use RandomResizedCrop if enabled, otherwise CenterCrop
+    # CenterCrop ensures fixed size (768x768) when images are larger
+    # or have varying dimensions. If images are already 768x768, it's a no-op
+    if transform_flags.get("random_crop", False):
+        # RandomResizedCrop: crop random portion (65-100% area) then resize
+        # scale=(0.65, 1.0): crop 65-100% of image area
+        # ratio=(1.0, 1.0): keep square aspect ratio for rock images
+        geometric_transforms_list.append(
+            transforms.RandomResizedCrop(
+                size=crop_sz,
+                scale=(0.65, 1.0),  # Crop 65-100% of original image area
+                ratio=(1.0, 1.0),  # Maintain square aspect ratio
+                interpolation=transforms.InterpolationMode.BILINEAR,
+            )
+        )
+    else:
+        # CenterCrop: extract center region if images are larger than crop_sz
+        # This is NOT redundant if original images are e.g. 800x800 or variable
+        geometric_transforms_list.append(transforms.CenterCrop(crop_sz))
+
+    # Add geometric transforms BEFORE ToTensor
+    # These must be applied to BOTH image and label
+    if transform_flags.get("horizontal_flip", False):
+        geometric_transforms_list.append(transforms.RandomHorizontalFlip())
+
+    if transform_flags.get("vertical_flip", False):
+        geometric_transforms_list.append(transforms.RandomVerticalFlip())
+
+    if transform_flags.get("rotation", False):
+        geometric_transforms_list.append(transforms.RandomRotation(15))
+
+    # Build image transform: geometric + color (on PIL) + tensor + normalize
+    image_transforms_list = geometric_transforms_list.copy()
+
+    # Color augmentations (apply to PIL image BEFORE ToTensor)
+    if transform_flags.get("color_jitter", False):
+        # ColorJitter works on PIL images (0-255 range)
+        # brightness=0.4 allows range [0.6, 1.4] of original brightness
+        # This enables darker images to simulate varying lighting conditions
+        image_transforms_list.append(
+            transforms.ColorJitter(
+                brightness=0.4, contrast=0.4, saturation=0.3, hue=0.15
+            )
         )
 
-    image_transform = transforms.Compose(train_transforms_list)
+    if transform_flags.get("gaussian_blur", False):
+        image_transforms_list.append(
+            transforms.GaussianBlur(kernel_size=(3, 3), sigma=(0.1, 1.0))
+        )
 
-    # Apply the same center crop to the labels
-    label_transform = transforms.Compose(
-        [
-            transforms.CenterCrop(crop_sz),  # Centre crop to match images
-            # transforms.Resize(
-            #     (resize_size, resize_size), interpolation=Image.NEAREST
-            # ),
-            transforms.ToTensor(),
-        ]
+    # Convert to tensor and normalize (after color augmentations)
+    image_transforms_list.append(transforms.ToTensor())
+    image_transforms_list.append(
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     )
+
+    image_transform = transforms.Compose(image_transforms_list)
+
+    # Build label transform: same geometric transforms + ToTensor (NO normalization/color)
+    label_transforms_list = geometric_transforms_list.copy()
+    label_transforms_list.append(transforms.ToTensor())
+
+    label_transform = transforms.Compose(label_transforms_list)
 
     return {"image": image_transform, "label": label_transform}
 

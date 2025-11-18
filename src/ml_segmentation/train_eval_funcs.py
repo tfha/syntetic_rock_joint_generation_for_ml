@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
+from PIL import Image
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
@@ -173,6 +175,11 @@ def train_one_epoch(
         with amp_ctx:
             # Forward pass
             outputs = model(images)
+            # Resize outputs to match mask dimensions (fixes DeepLabV3+ upsampling issue)
+            if outputs.shape[-2:] != masks.shape[-2:]:
+                outputs = F.interpolate(
+                    outputs, size=masks.shape[-2:], mode="bilinear", align_corners=False
+                )
             loss = criterion(outputs, masks)
 
         # Backward pass and optimization
@@ -304,6 +311,14 @@ def validate_one_epoch(
             with amp_ctx:
                 # Forward pass
                 outputs = model(images)
+                # Resize outputs to match mask dimensions (fixes DeepLabV3+ upsampling issue)
+                if outputs.shape[-2:] != masks.shape[-2:]:
+                    outputs = F.interpolate(
+                        outputs,
+                        size=masks.shape[-2:],
+                        mode="bilinear",
+                        align_corners=False,
+                    )
                 loss = criterion(outputs, masks)
 
             running_loss += loss.item() * images.size(0)
@@ -459,6 +474,40 @@ class EarlyStopping:
             self.val_loss_min = float("inf")
         else:
             self.val_loss_min = -self.best_score
+
+
+def calculate_image_statistics(image_tensor: torch.Tensor) -> dict[str, float]:
+    """
+    Calculate brightness, contrast, saturation, and hue statistics.
+
+    Args:
+        image_tensor: Normalized tensor (C, H, W) with ImageNet normalization
+
+    Returns:
+        Dictionary with mean brightness, contrast, saturation, hue
+    """
+    # Denormalize from ImageNet normalization
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+    img = image_tensor.cpu() * std + mean
+    img = torch.clamp(img, 0, 1)
+
+    # Convert to PIL for HSV conversion
+    img_pil = Image.fromarray((img.permute(1, 2, 0).numpy() * 255).astype(np.uint8))
+    img_hsv = np.array(img_pil.convert("HSV")).astype(np.float32) / 255.0
+
+    # Calculate statistics
+    brightness = float(img.mean())  # Mean RGB value
+    contrast = float(img.std())  # Standard deviation as contrast
+    saturation = float(img_hsv[:, :, 1].mean())  # Mean saturation
+    hue = float(img_hsv[:, :, 0].mean())  # Mean hue (0-1 range)
+
+    return {
+        "brightness": brightness,
+        "contrast": contrast,
+        "saturation": saturation,
+        "hue": hue,
+    }
 
 
 def save_image_predictions(

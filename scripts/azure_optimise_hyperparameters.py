@@ -25,9 +25,7 @@ from ml_segmentation.azure_authentication import (
     setup_azure_environment_variables,
 )
 from ml_segmentation.azure_core import configure_azure_logging_and_warning
-from ml_segmentation.azure_data_assets import (
-    get_data_asset,
-)
+from ml_segmentation.azure_data_assets import get_data_asset
 from ml_segmentation.azure_environment import export_poetry_to_environment_yml
 from ml_segmentation.azure_hyperparameter_spaces import (
     get_bayesian_sampling_params,
@@ -150,35 +148,21 @@ def main():
 
     # Get the latest versions of our data assets
     try:
-        console.print("Retrieving latest data assets from Azure ML...", style="info")
+        console.print("Retrieving data assets from Azure ML...", style="info")
 
-        # Get base image and mask datasets
+        # Use get_data_asset helper to retrieve datasets by alias
         images_dataset = get_data_asset(ml_client, console, "rock_images")
         masks_dataset = get_data_asset(ml_client, console, "rock_masks")
 
-        # Try to get data splits if available
-        try:
-            splits_dataset = get_data_asset(
-                ml_client, console, "rock_segmentation_splits"
-            )
-            console.print(
-                f"Using dataset splits version: {splits_dataset.version}",
-                style="info",
-            )
-            has_splits = True
-        except Exception:
-            console.print(
-                "No dataset splits found, will use strategy-based splitting",
-                style="warning",
-            )
-            has_splits = False
+        # Select the correct split dataset based on experiment strategy
+        split_asset_name = f"split_{opt_config['experiment_strategy']}"
+        splits_dataset = get_data_asset(ml_client, console, split_asset_name)
 
         console.print(
-            f"Using images dataset version: {images_dataset.version}",
-            style="info",
-        )
-        console.print(
-            f"Using masks dataset version: {masks_dataset.version}",
+            f"Data assets loaded:"
+            f"\n  Images: {images_dataset.name}@{images_dataset.version}"
+            f"\n  Masks: {masks_dataset.name}@{masks_dataset.version}"
+            f"\n  Splits: {splits_dataset.name}@{splits_dataset.version}",
             style="info",
         )
 
@@ -200,16 +184,20 @@ def main():
         conda_file=environment_file,
     )
 
-    # Register the environment if needed
+    # Use the same environment as verification experiments
+    # From main.yaml: environment_name=rock-segmentation-env-curated-py310
+    # version=2
     try:
-        registered_env = ml_client.environments.get(
-            name="rock-segmentation-env", label="latest"
+        env = ml_client.environments.get(
+            name="rock-segmentation-env-curated-py310", version="2"
         )
-        console.print("Using existing environment", style="info")
-        env = registered_env
+        console.print(
+            "Using curated environment: rock-segmentation-env-curated-py310:2",
+            style="info",
+        )
     except Exception:
-        console.print("Registering new environment", style="info")
-        env = ml_client.environments.create_or_update(env)
+        console.print("Curated environment not found, using latest", style="warning")
+        env = ml_client.environments.get(name="rock-segmentation-env", label="latest")
 
     # Set up the command job for hyperparameter tuning
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
@@ -227,13 +215,17 @@ def main():
         f"  Masks: {masks_dataset.name}@{masks_dataset.version}",
         style="info",
     )
-    if has_splits:
-        console.print(
-            f"  Splits: {splits_dataset.name}@{splits_dataset.version}",
-            style="info",
-        )
+    console.print(
+        f"  Splits: {splits_dataset.name}@{splits_dataset.version}",
+        style="info",
+    )
+
+    # Get the search space for the specified model
+    search_space = get_model_search_space(model_name)
 
     # Create the base training command
+    # Use ${{inputs.*}} syntax - Azure ML expands these to mounted paths
+    # Azure ML sweep parameters use underscores, map to Hydra dotted notation
     base_command = (
         f"python scripts/azure_train_eval.py "
         f"model={model_name} "
@@ -241,32 +233,30 @@ def main():
         f"experiment.experiment_strategy={opt_config['experiment_strategy']} "
         f"model.num_epochs={opt_config['epochs']} "
         f"experiment.num_workers={opt_config['num_workers']} "
-    )  # Data splits are now always used in the system
-    # No need to add any specific flags
+        f"+experiment.report_metrics_to_file=True "
+        f"+dataset.azure_images_path=${{{{inputs.images_data}}}} "
+        f"+dataset.azure_masks_path=${{{{inputs.masks_data}}}} "
+        f"+dataset.azure_splits_path=${{{{inputs.splits_data}}}} "
+    )
 
-    # Add output reporting for hyperparameter optimization
-    base_command += " experiment.report_metrics_to_file=True"
+    # Add search_space parameter mappings to command
+    # Azure ML uses underscore names, but Hydra needs dotted notation
+    for param_name in search_space.keys():
+        azure_param_name = param_name.replace(".", "_")
+        # Map Azure ML's underscore parameter back to Hydra's dotted format
+        base_command += f" {param_name}=${{{{search_space.{azure_param_name}}}}}"
 
-    # Prepare inputs dictionary using versioned asset names
-    # Use name@version format which sweep jobs handle correctly
-    inputs_dict = {
+    # Define inputs - Azure ML will mount these and expand ${{inputs.*}}
+    # Use dataset.id with mode="download" (same as verification experiments)
+    job_inputs = {
         "images_data": Input(
-            type="uri_folder",
-            path=f"{images_dataset.name}@{images_dataset.version}",
+            type="uri_folder", path=images_dataset.id, mode="download"
         ),
-        "masks_data": Input(
-            type="uri_folder",
-            path=f"{masks_dataset.name}@{masks_dataset.version}",
+        "masks_data": Input(type="uri_folder", path=masks_dataset.id, mode="download"),
+        "splits_data": Input(
+            type="uri_folder", path=splits_dataset.id, mode="download"
         ),
     }
-
-    # Add splits dataset if available
-    if has_splits:
-        inputs_dict["splits_data"] = Input(
-            type="uri_folder",
-            path=f"{splits_dataset.name}@{splits_dataset.version}",
-        )
-
     # Define the hyperparameter optimization command job
     command_job = command(
         code="./",
@@ -275,13 +265,9 @@ def main():
         compute=opt_config["compute_cluster"],
         display_name=f"hparam_opt_{model_name}",
         experiment_name=experiment_name,
-        inputs=inputs_dict,
+        inputs=job_inputs,
         identity=ManagedIdentityConfiguration(),
-        # Note: outputs are automatically handled by Azure ML for sweep jobs
     )
-
-    # Get the search space for the specified model
-    search_space = get_model_search_space(model_name)
 
     # Convert the search space to Azure ML sweep parameters
     # Azure ML requires parameter names with only letters, numbers,
@@ -319,6 +305,9 @@ def main():
         search_space=sweep_params,
     )
 
+    # Set timeout (in seconds) - 24 hours for full optimization
+    sweep_job.limits.timeout = 86400
+
     # Add early termination if specified
     if "early_termination" in sampling_params:
         et_params = sampling_params["early_termination"]
@@ -354,10 +343,8 @@ def main():
         "search_space": search_space,
         "images_dataset_version": images_dataset.version,
         "masks_dataset_version": masks_dataset.version,
+        "splits_dataset_version": splits_dataset.version,
     }
-
-    if has_splits:
-        job_info["splits_dataset_version"] = splits_dataset.version
 
     # Save job info to a file for later reference
     job_info_file = job_tracking_dir / f"job_info_{model_name}_{timestamp}.json"

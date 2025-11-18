@@ -558,7 +558,11 @@ def main(cfg: DictConfig) -> None:
 
     except Exception as e:
         console.print(f"Error during training: {str(e)}", style="danger")
-        mlflow.log_param("error", str(e))
+        # Truncate error message to avoid MLflow 500-char parameter limit
+        error_msg = str(e)
+        if len(error_msg) > 490:
+            error_msg = error_msg[:490] + "..."
+        mlflow.log_param("error", error_msg)
         mlflow.log_param("training_status", "failed")
         raise
 
