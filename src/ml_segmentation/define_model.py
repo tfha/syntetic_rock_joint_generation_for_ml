@@ -13,14 +13,19 @@ def choose_model(model_name: str, params: dict[str, Any]) -> nn.Module:
     Args:
         model_name (str): The name of the model to choose.
                          Supports base names and optimized variants
-                         (e.g., 'unet_dfn_optimised').
+                         (e.g., 'unet_dfn_optimised', 'unet_box_optimised').
 
     Returns:
         nn.Module: The chosen model.
 
     """
-    # Extract base model name (remove _dfn_optimised or other suffixes)
-    base_name = model_name.split("_dfn_")[0] if "_dfn_" in model_name else model_name
+    # Extract base model name (remove _dfn_optimised, _box_optimised, or other suffixes)
+    if "_dfn_" in model_name:
+        base_name = model_name.split("_dfn_")[0]
+    elif "_box_" in model_name:
+        base_name = model_name.split("_box_")[0]
+    else:
+        base_name = model_name
 
     match base_name:
         case "unet":
