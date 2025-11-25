@@ -458,35 +458,101 @@ def get_data_files(
 def split_data(
     train_files: list[str],
     test_files: list[str],
-    train_frac: float = 0.8,
-    val_frac: float = 0.1,
-    test_frac: float = 0.1,
+    train_frac: float | None = None,
+    val_frac: float | None = None,
+    test_frac: float | None = None,
+    train_count: int | None = None,
+    val_count: int | None = None,
+    test_count: int | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
     """
-    Splits file lists into training, validation, and test sets, handling both overlapping and disjoint datasets. This function takes two lists of file paths (train_files and test_files) and splits them into train, validation, and test sets according to the provided fractions. If the train_files and test_files are disjoint (no overlap), the test_files are kept as the test set, and train_files are split into train and validation sets proportionally. If the lists overlap or are from the same dataset, the union of both lists is split into train, validation, and test sets according to the specified fractions.
+    Splits file lists into training, validation, and test sets, handling both
+    overlapping and disjoint datasets. Supports both fraction-based and
+    count-based splitting.
+
+    This function takes two lists of file paths (train_files and test_files)
+    and splits them into train, validation, and test sets according to the
+    provided fractions or counts.
+
+    If the train_files and test_files are disjoint (no overlap), the
+    test_files are kept as the test set, and train_files are split into train
+    and validation sets proportionally.
+
+    If the lists overlap or are from the same dataset, the union of both lists
+    is split into train, validation, and test sets according to the specified
+    fractions or counts.
 
     The function ensures:
-    - The provided fractions sum to 1.0.
+    - Either fractions OR counts are provided (not both or neither).
+    - If fractions: they sum to 1.0.
+    - If counts: they don't exceed available data.
     - No duplicate files within each split.
     - No overlap between train, validation, and test sets.
     - The splits are persisted as JSON files for downstream usage.
+
     Parameters
     ----------
+    train_files : list[str]
         List of file paths for training data.
+    test_files : list[str]
         List of file paths for test data.
-        Fraction of data to use for training (default: 0.8).
-        Fraction of data to use for validation (default: 0.1).
-        Fraction of data to use for testing (default: 0.1).
+    train_frac : float | None
+        Fraction of data to use for training (0.0-1.0).
+    val_frac : float | None
+        Fraction of data to use for validation (0.0-1.0).
+    test_frac : float | None
+        Fraction of data to use for testing (0.0-1.0).
+    train_count : int | None
+        Exact number of images for training.
+    val_count : int | None
+        Exact number of images for validation.
+    test_count : int | None
+        Exact number of images for testing.
+
     Returns
+    -------
+    tuple[list[str], list[str], list[str]]
         Tuple containing three lists: (train_files, validation_files, test_files).
+
     Raises
     ------
-        If fractions do not sum to 1.0, if there are duplicate files in the input lists,
-        or if there is overlap between the resulting splits.
+    ValueError
+        If both fractions and counts are provided, if neither is provided,
+        if fractions do not sum to 1.0, if counts exceed available data,
+        if there are duplicate files in the input lists, or if there is
+        overlap between the resulting splits.
     """
-    # Ensure fractions sum up to 1.0
-    if not abs(train_frac + val_frac + test_frac - 1.0) < 1e-6:
-        raise ValueError("Fractions must sum to 1.0.")
+    # Determine split mode (fractions vs counts)
+    has_fractions = any([train_frac, val_frac, test_frac])
+    has_counts = any([train_count, val_count, test_count])
+
+    if has_fractions and has_counts:
+        msg = (
+            "Cannot mix fraction-based and count-based splits. "
+            "Provide either fractions OR counts, not both."
+        )
+        raise ValueError(msg)
+
+    if not has_fractions and not has_counts:
+        msg = (
+            "Must provide either fraction-based splits "
+            "(train_frac, val_frac, test_frac) OR count-based splits "
+            "(train_count, val_count, test_count)."
+        )
+        raise ValueError(msg)
+
+    # Use default fractions if none provided for fraction mode
+    if has_fractions:
+        # Use provided values, or defaults if None (but allow 0.0)
+        if train_frac is None:
+            train_frac = 0.8
+        if val_frac is None:
+            val_frac = 0.1
+        if test_frac is None:
+            test_frac = 0.1
+        # Ensure fractions sum up to 1.0
+        if not abs(train_frac + val_frac + test_frac - 1.0) < 1e-6:
+            raise ValueError("Fractions must sum to 1.0.")
 
     # Validate inputs contain no duplicates
     if len(train_files) != len(set(train_files)):
@@ -494,7 +560,7 @@ def split_data(
     if len(test_files) != len(set(test_files)):
         raise ValueError("Test set contains duplicate files")
 
-    # Prepare output directories and write the combined file list (with duplicates)
+    # Prepare output directories and write the combined file list
     raw_dir = Path("data/raw")
     model_ready_dir = Path("data/model_ready")
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -507,30 +573,94 @@ def split_data(
     # Disjoint vs similar datasets handling
     if set(train_files).isdisjoint(set(test_files)):
         # Different datasets: keep provided test_files unchanged.
-        # Split train_files into train/val based on relative proportions of train+val.
-        total_tv = train_frac + val_frac
-        # Guard against division by zero; though validated earlier to sum to 1.0
-        if total_tv <= 0:
-            # No train/val requested; all train_files become train, no val
-            tv_val_count = 0
+        # Split train_files into train/val based on proportions.
+        if has_fractions:
+            # Type narrowing: these are guaranteed to be floats at this point
+            if train_frac is None or val_frac is None:
+                msg = "train_frac and val_frac must be provided"
+                raise ValueError(msg)
+            total_tv = train_frac + val_frac
+            # Guard against division by zero
+            if total_tv <= 0:
+                # No train/val requested; all train_files become train, no val
+                tv_val_count = 0
+            else:
+                tv_val_count = int(round(len(train_files) * (val_frac / total_tv)))
         else:
-            tv_val_count = int(round(len(train_files) * (val_frac / total_tv)))
+            # Count-based: use val_count directly
+            tv_val_count = val_count or 0
+            # Validate counts don't exceed available data
+            if tv_val_count > len(train_files):
+                msg = (
+                    f"val_count ({tv_val_count}) exceeds available "
+                    f"train files ({len(train_files)})"
+                )
+                raise ValueError(msg)
 
         shuffled = train_files[:]
         random.shuffle(shuffled)
         val_list = shuffled[:tv_val_count]
-        train_list = shuffled[tv_val_count:]
-        test_list = test_files[:]
+        train_list_temp = shuffled[tv_val_count:]
+
+        # If using counts, further trim train_list
+        if has_counts and train_count is not None:
+            if train_count > len(train_list_temp):
+                msg = (
+                    f"train_count ({train_count}) exceeds available "
+                    f"files after validation split ({len(train_list_temp)})"
+                )
+                raise ValueError(msg)
+            train_list = train_list_temp[:train_count]
+        else:
+            train_list = train_list_temp
+
+        # Handle test set
+        if has_counts and test_count is not None:
+            if test_count > len(test_files):
+                msg = (
+                    f"test_count ({test_count}) exceeds available "
+                    f"test files ({len(test_files)})"
+                )
+                raise ValueError(msg)
+            test_list = test_files[:test_count]
+        else:
+            test_list = test_files[:]
     else:
-        # Similar datasets: split the union according to provided fractions
+        # Similar datasets: split the union according to fractions or counts
         unique_files = list(set(train_files) | set(test_files))
         random.shuffle(unique_files)
         n = len(unique_files)
-        train_end = int(round(n * train_frac))
-        val_end = train_end + int(round(n * val_frac))
-        train_list = unique_files[:train_end]
-        val_list = unique_files[train_end:val_end]
-        test_list = unique_files[val_end:]
+
+        if has_fractions:
+            # Type narrowing: these are guaranteed to be floats
+            if train_frac is None or val_frac is None:
+                msg = "train_frac and val_frac must be provided"
+                raise ValueError(msg)
+            train_end = int(round(n * train_frac))
+            val_end = train_end + int(round(n * val_frac))
+            train_list = unique_files[:train_end]
+            val_list = unique_files[train_end:val_end]
+            test_list = unique_files[val_end:]
+        else:
+            # Count-based splitting
+            tc = train_count or 0
+            vc = val_count or 0
+            tec = test_count or 0
+            total_requested = tc + vc + tec
+
+            if total_requested > n:
+                msg = (
+                    f"Requested counts (train:{tc}, val:{vc}, test:{tec}) "
+                    f"exceed available files ({n})"
+                )
+                raise ValueError(msg)
+
+            train_end = tc
+            val_end = tc + vc
+            test_end = tc + vc + tec
+            train_list = unique_files[:train_end]
+            val_list = unique_files[train_end:val_end]
+            test_list = unique_files[val_end:test_end]
 
     # Validate uniqueness and separation
     def check_no_duplicates(files, label):

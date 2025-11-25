@@ -187,18 +187,48 @@ def main(cfg: DictConfig) -> None:
             val_list = []
             test_list = list(test_files)
         else:
-            console.print(
-                f"Splitting data with train frac.: {pcfg.experiment.train_fraction}, "
-                f"val frac.: {pcfg.experiment.val_fraction}, "
-                f"test frac.: {pcfg.experiment.test_fraction}...",
-                style="info",
+            # Determine split mode for messaging
+            has_fractions = any(
+                [
+                    pcfg.experiment.train_fraction,
+                    pcfg.experiment.val_fraction,
+                    pcfg.experiment.test_fraction,
+                ]
             )
+            has_counts = any(
+                [
+                    pcfg.experiment.train_count,
+                    pcfg.experiment.val_count,
+                    pcfg.experiment.test_count,
+                ]
+            )
+
+            if has_fractions:
+                console.print(
+                    f"Splitting with train frac.: "
+                    f"{pcfg.experiment.train_fraction}, "
+                    f"val frac.: {pcfg.experiment.val_fraction}, "
+                    f"test frac.: {pcfg.experiment.test_fraction}...",
+                    style="info",
+                )
+            elif has_counts:
+                console.print(
+                    f"Splitting with train count: "
+                    f"{pcfg.experiment.train_count}, "
+                    f"val count: {pcfg.experiment.val_count}, "
+                    f"test count: {pcfg.experiment.test_count}...",
+                    style="info",
+                )
+
             train_list, val_list, test_list = split_data(
                 train_files,
                 test_files,
                 train_frac=pcfg.experiment.train_fraction,
                 val_frac=pcfg.experiment.val_fraction,
                 test_frac=pcfg.experiment.test_fraction,
+                train_count=pcfg.experiment.train_count,
+                val_count=pcfg.experiment.val_count,
+                test_count=pcfg.experiment.test_count,
             )
         # Save splits
         with open(train_json, "w") as f:
@@ -260,7 +290,7 @@ def main(cfg: DictConfig) -> None:
     if pcfg.experiment.quality_control_data:
         console.print("Visualize sample...", style="info")
         sample_idx = np.random.randint(0, len(train_dataset))
-        image, label = train_dataset[sample_idx]
+        image, label = train_dataset[sample_idx]  # type: ignore[misc]
         visualize_sample(image, label)
         input("Press any key to continue...")  # Pause here
 

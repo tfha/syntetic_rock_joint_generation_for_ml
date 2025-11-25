@@ -143,13 +143,47 @@ class ExperimentConfig(BaseModel):
         ..., description="Metric used for comparison in choosing new best metrics."
     )
     num_workers: int = Field(..., description="Number of workers for data loading.")
-    train_fraction: float = Field(
-        ..., description="Fraction of data used for training."
+    train_fraction: float | None = Field(
+        None,
+        description=(
+            "Fraction of data used for training (0.0-1.0). "
+            "Mutually exclusive with train_count."
+        ),
     )
-    val_fraction: float = Field(
-        ..., description="Fraction of data used for validation."
+    val_fraction: float | None = Field(
+        None,
+        description=(
+            "Fraction of data used for validation (0.0-1.0). "
+            "Mutually exclusive with val_count."
+        ),
     )
-    test_fraction: float = Field(..., description="Fraction of data used for testing.")
+    test_fraction: float | None = Field(
+        None,
+        description=(
+            "Fraction of data used for testing (0.0-1.0). "
+            "Mutually exclusive with test_count."
+        ),
+    )
+    train_count: int | None = Field(
+        None,
+        description=(
+            "Exact number of images for training. "
+            "Mutually exclusive with train_fraction."
+        ),
+    )
+    val_count: int | None = Field(
+        None,
+        description=(
+            "Exact number of images for validation. "
+            "Mutually exclusive with val_fraction."
+        ),
+    )
+    test_count: int | None = Field(
+        None,
+        description=(
+            "Exact number of images for testing. Mutually exclusive with test_fraction."
+        ),
+    )
     early_stopping_patience: int = Field(
         ..., description="Patience for early stopping in training."
     )
@@ -206,11 +240,57 @@ class ExperimentConfig(BaseModel):
     mnist_tutorial: bool = Field(
         False,
         description=(
-            "If true, runs the MNIST tutorial script for GPU testing and validation. "
-            "This provides a simple, well-documented example of computer vision training "
-            "on Azure ML GPU compute nodes."
+            "If true, runs the MNIST tutorial script for GPU testing and "
+            "validation. This provides a simple, well-documented example of "
+            "computer vision training on Azure ML GPU compute nodes."
         ),
     )
+
+    @field_validator("train_fraction", "val_fraction", "test_fraction")
+    @classmethod
+    def validate_split_mode(cls, v: float | None, info) -> float | None:
+        """Validate that either fractions OR counts are used, not both."""
+        if not info.data:
+            return v
+
+        # Check if we're using fraction mode or count mode
+        has_fractions = any(
+            [
+                info.data.get("train_fraction") is not None,
+                info.data.get("val_fraction") is not None,
+                info.data.get("test_fraction") is not None,
+            ]
+        )
+        has_counts = any(
+            [
+                info.data.get("train_count") is not None,
+                info.data.get("val_count") is not None,
+                info.data.get("test_count") is not None,
+            ]
+        )
+
+        if has_fractions and has_counts:
+            msg = (
+                "Cannot mix fraction-based and count-based splits. "
+                "Use either train_fraction/val_fraction/test_fraction OR "
+                "train_count/val_count/test_count, not both."
+            )
+            raise ValueError(msg)
+
+        # If using fractions, validate they sum to 1.0
+        if has_fractions:
+            train_f = info.data.get("train_fraction", 0.0) or 0.0
+            val_f = info.data.get("val_fraction", 0.0) or 0.0
+            test_f = info.data.get("test_fraction", 0.0) or 0.0
+            total = train_f + val_f + test_f
+            if not abs(total - 1.0) < 1e-6:
+                msg = (
+                    f"train_fraction + val_fraction + test_fraction must "
+                    f"sum to 1.0, got {total}"
+                )
+                raise ValueError(msg)
+
+        return v
 
 
 class DatasetConfig(BaseModel):

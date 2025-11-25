@@ -227,6 +227,9 @@ def main(cfg: DictConfig) -> None:
                         train_fraction=pcfg.experiment.train_fraction,
                         val_fraction=pcfg.experiment.val_fraction,
                         test_fraction=pcfg.experiment.test_fraction,
+                        train_count=pcfg.experiment.train_count,
+                        val_count=pcfg.experiment.val_count,
+                        test_count=pcfg.experiment.test_count,
                     )
                 case AzureDataAssetsCommand.UPLOAD_SPLITS:
                     upload_split_data_to_azure_blob(
@@ -273,6 +276,9 @@ def main(cfg: DictConfig) -> None:
                                 train_fraction=pcfg.experiment.train_fraction,
                                 val_fraction=pcfg.experiment.val_fraction,
                                 test_fraction=pcfg.experiment.test_fraction,
+                                train_count=pcfg.experiment.train_count,
+                                val_count=pcfg.experiment.val_count,
+                                test_count=pcfg.experiment.test_count,
                             )
                             # Step 2: Upload splits
                             console.print(

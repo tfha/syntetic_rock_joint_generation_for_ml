@@ -60,9 +60,15 @@ experiment:
   log_mlflow: true
   compare_metric: loss # metric for comparison in chosing new best model
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
+  # Dataset split configuration - use EITHER fractions OR counts, not both
+  # Option 1: Fraction-based splits (default)
   train_fraction: 0.8
   val_fraction: 0.1
   test_fraction: 0.1
+  # Option 2: Count-based splits (comment out fractions above and uncomment below)
+  # train_count: 100  # exact number of training images
+  # val_count: 20     # exact number of validation images
+  # test_count: 30    # exact number of test images
   early_stopping_patience: 3
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
   optional_transforms:
@@ -93,6 +99,16 @@ experiment:
         - "synthetic_dfn"
       test_datasets:
         - "synthetic_dfn"
+    verification_real_box:
+      train_datasets:
+        - "real_world_box"
+      test_datasets:
+        - "real_world_box"
+    verification_real_rock_slope:
+      train_datasets:
+        - "real_world_rock_slope"
+      test_datasets:
+        - "real_world_rock_slope"
     main_objective_dfn_rock_slope:
       train_datasets:
         - "synthetic_dfn"

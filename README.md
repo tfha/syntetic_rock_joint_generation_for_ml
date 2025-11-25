@@ -410,7 +410,55 @@ python scripts/azure_manage_data_assets.py azure_data_assets.command=register-ba
 
 ###### Creating Dataset Splits
 
-After your base datasets are registered, you can generate, upload, and register train/val/test splits for all experiment strategies in one step:
+After your base datasets are registered, you can generate, upload, and register train/val/test splits for all experiment strategies.
+
+**Dataset Split Configuration**
+
+The project supports two ways to configure dataset splits in `scripts/config/main.yaml`:
+
+**Option 1: Fraction-based Splits (Default)**
+
+Specify the proportion of data for each split:
+
+```yaml
+experiment:
+  train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
+```
+
+**Requirements:**
+- Fractions must sum to 1.0
+- Values between 0.0 and 1.0
+
+**Option 2: Count-based Splits**
+
+Specify the exact number of images for each split:
+
+```yaml
+experiment:
+  train_count: 100  # exact number of training images
+  val_count: 20     # exact number of validation images
+  test_count: 30    # exact number of test images
+```
+
+**Requirements:**
+- All values must be positive integers
+- Total count cannot exceed available images
+- Must comment out or remove fraction-based parameters
+
+⚠️ **Important:** You cannot mix fractions and counts. Use one method or the other.
+
+**Common Use Cases:**
+- **Limited labeled data**: Use exact counts (e.g., `train_count: 100, val_count: 25, test_count: 25`)
+- **Reproducible experiments**: Use counts with a seed (e.g., `seed: 42, train_count: 200`)
+- **Small-scale testing**: Quickly test with minimal data (e.g., `train_count: 10, val_count: 5, test_count: 5`)
+
+Both methods work with **local training** and **Azure ML training**. The system automatically validates your configuration and ensures no duplicate files or overlap between splits.
+
+**Processing All Splits**
+
+To generate, upload, and register train/val/test splits for all experiment strategies in one step:
 
 ```sh
 # Generate, upload, and register train/val/test splits for all experiment strategies

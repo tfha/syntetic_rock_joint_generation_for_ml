@@ -8,9 +8,10 @@ including versioning, metadata management, and data lineage tracking.
 import json
 import os
 import sys
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pandas as pd
 from azure.ai.ml import MLClient
@@ -855,9 +856,12 @@ def prepare_and_save_dataset_splits(
     experiment_strategy: str,
     dataset_strategies: dict[str, dict[str, list[str]]],
     dataset_prefixes: dict[str, list[str]],
-    train_fraction: float,
-    val_fraction: float,
-    test_fraction: float,
+    train_fraction: float | None = None,
+    val_fraction: float | None = None,
+    test_fraction: float | None = None,
+    train_count: int | None = None,
+    val_count: int | None = None,
+    test_count: int | None = None,
 ):
     """
     Prepare and save dataset splits for use in Azure ML.
@@ -869,7 +873,7 @@ def prepare_and_save_dataset_splits(
        and all train and test files are used as provided, regardless of
        the fraction values.
     4. Otherwise, splits the data into train/val/test sets according to
-       the provided fractions.
+       the provided fractions or counts.
     5. Saves the resulting splits as JSON files in the correct subfolder
        under data/model_ready/splits/<strategy>/<subtype>/.
 
@@ -880,9 +884,12 @@ def prepare_and_save_dataset_splits(
         experiment_strategy: The experiment strategy (used for split folder).
         dataset_strategies: Dictionary of dataset strategies.
         dataset_prefixes: Dictionary of dataset prefixes.
-        train_fraction: Fraction of data to use for training.
-        val_fraction: Fraction of data to use for validation.
-        test_fraction: Fraction of data to use for testing.
+        train_fraction: Fraction of data to use for training (0.0-1.0).
+        val_fraction: Fraction of data to use for validation (0.0-1.0).
+        test_fraction: Fraction of data to use for testing (0.0-1.0).
+        train_count: Exact number of images for training.
+        val_count: Exact number of images for validation.
+        test_count: Exact number of images for testing.
     """
 
     console.print("Preparing dataset splits for Azure ML", style="info")
@@ -946,7 +953,7 @@ def prepare_and_save_dataset_splits(
     test_set = set(test_files)
     if train_set.isdisjoint(test_set):
         console.print(
-            "Train and test sets are disjoint. No splitting will be performed; "
+            "Train and test sets are disjoint. No splitting performed; "
             "using all train and test files as provided.",
             style="info",
         )
@@ -954,18 +961,34 @@ def prepare_and_save_dataset_splits(
         val_list: list[str] = []
         test_list = list(test_files)
     else:
-        console.print(
-            f"Splitting data with train fraction: {train_fraction}, "
-            f"val fraction: {val_fraction}, "
-            f"test fraction: {test_fraction}...",
-            style="info",
-        )
+        # Determine split mode messaging
+        has_fractions = any([train_fraction, val_fraction, test_fraction])
+        has_counts = any([train_count, val_count, test_count])
+
+        if has_fractions:
+            console.print(
+                f"Splitting data with train fraction: {train_fraction}, "
+                f"val fraction: {val_fraction}, "
+                f"test fraction: {test_fraction}...",
+                style="info",
+            )
+        elif has_counts:
+            console.print(
+                f"Splitting data with train count: {train_count}, "
+                f"val count: {val_count}, "
+                f"test count: {test_count}...",
+                style="info",
+            )
+
         train_list, val_list, test_list = split_data(
             train_files,
             test_files,
             train_frac=train_fraction,
             val_frac=val_fraction,
             test_frac=test_fraction,
+            train_count=train_count,
+            val_count=val_count,
+            test_count=test_count,
         )
 
     # Save splits in the correct subfolder
