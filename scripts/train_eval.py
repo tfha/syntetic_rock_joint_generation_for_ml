@@ -405,11 +405,11 @@ def main(cfg: DictConfig) -> None:
                 writer=writer, metrics=metrics_training, prefix="Training", epoch=epoch
             )
 
-            # Validate for one epoch (only if validation/test data exists)
-            if len(test_loader.dataset) > 0:
+            # Validate for one epoch (only if validation data exists)
+            if len(val_loader.dataset) > 0:
                 metrics_validation = validate_one_epoch(
                     model=model,
-                    dataloader=test_loader,
+                    dataloader=val_loader,
                     criterion=criterion,
                     device=device,
                     threshold=0.5,
@@ -432,20 +432,20 @@ def main(cfg: DictConfig) -> None:
                 # Step the scheduler
                 scheduler.step(metrics_validation["loss"])
             else:
-                # No validation/test data - use training metrics
+                # No validation data - use training metrics
                 console.print(
-                    "No validation/test data available, using training loss "
+                    "No validation data available, using training loss "
                     "for scheduler and early stopping",
                     style="warning",
                 )
                 metrics_validation = metrics_training.copy()
                 scheduler.step(metrics_training["loss"])
 
-            # Save example predictions every 3rd epoch
-            if (epoch + 1) % 3 == 0 and len(test_loader.dataset) > 0:
+            # Save example predictions every 3rd epoch (use validation set)
+            if (epoch + 1) % 3 == 0 and len(val_loader.dataset) > 0:
                 save_image_predictions(
                     model,
-                    test_loader,
+                    val_loader,
                     device,
                     num_samples=3,
                     save_dir=example_images_dir / f"epoch_{epoch + 1}",
@@ -476,15 +476,43 @@ def main(cfg: DictConfig) -> None:
         writer.close()
         console.print("Training complete.", style="info")
 
-        # LOG RESULTS AND CONFIG TO MLFLOW
+        # Load best model and evaluate on test set
         ###############################################################
-        console.print("Logging results to mlflow...", style="info")
-
         if early_stopping.best_model is not None:
-            console.print("Saving best model...", style="info")
+            console.print("Loading best model for final evaluation...", style="info")
             model.load_state_dict(early_stopping.best_model)
             model_path = Path("models/best_model.pth")
             torch.save(model.state_dict(), model_path)
+
+        # Final evaluation on test set (only after training is complete)
+        if len(test_loader.dataset) > 0:
+            console.print("Evaluating on test set...", style="info")
+            metrics_test = validate_one_epoch(
+                model=model,
+                dataloader=test_loader,
+                criterion=criterion,
+                device=device,
+                threshold=0.5,
+                max_batches=None,  # Evaluate on full test set
+            )
+            console.print(
+                create_results_table(
+                    epoch=-1, metrics=metrics_test, session="Test (Final)"
+                )
+            )
+            # Add test metrics to best_metrics for logging
+            if best_metrics is not None:
+                best_metrics["test_loss"] = metrics_test["loss"]
+                best_metrics["test_dice"] = metrics_test["dice"]
+                best_metrics["test_iou"] = metrics_test["iou"]
+        else:
+            console.print(
+                "No test data available for final evaluation.", style="warning"
+            )
+
+        # LOG RESULTS AND CONFIG TO MLFLOW
+        ###############################################################
+        console.print("Logging results to mlflow...", style="info")
 
         if pcfg.experiment.log_mlflow:
             save_image_predictions(
