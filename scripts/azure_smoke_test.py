@@ -238,7 +238,7 @@ def main(cfg: DictConfig) -> None:
         if not path.exists():
             missing.append(f"{name}: {path}")
     if missing:
-        msg = f"Missing Azure ML input directories:\n" + "\n".join(missing)
+        msg = "Missing Azure ML input directories:\n" + "\n".join(missing)
         console.print(msg, style="danger")
         raise FileNotFoundError(msg)
 

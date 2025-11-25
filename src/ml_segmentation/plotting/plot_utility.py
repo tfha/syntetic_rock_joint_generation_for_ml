@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import matplotlib.pyplot as plt
 from rich import print as pprint

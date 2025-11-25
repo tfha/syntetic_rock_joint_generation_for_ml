@@ -69,6 +69,16 @@ experiment:
   # train_count: 100  # exact number of training images
   # val_count: 20     # exact number of validation images
   # test_count: 30    # exact number of test images
+  # Option 3: Per-strategy split configuration (overrides global settings for specific strategies)
+  # strategy_splits:
+  #   verification_box:
+  #     train_fraction: 0.7
+  #     val_fraction: 0.15
+  #     test_fraction: 0.15
+  #   main_objective_dfn_rock_slope:
+  #     train_count: 150
+  #     val_count: 25
+  #     test_count: 50
   early_stopping_patience: 3
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
   optional_transforms:

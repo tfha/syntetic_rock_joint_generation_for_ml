@@ -9,7 +9,8 @@ and logging configuration.
 import logging
 import time
 import warnings
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 from azure.core.exceptions import AzureError, ServiceRequestError
 

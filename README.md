@@ -414,7 +414,7 @@ After your base datasets are registered, you can generate, upload, and register 
 
 **Dataset Split Configuration**
 
-The project supports two ways to configure dataset splits in `scripts/config/main.yaml`:
+The project supports three ways to configure dataset splits in `scripts/config/main.yaml`:
 
 **Option 1: Fraction-based Splits (Default)**
 
@@ -447,14 +447,43 @@ experiment:
 - Total count cannot exceed available images
 - Must comment out or remove fraction-based parameters
 
-⚠️ **Important:** You cannot mix fractions and counts. Use one method or the other.
+**Option 3: Per-Strategy Split Configuration**
+
+Specify different split settings for each experiment strategy:
+
+```yaml
+experiment:
+  # Global defaults (used if no strategy-specific config exists)
+  train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
+
+  # Strategy-specific overrides
+  strategy_splits:
+    verification_box:
+      train_fraction: 0.7
+      val_fraction: 0.15
+      test_fraction: 0.15
+    main_objective_dfn_rock_slope:
+      train_count: 150
+      val_count: 25
+      test_count: 50
+```
+
+**Requirements:**
+- Each strategy can use either fractions or counts
+- Strategies without specific configuration use global defaults
+- Allows mixing different split modes across strategies
+
+⚠️ **Important:** Within a single configuration (global or strategy-specific), you cannot mix fractions and counts. Use one method or the other.
 
 **Common Use Cases:**
 - **Limited labeled data**: Use exact counts (e.g., `train_count: 100, val_count: 25, test_count: 25`)
 - **Reproducible experiments**: Use counts with a seed (e.g., `seed: 42, train_count: 200`)
 - **Small-scale testing**: Quickly test with minimal data (e.g., `train_count: 10, val_count: 5, test_count: 5`)
+- **Different strategies need different splits**: Use per-strategy configuration (e.g., verification with 70-15-15, main objective with fixed counts)
 
-Both methods work with **local training** and **Azure ML training**. The system automatically validates your configuration and ensures no duplicate files or overlap between splits.
+All methods work with **local training** and **Azure ML training**. The system automatically validates your configuration and ensures no duplicate files or overlap between splits.
 
 **Processing All Splits**
 

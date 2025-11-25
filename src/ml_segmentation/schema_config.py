@@ -102,6 +102,17 @@ class ExperimentStrategy(str, Enum):
     ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
 
 
+class StrategySplitConfig(BaseModel):
+    """Split configuration for a specific experiment strategy."""
+
+    train_fraction: float | None = Field(None, description="Training fraction")
+    val_fraction: float | None = Field(None, description="Validation fraction")
+    test_fraction: float | None = Field(None, description="Test fraction")
+    train_count: int | None = Field(None, description="Training count")
+    val_count: int | None = Field(None, description="Validation count")
+    test_count: int | None = Field(None, description="Test count")
+
+
 class ExperimentConfig(BaseModel):
     experiment_strategy: ExperimentStrategy = Field(
         ..., description="The experiment strategy chosen for this run."
@@ -113,6 +124,15 @@ class ExperimentConfig(BaseModel):
             "configurations. Each strategy includes 'train_datasets' and "
             "'test_datasets', which are lists of dataset names used for "
             "training and testing respectively."
+        ),
+    )
+    strategy_splits: dict[str, StrategySplitConfig] | None = Field(
+        None,
+        description=(
+            "Optional per-strategy split configurations. "
+            "Keys are strategy names. "
+            "If not specified for a strategy, "
+            "falls back to global split settings."
         ),
     )
 
