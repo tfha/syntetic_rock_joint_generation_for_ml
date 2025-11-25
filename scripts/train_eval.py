@@ -503,8 +503,14 @@ def main(cfg: DictConfig) -> None:
             # Add test metrics to best_metrics for logging
             if best_metrics is not None:
                 best_metrics["test_loss"] = metrics_test["loss"]
-                best_metrics["test_dice"] = metrics_test["dice"]
                 best_metrics["test_iou"] = metrics_test["iou"]
+                best_metrics["test_iou_joints"] = metrics_test["iou_joints"]
+                best_metrics["test_dice"] = metrics_test["dice"]
+                best_metrics["test_dice_joints"] = metrics_test["dice_joints"]
+                best_metrics["test_precision"] = metrics_test["precision"]
+                best_metrics["test_precision_joints"] = metrics_test["precision_joints"]
+                best_metrics["test_recall"] = metrics_test["recall"]
+                best_metrics["test_recall_joints"] = metrics_test["recall_joints"]
         else:
             console.print(
                 "No test data available for final evaluation.", style="warning"
