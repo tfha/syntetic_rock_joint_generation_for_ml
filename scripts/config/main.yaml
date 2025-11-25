@@ -70,15 +70,23 @@ experiment:
   # val_count: 20     # exact number of validation images
   # test_count: 30    # exact number of test images
   # Option 3: Per-strategy split configuration (overrides global settings for specific strategies)
-  # strategy_splits:
-  #   verification_box:
-  #     train_fraction: 0.7
-  #     val_fraction: 0.15
-  #     test_fraction: 0.15
-  #   main_objective_dfn_rock_slope:
-  #     train_count: 150
-  #     val_count: 25
-  #     test_count: 50
+  strategy_splits:
+    main_objective_dfn_rock_slope:
+      train_fraction: 1.0  # Use ALL synthetic data for training
+      val_fraction: 0.0     # No validation (test is different distribution)
+      test_fraction: 1.0    # Use ALL real-world data for testing
+    main_objective_dfn_box:
+      train_fraction: 1.0  # Use ALL synthetic data for training
+      val_fraction: 0.0     # No validation (test is different distribution)
+      test_fraction: 1.0    # Use ALL real-world data for testing
+    main_objective_box_rock_slope:
+      train_fraction: 1.0  # Use ALL synthetic data for training
+      val_fraction: 0.0     # No validation (test is different distribution)
+      test_fraction: 1.0    # Use ALL real-world data for testing
+    main_objective_box_box:
+      train_fraction: 1.0  # Use ALL synthetic data for training
+      val_fraction: 0.0     # No validation (test is different distribution)
+      test_fraction: 1.0    # Use ALL real-world data for testing
   early_stopping_patience: 3
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
   optional_transforms:
