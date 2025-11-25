@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from omegaconf import OmegaConf
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from rich.console import Console
 
 # Hydra is a script-level dependency. Defer/guard import so the library can be
@@ -93,6 +93,8 @@ class TransformConfig(BaseModel):
 class ExperimentStrategy(str, Enum):
     VERIFICATION_BOX = "verification_box"
     VERIFICATION_DFN = "verification_dfn"
+    VERIFICATION_REAL_BOX = "verification_real_box"
+    VERIFICATION_REAL_ROCK_SLOPE = "verification_real_rock_slope"
     MAIN_OBJECTIVE_DFN_ROCK_SLOPE = "main_objective_dfn_rock_slope"
     MAIN_OBJECTIVE_DFN_BOX = "main_objective_dfn_box"
     MAIN_OBJECITVE_BOX_ROCK_SLOPE = "main_objective_box_rock_slope"
@@ -111,6 +113,48 @@ class StrategySplitConfig(BaseModel):
     train_count: int | None = Field(None, description="Training count")
     val_count: int | None = Field(None, description="Validation count")
     test_count: int | None = Field(None, description="Test count")
+
+    @model_validator(mode="after")
+    def validate_split_mode(self) -> "StrategySplitConfig":
+        """Validate that either fractions OR counts are used, not both."""
+        # Check if we're using fraction mode or count mode
+        has_fractions = any(
+            [
+                self.train_fraction is not None,
+                self.val_fraction is not None,
+                self.test_fraction is not None,
+            ]
+        )
+        has_counts = any(
+            [
+                self.train_count is not None,
+                self.val_count is not None,
+                self.test_count is not None,
+            ]
+        )
+
+        if has_fractions and has_counts:
+            msg = (
+                "Cannot mix fraction-based and count-based splits. "
+                "Use either train_fraction/val_fraction/test_fraction OR "
+                "train_count/val_count/test_count, not both."
+            )
+            raise ValueError(msg)
+
+        # If using fractions, validate they sum to 1.0
+        if has_fractions:
+            train_f = self.train_fraction or 0.0
+            val_f = self.val_fraction or 0.0
+            test_f = self.test_fraction or 0.0
+            total = train_f + val_f + test_f
+            if not abs(total - 1.0) < 1e-6:
+                msg = (
+                    f"train_fraction + val_fraction + test_fraction must "
+                    f"sum to 1.0, got {total}"
+                )
+                raise ValueError(msg)
+
+        return self
 
 
 class ExperimentConfig(BaseModel):
@@ -266,26 +310,22 @@ class ExperimentConfig(BaseModel):
         ),
     )
 
-    @field_validator("train_fraction", "val_fraction", "test_fraction")
-    @classmethod
-    def validate_split_mode(cls, v: float | None, info) -> float | None:
+    @model_validator(mode="after")
+    def validate_split_mode(self) -> "ExperimentConfig":
         """Validate that either fractions OR counts are used, not both."""
-        if not info.data:
-            return v
-
         # Check if we're using fraction mode or count mode
         has_fractions = any(
             [
-                info.data.get("train_fraction") is not None,
-                info.data.get("val_fraction") is not None,
-                info.data.get("test_fraction") is not None,
+                self.train_fraction is not None,
+                self.val_fraction is not None,
+                self.test_fraction is not None,
             ]
         )
         has_counts = any(
             [
-                info.data.get("train_count") is not None,
-                info.data.get("val_count") is not None,
-                info.data.get("test_count") is not None,
+                self.train_count is not None,
+                self.val_count is not None,
+                self.test_count is not None,
             ]
         )
 
@@ -299,9 +339,9 @@ class ExperimentConfig(BaseModel):
 
         # If using fractions, validate they sum to 1.0
         if has_fractions:
-            train_f = info.data.get("train_fraction", 0.0) or 0.0
-            val_f = info.data.get("val_fraction", 0.0) or 0.0
-            test_f = info.data.get("test_fraction", 0.0) or 0.0
+            train_f = self.train_fraction or 0.0
+            val_f = self.val_fraction or 0.0
+            test_f = self.test_fraction or 0.0
             total = train_f + val_f + test_f
             if not abs(total - 1.0) < 1e-6:
                 msg = (
@@ -310,7 +350,7 @@ class ExperimentConfig(BaseModel):
                 )
                 raise ValueError(msg)
 
-        return v
+        return self
 
 
 class DatasetConfig(BaseModel):
