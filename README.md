@@ -474,8 +474,12 @@ experiment:
 - Each strategy can use either fractions or counts
 - Strategies without specific configuration use global defaults
 - Allows mixing different split modes across strategies
+- `strategy_splits` is optional - specify only the strategies you want to override
 
-⚠️ **Important:** Within a single configuration (global or strategy-specific), you cannot mix fractions and counts. Use one method or the other.
+⚠️ **Important:**
+- Within a single configuration (global or strategy-specific), you cannot mix fractions and counts. Use one method or the other.
+- **No automatic fallback**: If count-based splits fail (e.g., requesting more images than available), the system will raise an error and NOT automatically fall back to fraction-based splits. You must fix the configuration manually.
+- **Fallback only applies to Option 3**: Strategies not listed in `strategy_splits` will use the global settings. If a strategy IS listed but has invalid values, it will error without fallback.
 
 **Common Use Cases:**
 - **Limited labeled data**: Use exact counts (e.g., `train_count: 100, val_count: 25, test_count: 25`)
