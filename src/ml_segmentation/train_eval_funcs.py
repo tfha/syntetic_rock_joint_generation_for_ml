@@ -344,21 +344,22 @@ class EarlyStopping:
         verbose (bool): If True, prints the early stopping counter.
         delta (float): The minimum change in the monitored metric to be considered as
         improvement.
+        mode (str): 'min' for metrics like loss, 'max' for metrics like IoU/Dice.
 
     Attributes:
         patience (int): The number of epochs to wait for improvement before stopping.
         verbose (bool): If True, prints the early stopping counter.
         delta (float): The minimum change in the monitored metric to be considered as
         improvement.
+        mode (str): 'min' or 'max' - whether lower or higher metric values are better.
         counter (int): The number of epochs since the last improvement.
         best_score (float or None): The best score achieved so far.
         early_stop (bool): Whether to stop the training early or not.
-        val_loss_min (float): The minimum validation loss achieved so far.
         best_model (dict or None): The state dictionary of the best model.
 
     Methods:
-        __call__(val_loss, model): Updates the early stopping criteria based on the
-        validation loss.
+        __call__(val_metric, model): Updates the early stopping criteria based on the
+        validation metric.
         _save_best_model(model): Saves the state dictionary of the best model.
 
     """
@@ -366,32 +367,39 @@ class EarlyStopping:
     # Attribute type declarations (PEP 526)
     best_score: float | None
     early_stop: bool
-    val_loss_min: float
     best_model: dict[str, Any] | None
 
-    def __init__(self, patience: int = 7, verbose: bool = False, delta: float = 0.0):
+    def __init__(
+        self,
+        patience: int = 7,
+        verbose: bool = False,
+        delta: float = 0.0,
+        mode: str = "min",
+    ):
         self.patience = patience
         self.verbose = verbose
         self.delta = delta
+        self.mode = mode
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = float("inf")
         self.best_model = None
 
-    def __call__(self, val_loss: float, model: nn.Module) -> None:
+    def __call__(self, val_metric: float, model: nn.Module) -> None:
         """
-        Updates the early stopping criteria based on the validation loss.
+        Updates the early stopping criteria based on the validation metric.
 
         Args:
-            val_loss (float): The validation loss of the current epoch.
+            val_metric (float): The validation metric of the current epoch.
             model (nn.Module): The model being trained.
 
         Returns:
             None
 
         """
-        score = -val_loss
+        # For 'min' mode (loss), lower is better, so negate
+        # For 'max' mode (IoU/Dice), higher is better, use as-is
+        score = -val_metric if self.mode == "min" else val_metric
 
         if self.best_score is None:
             self.best_score = score

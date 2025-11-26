@@ -58,12 +58,15 @@ azure_data_assets:
 experiment:
   seed: 42
   log_mlflow: true
-  compare_metric: loss # metric for comparison in chosing new best model
+  compare_metric: dice_joints  # Metric for best model selection & early stopping
+  # Recommended: Use 'dice_joints' or 'iou_joints' to focus on joint performance
+  # Using joint metrics prevents early stopping when loss plateaus but joints still improving
+  # Options: 'loss' (min), 'iou_joints' (max), 'dice_joints' (max), 'recall_joints' (max)
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
-  # IMPORTANT: For segmentation where mask=1 is background (majority) and mask=0 is joints (minority),
-  # use alpha=0.75 to give MORE weight to the minority class (opposite of RetinaNet object detection)
+  # IMPORTANT: After label inversion (1-label), mask=1 is joints (minority), mask=0 is background
+  # use alpha=0.75 to give MORE weight to the minority class (joints)
   focal_alpha: 0.75 # Focal loss class balancing (0.75 = more weight on minority class)
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
@@ -93,8 +96,9 @@ experiment:
     #   train_fraction: 1.0  # Use ALL synthetic data for training
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
-  early_stopping_patience: 3
+  early_stopping_patience: 10  # Increased from 3 to allow more exploration
   early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
+  # Note: After metrics fix, consider changing compare_metric from 'loss' to 'iou_joints' or 'dice_joints'
   optional_transforms:
     random_crop: true
     horizontal_flip: true

@@ -366,10 +366,13 @@ def main(cfg: DictConfig) -> None:
             patience=pcfg.model.scheduler.patience,
         )
     )
+    # Determine early stopping mode based on compare_metric
+    es_mode = "min" if pcfg.experiment.compare_metric == "loss" else "max"
     early_stopping = EarlyStopping(
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
+        mode=es_mode,
     )
 
     # ALTERNATIVE RUNS FOR DEBUG AND CHECKS
@@ -466,12 +469,18 @@ def main(cfg: DictConfig) -> None:
             # Update best metrics if applicable
             training_time = time.time() - start_time
             best_metrics = check_and_update_best_metrics(
-                metrics_validation, best_metrics, epoch, training_time
+                metrics_validation,
+                best_metrics,
+                epoch,
+                training_time,
+                compare_metric=pcfg.experiment.compare_metric,
             )
 
             # Check early stopping condition
             if not pcfg.experiment.sanity_check_num_batches:
-                early_stopping(metrics_validation["loss"], model)
+                # Use compare_metric for early stopping (e.g., 'iou_joints' or 'loss')
+                metric_value = metrics_validation[pcfg.experiment.compare_metric]
+                early_stopping(metric_value, model)
                 if early_stopping.early_stop:
                     console.print(
                         "Early stopping triggered. Training stopped.", style="warning"

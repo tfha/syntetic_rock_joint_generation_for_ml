@@ -1,5 +1,5 @@
 name: unetplusplus
-num_epochs: 50
+num_epochs: 100  # Increased from 50 to give more time for joint learning
 batch_size: 8  # Matching UNet and DeepLabV3+ batch size (reduced from 64 due to memory constraints)
 learning_rate: 0.001
 scheduler:
