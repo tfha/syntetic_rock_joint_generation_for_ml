@@ -219,8 +219,14 @@ class ExperimentConfig(BaseModel):
         description=("Focal loss gamma parameter (focusing parameter, default: 2.0)"),
     )
     focal_alpha: float = Field(
-        0.25,
-        description=("Focal loss alpha parameter (class balance, default: 0.25)"),
+        0.75,
+        description=(
+            "Focal loss alpha parameter (class balance). "
+            "For binary segmentation: alpha is weight for positive class (mask=1). "
+            "Since mask=1 is background (majority) and mask=0 is joints (minority), "
+            "use alpha=0.75 to give LESS weight to majority class. "
+            "Range: 0.5-0.9 for minority class focus."
+        ),
     )
     num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float | None = Field(

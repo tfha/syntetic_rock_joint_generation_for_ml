@@ -62,7 +62,9 @@ experiment:
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
-  focal_alpha: 0.25 # Focal loss class balancing (default from paper: 0.25)
+  # IMPORTANT: For segmentation where mask=1 is background (majority) and mask=0 is joints (minority),
+  # use alpha=0.75 to give MORE weight to the minority class (opposite of RetinaNet object detection)
+  focal_alpha: 0.75 # Focal loss class balancing (0.75 = more weight on minority class)
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
   # Option 1: Fraction-based splits (default)
