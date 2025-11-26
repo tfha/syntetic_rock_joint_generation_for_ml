@@ -140,8 +140,12 @@ def main(cfg: DictConfig) -> None:
         train_command = (
             f"python scripts/azure_train_eval.py "
             f"model={pcfg.model.name} "
+            f"model.num_epochs={pcfg.model.num_epochs} "
             f"experiment.experiment_strategy="
             f"{pcfg.experiment.experiment_strategy.value} "
+            f"experiment.loss_function={pcfg.experiment.loss_function} "
+            f"experiment.focal_alpha={pcfg.experiment.focal_alpha} "
+            f"experiment.focal_gamma={pcfg.experiment.focal_gamma} "
             f"+dataset.azure_images_path=${{{{inputs.images_data}}}} "
             f"+dataset.azure_masks_path=${{{{inputs.masks_data}}}} "
             f"+dataset.azure_splits_path=${{{{inputs.splits_data}}}}"
