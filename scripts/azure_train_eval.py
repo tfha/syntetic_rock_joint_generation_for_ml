@@ -64,8 +64,8 @@ import hydra  # noqa: E402 (deferred until optional package install step)
 import mlflow  # noqa: E402
 import torch  # noqa: E402
 from omegaconf import DictConfig, OmegaConf  # noqa: E402
-from segmentation_models_pytorch.losses import DiceLoss  # noqa: E402
-from torch import optim  # noqa: E402
+from segmentation_models_pytorch.losses import DiceLoss, FocalLoss  # noqa: E402
+from torch import nn, optim  # noqa: E402
 from torch.optim.lr_scheduler import ReduceLROnPlateau  # noqa: E402
 from torch.utils.tensorboard import SummaryWriter  # noqa: E402
 from torchinfo import summary  # noqa: E402
@@ -397,8 +397,18 @@ def main(cfg: DictConfig) -> None:
     ########################################################################
     console.print("Setting up training components...", style="info")
 
-    # Loss function
-    criterion = DiceLoss(mode="binary", from_logits=True)
+    # Select loss function based on configuration
+    criterion: nn.Module
+    if pcfg.experiment.loss_function == "focal":
+        # Focal Loss (based on Lin et al. 2017) from segmentation_models_pytorch
+        criterion = FocalLoss(
+            mode="binary",
+            alpha=pcfg.experiment.focal_alpha,
+            gamma=pcfg.experiment.focal_gamma,
+        )
+    else:  # Default to "dice"
+        # Dice Loss (based on V-Net, Milletari et al. 2016) from segmentation_models_pytorch
+        criterion = DiceLoss(mode="binary", from_logits=True)
 
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
