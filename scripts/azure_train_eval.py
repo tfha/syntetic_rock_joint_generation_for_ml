@@ -406,9 +406,19 @@ def main(cfg: DictConfig) -> None:
             alpha=pcfg.experiment.focal_alpha,
             gamma=pcfg.experiment.focal_gamma,
         )
+        console.print(
+            f"Using Focal Loss (alpha={pcfg.experiment.focal_alpha}, "
+            f"gamma={pcfg.experiment.focal_gamma})",
+            style="info",
+        )
+        mlflow.log_param("loss_function", "focal")
+        mlflow.log_param("focal_alpha", pcfg.experiment.focal_alpha)
+        mlflow.log_param("focal_gamma", pcfg.experiment.focal_gamma)
     else:  # Default to "dice"
         # Dice Loss (based on V-Net, Milletari et al. 2016) from segmentation_models_pytorch
         criterion = DiceLoss(mode="binary", from_logits=True)
+        console.print("Using Dice Loss", style="info")
+        mlflow.log_param("loss_function", "dice")
 
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
