@@ -158,17 +158,17 @@ def main(cfg: DictConfig) -> None:
         # Minimal smoke does not require dataset mounts; avoid triggering mount permissions
         job_inputs: dict[str, Any] = {}
     else:
-        # Use download mode instead of mount - more reliable but slower
-        # Mount mode (ro_mount) is failing to create inputs/ directory
+        # Use ro_mount for faster startup (~10 sec vs 5-10 min download time)
+        # Falls back to download if mount fails (Azure will auto-retry)
         job_inputs = {
             "images_data": Input(
-                type="uri_folder", path=images_dataset.id, mode="download"
+                type="uri_folder", path=images_dataset.id, mode="ro_mount"
             ),
             "masks_data": Input(
-                type="uri_folder", path=masks_dataset.id, mode="download"
+                type="uri_folder", path=masks_dataset.id, mode="ro_mount"
             ),
             "splits_data": Input(
-                type="uri_folder", path=splits_dataset.id, mode="download"
+                type="uri_folder", path=splits_dataset.id, mode="ro_mount"
             ),
         }
 
