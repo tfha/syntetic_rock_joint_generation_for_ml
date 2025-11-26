@@ -206,6 +206,22 @@ class ExperimentConfig(BaseModel):
     compare_metric: str = Field(
         ..., description="Metric used for comparison in choosing new best metrics."
     )
+    loss_function: str = Field(
+        "dice",
+        description=(
+            "Loss function to use for training. Options: "
+            "'dice' (Dice Loss from V-Net 2016, segmentation_models_pytorch), "
+            "'focal' (Focal Loss from Lin et al. 2017, segmentation_models_pytorch)"
+        ),
+    )
+    focal_gamma: float = Field(
+        2.0,
+        description=("Focal loss gamma parameter (focusing parameter, default: 2.0)"),
+    )
+    focal_alpha: float = Field(
+        0.25,
+        description=("Focal loss alpha parameter (class balance, default: 0.25)"),
+    )
     num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float | None = Field(
         None,

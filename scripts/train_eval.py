@@ -35,11 +35,12 @@ from typing import Any
 import hydra
 import numpy as np
 import torch
+import torch.nn as nn
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 from PIL import Image
 from rich.progress import track
-from segmentation_models_pytorch.losses import DiceLoss
+from segmentation_models_pytorch.losses import DiceLoss, FocalLoss
 from torch import optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
@@ -341,10 +342,18 @@ def main(cfg: DictConfig) -> None:
         style="info",
     )
 
-    # criterion = nn.BCEWithLogitsLoss()
-    criterion = DiceLoss(
-        mode="binary", from_logits=True
-    )  # works better for imbalanced datasets than the classic BCEWithLogitsLoss
+    # Select loss function based on configuration
+    criterion: nn.Module
+    if pcfg.experiment.loss_function == "focal":
+        # Focal Loss (based on Lin et al. 2017) from segmentation_models_pytorch
+        criterion = FocalLoss(
+            mode="binary",
+            alpha=pcfg.experiment.focal_alpha,
+            gamma=pcfg.experiment.focal_gamma,
+        )
+    else:  # Default to "dice"
+        # Dice Loss (based on V-Net, Milletari et al. 2016) from segmentation_models_pytorch
+        criterion = DiceLoss(mode="binary", from_logits=True)
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
     scaler = torch.amp.GradScaler(
         device="cuda"

@@ -59,6 +59,10 @@ experiment:
   seed: 42
   log_mlflow: true
   compare_metric: loss # metric for comparison in chosing new best model
+  # Loss function configuration (using standard segmentation_models_pytorch library)
+  loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
+  focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
+  focal_alpha: 0.25 # Focal loss class balancing (default from paper: 0.25)
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
   # Option 1: Fraction-based splits (default)
