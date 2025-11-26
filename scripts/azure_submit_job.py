@@ -215,6 +215,7 @@ def main(cfg: DictConfig) -> None:
     run_metadata = {
         "model_name": pcfg.model.name,
         "strategy": pcfg.experiment.experiment_strategy.value,
+        "loss_function": pcfg.experiment.loss_function,
         "images_dataset_version": images_dataset.version,
         "masks_dataset_version": masks_dataset.version,
         "splits_dataset_version": splits_dataset.version,
