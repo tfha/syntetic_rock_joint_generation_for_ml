@@ -141,17 +141,18 @@ def train_one_epoch(
     running_loss = 0.0
 
     # Initialize metrics
-    # Overall metrics treat background (1) as positive class
-    binary_iou_metric = JaccardIndex(task="binary").to(device)
-    dice_metric = BinaryF1Score().to(device)
-    precision_metric = Precision(task="binary").to(device)
-    recall_metric = Recall(task="binary").to(device)
-
-    # Joint-specific metrics (inverted to treat joints as positive class)
+    # After label inversion (1-label), masks have joints=1, background=0
+    # Joint metrics: treat joints (mask=1) as positive class
     joint_iou_metric = JaccardIndex(task="binary").to(device)
     joint_dice_metric = BinaryF1Score().to(device)
     joint_precision_metric = Precision(task="binary").to(device)
     joint_recall_metric = Recall(task="binary").to(device)
+
+    # Background metrics: invert to treat background (mask=0) as positive
+    bg_iou_metric = JaccardIndex(task="binary").to(device)
+    bg_dice_metric = BinaryF1Score().to(device)
+    bg_precision_metric = Precision(task="binary").to(device)
+    bg_recall_metric = Recall(task="binary").to(device)
 
     for batch_idx, batch_data in enumerate(
         track(dataloader, description="Training", total=len(dataloader))
@@ -206,34 +207,35 @@ def train_one_epoch(
         with torch.no_grad():
             preds = torch.sigmoid(outputs) > threshold
 
-            # Overall metrics (background as positive class since mask=1)
-            binary_iou_metric.update(preds, masks.int())
-            dice_metric.update(preds, masks.int())
-            precision_metric.update(preds, masks.int())
-            recall_metric.update(preds, masks.int())
+            # Joint metrics: use masks directly (joints=1 after label inversion)
+            joint_iou_metric.update(preds, masks.int())
+            joint_dice_metric.update(preds, masks.int())
+            joint_precision_metric.update(preds, masks.int())
+            joint_recall_metric.update(preds, masks.int())
 
-            # Joint metrics: invert both predictions and masks to treat joints
-            # (mask=0) as positive class
-            joint_preds = ~preds
-            joint_masks = ~masks.bool()
-            joint_iou_metric.update(joint_preds, joint_masks.int())
-            joint_dice_metric.update(joint_preds, joint_masks.int())
-            joint_precision_metric.update(joint_preds, joint_masks.int())
-            joint_recall_metric.update(joint_preds, joint_masks.int())
+            # Background metrics: invert both preds and masks (background=0 → 1)
+            bg_preds = ~preds
+            bg_masks = ~masks.bool()
+            bg_iou_metric.update(bg_preds, bg_masks.int())
+            bg_dice_metric.update(bg_preds, bg_masks.int())
+            bg_precision_metric.update(bg_preds, bg_masks.int())
+            bg_recall_metric.update(bg_preds, bg_masks.int())
 
     ds_sized: Sized = dataloader.dataset  # type: ignore[assignment]
     epoch_loss = float(running_loss) / float(len(ds_sized))
 
     metrics = {
         "loss": epoch_loss,
-        "iou": round(_to_float(binary_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "dice": round(_to_float(dice_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "dice_joints": round(_to_float(joint_dice_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "precision": round(_to_float(precision_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "precision_joints": round(_to_float(joint_precision_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "recall": round(_to_float(recall_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "recall_joints": round(_to_float(joint_recall_metric.compute()), 4),  # type: ignore[func-returns-value]
+        # Background metrics (mask=0 after inversion)
+        "iou": round(_to_float(bg_iou_metric.compute()), 4),  # type: ignore
+        "dice": round(_to_float(bg_dice_metric.compute()), 4),  # type: ignore
+        "precision": round(_to_float(bg_precision_metric.compute()), 4),  # type: ignore
+        "recall": round(_to_float(bg_recall_metric.compute()), 4),  # type: ignore
+        # Joint metrics (mask=1 after inversion)
+        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore
+        "dice_joints": round(_to_float(joint_dice_metric.compute()), 4),  # type: ignore
+        "precision_joints": round(_to_float(joint_precision_metric.compute()), 4),  # type: ignore
+        "recall_joints": round(_to_float(joint_recall_metric.compute()), 4),  # type: ignore
     }
 
     return metrics
@@ -251,17 +253,18 @@ def validate_one_epoch(
     running_loss = 0.0
 
     # Initialize metrics
-    # Overall metrics treat background (1) as positive class
-    binary_iou_metric = JaccardIndex(task="binary").to(device)
-    dice_metric = BinaryF1Score().to(device)
-    precision_metric = Precision(task="binary").to(device)
-    recall_metric = Recall(task="binary").to(device)
-
-    # Joint-specific metrics (inverted to treat joints as positive class)
+    # After label inversion (1-label), masks have joints=1, background=0
+    # Joint metrics: treat joints (mask=1) as positive class
     joint_iou_metric = JaccardIndex(task="binary").to(device)
     joint_dice_metric = BinaryF1Score().to(device)
     joint_precision_metric = Precision(task="binary").to(device)
     joint_recall_metric = Recall(task="binary").to(device)
+
+    # Background metrics: invert to treat background (mask=0) as positive
+    bg_iou_metric = JaccardIndex(task="binary").to(device)
+    bg_dice_metric = BinaryF1Score().to(device)
+    bg_precision_metric = Precision(task="binary").to(device)
+    bg_recall_metric = Recall(task="binary").to(device)
 
     with torch.no_grad():
         for batch_idx, batch_data in enumerate(
@@ -297,34 +300,35 @@ def validate_one_epoch(
             # Calculate metrics
             preds = torch.sigmoid(outputs) > threshold
 
-            # Overall metrics (background as positive class since mask=1)
-            binary_iou_metric.update(preds, masks.int())
-            dice_metric.update(preds, masks.int())
-            precision_metric.update(preds, masks.int())
-            recall_metric.update(preds, masks.int())
+            # Joint metrics: use masks directly (joints=1 after inversion)
+            joint_iou_metric.update(preds, masks.int())
+            joint_dice_metric.update(preds, masks.int())
+            joint_precision_metric.update(preds, masks.int())
+            joint_recall_metric.update(preds, masks.int())
 
-            # Joint metrics: invert both predictions and masks to treat joints
-            # (mask=0) as positive class
-            joint_preds = ~preds
-            joint_masks = ~masks.bool()
-            joint_iou_metric.update(joint_preds, joint_masks.int())
-            joint_dice_metric.update(joint_preds, joint_masks.int())
-            joint_precision_metric.update(joint_preds, joint_masks.int())
-            joint_recall_metric.update(joint_preds, joint_masks.int())
+            # Background metrics: invert both (background=0 → 1)
+            bg_preds = ~preds
+            bg_masks = ~masks.bool()
+            bg_iou_metric.update(bg_preds, bg_masks.int())
+            bg_dice_metric.update(bg_preds, bg_masks.int())
+            bg_precision_metric.update(bg_preds, bg_masks.int())
+            bg_recall_metric.update(bg_preds, bg_masks.int())
 
     ds_sized: Sized = dataloader.dataset  # type: ignore[assignment]
     epoch_loss = float(running_loss) / float(len(ds_sized))
 
     metrics = {
         "loss": epoch_loss,
-        "iou": round(_to_float(binary_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "dice": round(_to_float(dice_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "dice_joints": round(_to_float(joint_dice_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "precision": round(_to_float(precision_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "precision_joints": round(_to_float(joint_precision_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "recall": round(_to_float(recall_metric.compute()), 4),  # type: ignore[func-returns-value]
-        "recall_joints": round(_to_float(joint_recall_metric.compute()), 4),  # type: ignore[func-returns-value]
+        # Background metrics (mask=0 after inversion)
+        "iou": round(_to_float(bg_iou_metric.compute()), 4),  # type: ignore
+        "dice": round(_to_float(bg_dice_metric.compute()), 4),  # type: ignore
+        "precision": round(_to_float(bg_precision_metric.compute()), 4),  # type: ignore
+        "recall": round(_to_float(bg_recall_metric.compute()), 4),  # type: ignore
+        # Joint metrics (mask=1 after inversion)
+        "iou_joints": round(_to_float(joint_iou_metric.compute()), 4),  # type: ignore
+        "dice_joints": round(_to_float(joint_dice_metric.compute()), 4),  # type: ignore
+        "precision_joints": round(_to_float(joint_precision_metric.compute()), 4),  # type: ignore
+        "recall_joints": round(_to_float(joint_recall_metric.compute()), 4),  # type: ignore
     }
 
     return metrics
