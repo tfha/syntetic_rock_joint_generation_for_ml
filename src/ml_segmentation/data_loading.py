@@ -183,6 +183,9 @@ def get_transforms(
             "color_jitter": optional_transforms,
             "rotation": False,
             "gaussian_blur": False,
+            "random_affine": False,
+            "random_perspective": False,
+            "random_erasing": False,
         }
     elif isinstance(optional_transforms, dict):
         # Dict mode: individual control from dict
@@ -196,6 +199,9 @@ def get_transforms(
             "color_jitter": optional_transforms.color_jitter,
             "rotation": optional_transforms.rotation,
             "gaussian_blur": optional_transforms.gaussian_blur,
+            "random_affine": optional_transforms.random_affine,
+            "random_perspective": optional_transforms.random_perspective,
+            "random_erasing": optional_transforms.random_erasing,
         }
 
     # Build transform lists for both image and label
@@ -236,6 +242,29 @@ def get_transforms(
         # Prevents black boundaries from being learned as joints
         geometric_transforms_list.append(transforms.RandomRotation(15, fill=255))
 
+    if transform_flags.get("random_affine", False):
+        # RandomAffine: scale, translate, shear
+        # Simulates different camera positions/distances
+        # scale=(0.8, 1.2): rock faces at 80-120% of original size
+        # translate=(0.1, 0.1): shift up to 10% in x and y directions
+        # shear=(-10, 10): shear angle in degrees
+        geometric_transforms_list.append(
+            transforms.RandomAffine(
+                degrees=0,  # rotation handled separately
+                translate=(0.1, 0.1),
+                scale=(0.8, 1.2),
+                shear=(-10, 10),
+                fill=255,  # white fill to match rock color
+            )
+        )
+
+    if transform_flags.get("random_perspective", False):
+        # RandomPerspective: simulates different camera viewing angles
+        # distortion_scale=0.2: moderate perspective distortion
+        geometric_transforms_list.append(
+            transforms.RandomPerspective(distortion_scale=0.2, p=0.5, fill=255)
+        )
+
     # Build image transform: geometric + color (on PIL) + tensor + normalize
     image_transforms_list = geometric_transforms_list.copy()
 
@@ -261,9 +290,25 @@ def get_transforms(
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     )
 
+    # RandomErasing is applied AFTER ToTensor
+    # (operates on tensors, not PIL images)
+    # This simulates occlusions (vegetation, shadows, equipment)
+    # IMPORTANT: Only apply to images, NOT to labels
+    # (we don't want to erase joint annotations)
+    if transform_flags.get("random_erasing", False):
+        image_transforms_list.append(
+            transforms.RandomErasing(
+                p=0.2,  # 20% probability of erasing
+                scale=(0.02, 0.1),  # erase 2-10% of image area
+                ratio=(0.3, 3.3),  # aspect ratio of erased region
+                value="random",  # fill with random values
+            )
+        )
+
     image_transform = transforms.Compose(image_transforms_list)
 
-    # Build label transform: same geometric transforms + ToTensor (NO normalization/color)
+    # Build label transform: same geometric transforms + ToTensor
+    # (NO normalization/color/erasing)
     label_transforms_list = geometric_transforms_list.copy()
     label_transforms_list.append(transforms.ToTensor())
 

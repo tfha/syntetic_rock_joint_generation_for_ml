@@ -88,6 +88,20 @@ class TransformConfig(BaseModel):
     )
     rotation: bool = Field(False, description="Whether to apply random rotation.")
     gaussian_blur: bool = Field(False, description="Whether to apply Gaussian blur.")
+    random_affine: bool = Field(
+        False,
+        description=(
+            "Whether to apply random affine transformations (scale, translate, shear)."
+        ),
+    )
+    random_perspective: bool = Field(
+        False,
+        description="Whether to apply random perspective transformation.",
+    )
+    random_erasing: bool = Field(
+        False,
+        description="Whether to apply random erasing (occlusion simulation).",
+    )
 
 
 class ExperimentStrategy(str, Enum):
