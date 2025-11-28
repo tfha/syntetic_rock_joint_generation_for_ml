@@ -190,10 +190,11 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**OmegaConf.to_container(cfg, resolve=True))
 
     # Verify this is a finetune experiment
-    if not str(pcfg.experiment.experiment_strategy).startswith("finetune_"):
+    strategy_value = pcfg.experiment.experiment_strategy.value
+    if not strategy_value.startswith("finetune_"):
         console.print(
             f"[red]Error: This script is only for finetune_* experiments. "
-            f"Got: {pcfg.experiment.experiment_strategy}[/red]"
+            f"Got: {strategy_value}[/red]"
         )
         console.print(
             "[cyan]For simplemixed_* experiments, use: azure_train_eval.py[/cyan]"
