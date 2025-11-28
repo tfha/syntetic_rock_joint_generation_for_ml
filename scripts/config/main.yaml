@@ -185,78 +185,150 @@ experiment:
       train_datasets:
         - "real_world_rock_slope"
       test_datasets: []
-    # Wachter et al. (2026) Finetuning Experiments - BOX
+    # Wachter et al. (2026) Simple Mixed (SM) Experiments - BOX
+    simplemixed_box_0:
+      train_datasets: []  # Loaded from custom splits
+      test_datasets: []   # Loaded from custom splits
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_0"
+    simplemixed_box_10:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_10"
+    simplemixed_box_30:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_30"
+    simplemixed_box_50:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_50"
+    simplemixed_box_70:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_70"
+    simplemixed_box_90:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_90"
+    simplemixed_box_100:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_100"
+    # Wachter et al. (2026) Simple Mixed (SM) Experiments - SLOPE
+    simplemixed_slope_0:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_0"
+    simplemixed_slope_10:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_10"
+    simplemixed_slope_30:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_30"
+    simplemixed_slope_50:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_50"
+    simplemixed_slope_70:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_70"
+    simplemixed_slope_90:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_90"
+    simplemixed_slope_100:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_100"
+    # Wachter et al. (2026) Fine-Tuned (FT) Experiments - BOX
     finetune_box_0:
       train_datasets: []  # Loaded from custom splits
       test_datasets: []   # Loaded from custom splits
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_0"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_0"
     finetune_box_10:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_10"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_10"
     finetune_box_30:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_30"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_30"
     finetune_box_50:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_50"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_50"
     finetune_box_70:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_70"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_70"
     finetune_box_90:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_90"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_90"
     finetune_box_100:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_100"
-    # Wachter et al. (2026) Finetuning Experiments - SLOPE
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_100"
+    # Wachter et al. (2026) Fine-Tuned (FT) Experiments - SLOPE
     finetune_slope_0:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_0"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_0"
     finetune_slope_10:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_10"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_10"
     finetune_slope_30:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_30"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_30"
     finetune_slope_50:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_50"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_50"
     finetune_slope_70:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_70"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_70"
     finetune_slope_90:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_90"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_90"
     finetune_slope_100:
       train_datasets: []
       test_datasets: []
       use_custom_splits: true
-      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_100"
+      custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_100"
 
 dataset:
   path_images: ${path_project}/Data/rockmass

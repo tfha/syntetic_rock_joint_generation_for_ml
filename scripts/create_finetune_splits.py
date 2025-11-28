@@ -22,7 +22,113 @@ from ml_segmentation.data_loading import get_data_files, get_datasets_prefixes
 console = Console()
 
 
-# Experimental design from table
+# Wachter et al. (2026) Experimental design from Table 1
+# Simple Mixed (SM) strategy - train on shuffled synthetic+real
+SIMPLEMIXED_EXPERIMENTS_BOX = [
+    {
+        "name": "simplemixed_box_0",
+        "percent_real": 0,
+        "train_synthetic": 180,
+        "train_real": 0,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_10",
+        "percent_real": 10,
+        "train_synthetic": 162,
+        "train_real": 18,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_30",
+        "percent_real": 30,
+        "train_synthetic": 126,
+        "train_real": 54,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_50",
+        "percent_real": 50,
+        "train_synthetic": 90,
+        "train_real": 90,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_70",
+        "percent_real": 70,
+        "train_synthetic": 54,
+        "train_real": 126,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_90",
+        "percent_real": 90,
+        "train_synthetic": 18,
+        "train_real": 162,
+        "test_real": 20,
+    },
+    {
+        "name": "simplemixed_box_100",
+        "percent_real": 100,
+        "train_synthetic": 0,
+        "train_real": 180,
+        "test_real": 20,
+    },
+]
+
+SIMPLEMIXED_EXPERIMENTS_SLOPE = [
+    {
+        "name": "simplemixed_slope_0",
+        "percent_real": 0,
+        "train_synthetic": 2700,
+        "train_real": 0,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_10",
+        "percent_real": 10,
+        "train_synthetic": 2430,
+        "train_real": 270,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_30",
+        "percent_real": 30,
+        "train_synthetic": 1890,
+        "train_real": 810,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_50",
+        "percent_real": 50,
+        "train_synthetic": 1350,
+        "train_real": 1350,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_70",
+        "percent_real": 70,
+        "train_synthetic": 810,
+        "train_real": 1890,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_90",
+        "percent_real": 90,
+        "train_synthetic": 270,
+        "train_real": 2430,
+        "test_real": 300,
+    },
+    {
+        "name": "simplemixed_slope_100",
+        "percent_real": 100,
+        "train_synthetic": 0,
+        "train_real": 2700,
+        "test_real": 300,
+    },
+]
+
+# Fine-Tuned (FT) strategy - pretrain on synthetic, finetune on real
 FINETUNE_EXPERIMENTS_BOX = [
     {
         "name": "finetune_box_0",
@@ -182,11 +288,15 @@ def create_splits_for_experiment(
     exp_dir = output_dir / experiment["name"]
     exp_dir.mkdir(parents=True, exist_ok=True)
 
+    # Determine strategy type from experiment name
+    is_simplemixed = experiment["name"].startswith("simplemixed_")
+
     # Save splits
     splits = {
-        "train_all.json": train_all,  # For SM strategy
-        "train_synthetic.json": train_synthetic_only,  # For FT strategy stage 1
-        "train_real.json": train_real_only,  # For FT strategy stage 2
+        "train.json": train_all,  # Azure expects train.json
+        "train_all.json": train_all,  # For SM strategy (kept for reference)
+        "train_synthetic.json": train_synthetic_only,  # For FT stage 1
+        "train_real.json": train_real_only,  # For FT stage 2
         "test.json": test_real,  # Always real data
         "val.json": test_real,  # Use same as test (following Wachter)
     }
@@ -198,13 +308,21 @@ def create_splits_for_experiment(
     # Save metadata
     metadata = {
         "experiment_name": experiment["name"],
+        "strategy_type": "simplemixed" if is_simplemixed else "finetune",
         "percent_real": experiment["percent_real"],
         "train_synthetic_count": len(train_synthetic),
         "train_real_count": len(train_real),
         "train_total_count": len(train_all),
         "test_count": len(test_real),
         "val_count": len(test_real),
-        "synth_real_ratio": f"{100 - experiment['percent_real']}/{experiment['percent_real']}",
+        "synth_real_ratio": (
+            f"{100 - experiment['percent_real']}/{experiment['percent_real']}"
+        ),
+        "note": (
+            "train.json contains shuffled synthetic+real for Azure compatibility. "
+            "SM uses train.json directly. FT will use train_synthetic.json "
+            "then train_real.json in two-stage training (not yet implemented)."
+        ),
     }
     with open(exp_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
@@ -218,9 +336,11 @@ def create_splits_for_experiment(
 
 @hydra.main(version_base=None, config_path="config", config_name="main")
 def main(cfg: DictConfig) -> None:
-    """Generate all finetune experiment splits."""
-    console.print("[bold green]Creating Finetuning Experiment Splits[/bold green]")
-    console.print("Following Wachter et al. (2026) methodology\n")
+    """Generate all Simple Mixed and Fine-Tuned experiment splits."""
+    console.print(
+        "[bold green]Creating Wachter et al. (2026) Experiment Splits[/bold green]"
+    )
+    console.print("Generating both SM and FT strategy splits\n")
 
     # Load configuration
     from ml_segmentation.schema_config import ConfigSchema
@@ -228,15 +348,12 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**OmegaConf.to_container(cfg, resolve=True))
 
     # Output directory
-    output_base = Path("data/model_ready/finetune_splits")
+    output_base = Path("data/model_ready/wachter_splits")
     output_base.mkdir(parents=True, exist_ok=True)
 
     console.print(f"Output directory: {output_base}\n")
 
-    # === BOX EXPERIMENTS ===
-    console.print("[bold yellow]BOX Experiments[/bold yellow]")
-
-    # Load box datasets using get_data_files
+    # === LOAD DATA FILES ===
     # Get synthetic box files (Benchmark prefix)
     synthetic_box_prefixes = get_datasets_prefixes(
         experiment_strategy="verification_box",
@@ -262,26 +379,6 @@ def main(cfg: DictConfig) -> None:
         train_prefixes=real_box_prefixes["train_prefixes"],
         test_prefixes=[],
     )
-
-    console.print(
-        f"Available data: {len(synthetic_box_files)} synthetic, "
-        f"{len(real_box_files)} real"
-    )
-
-    # Create splits for each experiment
-    for exp in FINETUNE_EXPERIMENTS_BOX:
-        create_splits_for_experiment(
-            experiment=exp,
-            synthetic_files=synthetic_box_files,
-            real_files=real_box_files,
-            output_dir=output_base / "box",
-            seed=pcfg.experiment.seed,
-        )
-
-    console.print()
-
-    # === SLOPE EXPERIMENTS ===
-    console.print("[bold yellow]SLOPE Experiments[/bold yellow]")
 
     # Get synthetic slope files (FracMan prefix)
     synthetic_slope_prefixes = get_datasets_prefixes(
@@ -309,18 +406,60 @@ def main(cfg: DictConfig) -> None:
         test_prefixes=[],
     )
 
+    # === SIMPLE MIXED (SM) EXPERIMENTS ===
+    console.print("[bold yellow]Simple Mixed (SM) Strategy - BOX[/bold yellow]")
     console.print(
-        f"Available data: {len(synthetic_slope_files)} synthetic, "
-        f"{len(real_slope_files)} real"
+        f"Available: {len(synthetic_box_files)} synth, {len(real_box_files)} real"
     )
+    for exp in SIMPLEMIXED_EXPERIMENTS_BOX:
+        create_splits_for_experiment(
+            experiment=exp,
+            synthetic_files=synthetic_box_files,
+            real_files=real_box_files,
+            output_dir=output_base / "sm_box",
+            seed=pcfg.experiment.seed,
+        )
+    console.print()
 
-    # Create splits for each experiment
+    console.print("[bold yellow]Simple Mixed (SM) Strategy - SLOPE[/bold yellow]")
+    console.print(
+        f"Available: {len(synthetic_slope_files)} synth, {len(real_slope_files)} real"
+    )
+    for exp in SIMPLEMIXED_EXPERIMENTS_SLOPE:
+        create_splits_for_experiment(
+            experiment=exp,
+            synthetic_files=synthetic_slope_files,
+            real_files=real_slope_files,
+            output_dir=output_base / "sm_slope",
+            seed=pcfg.experiment.seed,
+        )
+    console.print()
+
+    # === FINE-TUNED (FT) EXPERIMENTS ===
+    console.print("[bold yellow]Fine-Tuned (FT) Strategy - BOX[/bold yellow]")
+    console.print(
+        f"Available: {len(synthetic_box_files)} synth, {len(real_box_files)} real"
+    )
+    for exp in FINETUNE_EXPERIMENTS_BOX:
+        create_splits_for_experiment(
+            experiment=exp,
+            synthetic_files=synthetic_box_files,
+            real_files=real_box_files,
+            output_dir=output_base / "ft_box",
+            seed=pcfg.experiment.seed,
+        )
+    console.print()
+
+    console.print("[bold yellow]Fine-Tuned (FT) Strategy - SLOPE[/bold yellow]")
+    console.print(
+        f"Available: {len(synthetic_slope_files)} synth, {len(real_slope_files)} real"
+    )
     for exp in FINETUNE_EXPERIMENTS_SLOPE:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_slope_files,
             real_files=real_slope_files,
-            output_dir=output_base / "slope",
+            output_dir=output_base / "ft_slope",
             seed=pcfg.experiment.seed,
         )
 
@@ -328,9 +467,14 @@ def main(cfg: DictConfig) -> None:
     console.print("[bold green]✓ All splits created successfully![/bold green]")
     console.print(f"\nSplits saved to: {output_base}")
     console.print(
-        "\nNext steps:"
-        "\n1. Register these splits in Azure ML (if needed)"
-        "\n2. Run training with FT strategy using these splits"
+        "\n[cyan]Generated:[/cyan]"
+        "\n  • 14 Simple Mixed (SM) experiments: sm_box/ and sm_slope/"
+        "\n  • 14 Fine-Tuned (FT) experiments: ft_box/ and ft_slope/"
+        "\n\n[cyan]Next steps:[/cyan]"
+        "\n  1. Register splits in Azure ML (if deploying to cloud)"
+        "\n  2. Run training using experiment_strategy parameter"
+        "\n     - SM: simplemixed_box_10, simplemixed_slope_30, etc."
+        "\n     - FT: finetune_box_10, finetune_slope_30, etc."
     )
 
 

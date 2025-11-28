@@ -671,9 +671,9 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
 def upload_finetune_split_data_to_azure_blob(
     console: Console, experiment_strategy: str
 ):
-    """Upload finetune split files to Azure Blob Storage under splits/<strategy>/.
+    """Upload Wachter et al. split files to Azure Blob Storage.
 
-    Finetune splits are stored in data/model_ready/finetune_splits/{box|slope}/{strategy}/
+    Wachter splits are in data/model_ready/wachter_splits/{sm|ft}_{box|slope}/{strategy}/
     and contain: train_all.json, train_synthetic.json, train_real.json, val.json, test.json
     """
     # Get storage config and connect to Azure Blob storage in one step
@@ -685,22 +685,24 @@ def upload_finetune_split_data_to_azure_blob(
         )
         sys.exit(1)
 
-    # Determine dataset type (box or slope) from strategy name
-    if "box" in experiment_strategy:
-        dataset_type = "box"
-    elif "slope" in experiment_strategy:
-        dataset_type = "slope"
+    # Determine strategy type and dataset type from experiment name
+    if experiment_strategy.startswith("simplemixed_box"):
+        subdir = "sm_box"
+    elif experiment_strategy.startswith("simplemixed_slope"):
+        subdir = "sm_slope"
+    elif experiment_strategy.startswith("finetune_box"):
+        subdir = "ft_box"
+    elif experiment_strategy.startswith("finetune_slope"):
+        subdir = "ft_slope"
     else:
         console.print(
-            f"Error: Cannot determine dataset type from strategy '{experiment_strategy}'",
+            f"Error: Unknown Wachter strategy pattern '{experiment_strategy}'",
             style="error",
         )
         sys.exit(1)
 
-    # Finetune splits are in data/model_ready/finetune_splits/{box|slope}/{strategy}/
-    split_dir = (
-        Path("data/model_ready/finetune_splits") / dataset_type / experiment_strategy
-    )
+    # Wachter splits are in data/model_ready/wachter_splits/{sm|ft}_{box|slope}/{strategy}/
+    split_dir = Path("data/model_ready/wachter_splits") / subdir / experiment_strategy
 
     # Validate split directory exists
     if not split_dir.exists():
@@ -712,16 +714,15 @@ def upload_finetune_split_data_to_azure_blob(
 
     # Validate required split files exist
     required_files = [
-        "train_all.json",
-        "train_synthetic.json",
-        "train_real.json",
+        "train.json",  # Azure ML expects train.json
         "val.json",
         "test.json",
     ]
     for fname in required_files:
         if not (split_dir / fname).exists():
             console.print(
-                f"Error: Missing split file: {split_dir / fname}", style="error"
+                f"Error: Missing split file: {split_dir / fname}",
+                style="error",
             )
             sys.exit(1)
 
@@ -735,7 +736,7 @@ def upload_finetune_split_data_to_azure_blob(
             blob_folder=blob_folder,
         )
         console.print(
-            f"Uploaded finetune split files to Azure Blob Storage: {blob_folder}",
+            f"Uploaded Wachter split files to Azure: {blob_folder}",
             style="success",
         )
     except Exception as e:

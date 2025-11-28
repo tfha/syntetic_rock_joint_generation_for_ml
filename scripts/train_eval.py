@@ -164,8 +164,13 @@ def main(cfg: DictConfig) -> None:
         split_dir = Path("data/model_ready/splits") / split_subfolder
         split_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine which split files to load based on training strategy
-    if pcfg.experiment.training_strategy == "FT":
+    # Detect training strategy from experiment name
+    experiment_name = str(pcfg.experiment.experiment_strategy).lower()
+    is_finetune = experiment_name.startswith("finetune_")
+    is_simplemixed = experiment_name.startswith("simplemixed_")
+
+    # Determine which split files to load based on experiment strategy
+    if is_finetune:
         # FT strategy uses separate files for two stages
         train_synthetic_json = split_dir / "train_synthetic.json"
         train_real_json = split_dir / "train_real.json"
@@ -179,7 +184,7 @@ def main(cfg: DictConfig) -> None:
                 test_json.exists(),
             ]
         )
-    elif pcfg.experiment.training_strategy == "SM":
+    elif is_simplemixed:
         # SM strategy uses mixed file
         train_json = split_dir / "train_all.json"
         val_json = split_dir / "val.json"
@@ -195,7 +200,7 @@ def main(cfg: DictConfig) -> None:
     if splits_exist:
         console.print(f"Loading dataset splits from {split_dir}", style="info")
 
-        if pcfg.experiment.training_strategy == "FT":
+        if is_finetune:
             # Load FT strategy splits (will use them in two-stage training)
             with open(train_synthetic_json) as f:
                 train_synthetic_list = json.load(f)
@@ -204,7 +209,7 @@ def main(cfg: DictConfig) -> None:
             # For now, use combined for initial dataloader setup
             # (will be properly handled in FT training loop implementation)
             train_list = train_synthetic_list + train_real_list
-        elif pcfg.experiment.training_strategy == "SM":
+        elif is_simplemixed:
             # Load SM strategy mixed split
             with open(train_json) as f:
                 train_list = json.load(f)

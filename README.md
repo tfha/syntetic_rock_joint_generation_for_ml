@@ -118,14 +118,25 @@ Following the methodology from [Wachter et al. (2026)](https://arxiv.org/abs/250
 
 **Dataset Split Files**:
 
-Each experiment generates 5 JSON files containing image filenames:
+Each experiment generates these JSON files containing image filenames:
+- **`train.json`**: Training data (same as train_all.json) - **used by Azure ML**
 - **`train_all.json`**: Combined synthetic + real data (shuffled) - used by **SM strategy**
 - **`train_synthetic.json`**: Synthetic-only data - used by **FT strategy stage 1** (pretrain)
 - **`train_real.json`**: Real-only data - used by **FT strategy stage 2** (finetune)
 - **`val.json`**: 100% real validation data (shared by both strategies)
 - **`test.json`**: 100% real test data (same as validation, per Wachter et al.)
 
-Note: `train_all` contains the exact same images as `train_synthetic` + `train_real` combined, but randomly shuffled together. The total training data is identical between SM and FT - only the training order and staging differs.
+Note: `train.json` and `train_all.json` contain identical shuffled data. Azure ML uses `train.json`. The separate `train_synthetic.json` and `train_real.json` files are for the FT two-stage training implementation.
+
+**Available Experiments** (28 total):
+
+Simple Mixed (SM) - train on shuffled synthetic+real simultaneously:
+- **BOX**: `simplemixed_box_0`, `simplemixed_box_10`, `simplemixed_box_30`, `simplemixed_box_50`, `simplemixed_box_70`, `simplemixed_box_90`, `simplemixed_box_100`
+- **SLOPE**: `simplemixed_slope_0`, `simplemixed_slope_10`, `simplemixed_slope_30`, `simplemixed_slope_50`, `simplemixed_slope_70`, `simplemixed_slope_90`, `simplemixed_slope_100`
+
+Fine-Tuned (FT) - pretrain on synthetic, finetune on real (requires FT implementation):
+- **BOX**: `finetune_box_0`, `finetune_box_10`, `finetune_box_30`, `finetune_box_50`, `finetune_box_70`, `finetune_box_90`, `finetune_box_100`
+- **SLOPE**: `finetune_slope_0`, `finetune_slope_10`, `finetune_slope_30`, `finetune_slope_50`, `finetune_slope_70`, `finetune_slope_90`, `finetune_slope_100`
 
 **Running the Experiments**:
 
@@ -133,34 +144,30 @@ Note: `train_all` contains the exact same images as `train_synthetic` + `train_r
    ```bash
    poetry run python scripts/create_finetune_splits.py
    ```
-   This creates splits in `data/model_ready/finetune_splits/{box,slope}/finetune_{box,slope}_{0,10,30,50,70,90,100}/`
+   This creates splits in `data/model_ready/wachter_splits/{sm_box,sm_slope,ft_box,ft_slope}/`
 
 2. **Register splits in Azure ML**:
    ```bash
    poetry run python scripts/azure_manage_assets_and_resources.py azure_data_assets.command=register-finetune-splits
    ```
-   This registers all 14 finetune experiment splits (7 BOX + 7 SLOPE) in Azure ML.
+   This registers all 28 experiment splits (14 SM + 14 FT) in Azure ML.
 
 3. **Run experiments**:
    ```bash
-   # SM strategy (simple mixed)
+   # Simple Mixed (SM) strategy - ready to run
    poetry run python scripts/azure_submit_job.py \
      model=unet \
      experiment.max_epochs=100 \
-     experiment.experiment_strategy=finetune_box_10 \
-     experiment.training_strategy=SM
+     experiment.experiment_strategy=simplemixed_box_10
 
-   # FT strategy (fine-tuned) - requires two-stage training implementation
+   # Fine-Tuned (FT) strategy - requires two-stage training implementation
    poetry run python scripts/azure_submit_job.py \
      model=unet \
      experiment.max_epochs=100 \
-     experiment.experiment_strategy=finetune_box_10 \
-     experiment.training_strategy=FT
+     experiment.experiment_strategy=finetune_box_10
    ```
 
-**Available Experiments**:
-- BOX: `finetune_box_0`, `finetune_box_10`, `finetune_box_30`, `finetune_box_50`, `finetune_box_70`, `finetune_box_90`, `finetune_box_100`
-- SLOPE: `finetune_slope_0`, `finetune_slope_10`, `finetune_slope_30`, `finetune_slope_50`, `finetune_slope_70`, `finetune_slope_90`, `finetune_slope_100`
+Note: The FT two-stage training loop is not yet implemented. Currently, FT experiments will use combined synthetic+real data like SM. The implementation will be added in a future update.
 
 **Note**: The FT strategy two-stage training loop is not yet fully implemented in `train_eval.py`. Currently, the data loading infrastructure is in place, but the training needs to be split into stage 1 (pretrain on synthetic) and stage 2 (finetune on real).
 

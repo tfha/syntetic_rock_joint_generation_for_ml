@@ -116,7 +116,22 @@ class ExperimentStrategy(str, Enum):
     DATASET_SIZE_TEST = "dataset_size_test"
     SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
     ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
-    # Wachter et al. (2026) Finetuning Experiments
+    # Wachter et al. (2026) Simple Mixed (SM) Experiments
+    SIMPLEMIXED_BOX_0 = "simplemixed_box_0"
+    SIMPLEMIXED_BOX_10 = "simplemixed_box_10"
+    SIMPLEMIXED_BOX_30 = "simplemixed_box_30"
+    SIMPLEMIXED_BOX_50 = "simplemixed_box_50"
+    SIMPLEMIXED_BOX_70 = "simplemixed_box_70"
+    SIMPLEMIXED_BOX_90 = "simplemixed_box_90"
+    SIMPLEMIXED_BOX_100 = "simplemixed_box_100"
+    SIMPLEMIXED_SLOPE_0 = "simplemixed_slope_0"
+    SIMPLEMIXED_SLOPE_10 = "simplemixed_slope_10"
+    SIMPLEMIXED_SLOPE_30 = "simplemixed_slope_30"
+    SIMPLEMIXED_SLOPE_50 = "simplemixed_slope_50"
+    SIMPLEMIXED_SLOPE_70 = "simplemixed_slope_70"
+    SIMPLEMIXED_SLOPE_90 = "simplemixed_slope_90"
+    SIMPLEMIXED_SLOPE_100 = "simplemixed_slope_100"
+    # Wachter et al. (2026) Fine-Tuned (FT) Experiments
     FINETUNE_BOX_0 = "finetune_box_0"
     FINETUNE_BOX_10 = "finetune_box_10"
     FINETUNE_BOX_30 = "finetune_box_30"
@@ -291,22 +306,6 @@ class ExperimentConfig(BaseModel):
             "Threshold for binary predictions (sigmoid > threshold = joint). "
             "For class imbalance, lower values (0.3-0.4) favor minority class. "
             "Default 0.5 is neutral. Range: 0.1-0.9."
-        ),
-    )
-    training_strategy: str | None = Field(
-        None,
-        description=(
-            "Training strategy for hybrid datasets (Wachter et al. 2026). "
-            "None: standard training (verification/main experiments). "
-            "'SM' (Simple Mixed): train on synthetic+real simultaneously. "
-            "'FT' (Fine-Tuned): pretrain on synthetic, then finetune on real."
-        ),
-    )
-    finetune_pretrain_patience: int = Field(
-        10,
-        description=(
-            "Early stopping patience for FT strategy stage 1 (pretrain on synthetic). "
-            "Training stops if real validation accuracy doesn't improve for this many epochs."
         ),
     )
     num_workers: int = Field(..., description="Number of workers for data loading.")

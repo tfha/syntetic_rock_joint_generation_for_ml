@@ -250,8 +250,26 @@ def main(cfg: DictConfig) -> None:
                         pcfg.experiment.experiment_strategy,
                     )
                 case AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS:
-                    # Upload and register all Wachter et al. finetune experiment splits
-                    finetune_strategies = [
+                    # Upload and register all Wachter et al. experiment splits
+                    # 28 total: 14 Simple Mixed (SM) + 14 Fine-Tuned (FT)
+                    wachter_strategies = [
+                        # Simple Mixed (SM) - BOX
+                        "simplemixed_box_0",
+                        "simplemixed_box_10",
+                        "simplemixed_box_30",
+                        "simplemixed_box_50",
+                        "simplemixed_box_70",
+                        "simplemixed_box_90",
+                        "simplemixed_box_100",
+                        # Simple Mixed (SM) - SLOPE
+                        "simplemixed_slope_0",
+                        "simplemixed_slope_10",
+                        "simplemixed_slope_30",
+                        "simplemixed_slope_50",
+                        "simplemixed_slope_70",
+                        "simplemixed_slope_90",
+                        "simplemixed_slope_100",
+                        # Fine-Tuned (FT) - BOX
                         "finetune_box_0",
                         "finetune_box_10",
                         "finetune_box_30",
@@ -259,6 +277,7 @@ def main(cfg: DictConfig) -> None:
                         "finetune_box_70",
                         "finetune_box_90",
                         "finetune_box_100",
+                        # Fine-Tuned (FT) - SLOPE
                         "finetune_slope_0",
                         "finetune_slope_10",
                         "finetune_slope_30",
@@ -268,16 +287,18 @@ def main(cfg: DictConfig) -> None:
                         "finetune_slope_100",
                     ]
                     console.print(
-                        "\n=== Uploading & Registering Wachter et al. Finetune Splits ===",
+                        "\n=== Uploading & Registering Wachter et al. Splits ===",
                         style="bold green",
                     )
                     console.print(
-                        f"Total experiments to process: {len(finetune_strategies)}\n",
+                        f"Total experiments: {len(wachter_strategies)} "
+                        "(14 SM + 14 FT)\n",
                         style="info",
                     )
-                    for i, strategy in enumerate(finetune_strategies, 1):
+                    for i, strategy in enumerate(wachter_strategies, 1):
                         console.print(
-                            f"\n[{i}/{len(finetune_strategies)}] Processing {strategy}...",
+                            f"\n[{i}/{len(wachter_strategies)}] "
+                            f"Processing {strategy}...",
                             style="yellow",
                         )
                         try:
@@ -304,7 +325,7 @@ def main(cfg: DictConfig) -> None:
                                 style="red",
                             )
                     console.print(
-                        "\n=== Finetune splits upload & registration complete ===",
+                        "\n=== Wachter splits upload & registration complete ===",
                         style="bold green",
                     )
                 case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:
