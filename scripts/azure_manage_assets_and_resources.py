@@ -22,6 +22,7 @@ from ml_segmentation.azure_data_assets import (
     register_base_datasets,
     register_split_data_asset,
     upload_base_data_to_azure_blob,
+    upload_finetune_split_data_to_azure_blob,
     upload_split_data_to_azure_blob,
 )
 from ml_segmentation.schema_config import AzureDataAssetsCommand, ConfigSchema
@@ -249,7 +250,7 @@ def main(cfg: DictConfig) -> None:
                         pcfg.experiment.experiment_strategy,
                     )
                 case AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS:
-                    # Register all Wachter et al. finetune experiment splits
+                    # Upload and register all Wachter et al. finetune experiment splits
                     finetune_strategies = [
                         "finetune_box_0",
                         "finetune_box_10",
@@ -267,35 +268,43 @@ def main(cfg: DictConfig) -> None:
                         "finetune_slope_100",
                     ]
                     console.print(
-                        "\n=== Registering Wachter et al. Finetune Splits ===",
+                        "\n=== Uploading & Registering Wachter et al. Finetune Splits ===",
                         style="bold green",
                     )
                     console.print(
-                        f"Total experiments to register: {len(finetune_strategies)}\n",
+                        f"Total experiments to process: {len(finetune_strategies)}\n",
                         style="info",
                     )
                     for i, strategy in enumerate(finetune_strategies, 1):
                         console.print(
-                            f"[{i}/{len(finetune_strategies)}] Registering {strategy}...",
+                            f"\n[{i}/{len(finetune_strategies)}] Processing {strategy}...",
                             style="yellow",
                         )
                         try:
+                            # Step 1: Upload splits to Azure Blob Storage
+                            console.print(f"  Uploading {strategy}...", style="info")
+                            upload_finetune_split_data_to_azure_blob(
+                                console,
+                                strategy,
+                            )
+                            # Step 2: Register as data asset
+                            console.print(f"  Registering {strategy}...", style="info")
                             register_split_data_asset(
                                 ml_client,
                                 console,
                                 strategy,
                             )
                             console.print(
-                                f"✓ Successfully registered {strategy}",
+                                f"✓ Successfully processed {strategy}",
                                 style="green",
                             )
                         except Exception as e:
                             console.print(
-                                f"✗ Error registering {strategy}: {str(e)}",
+                                f"✗ Error processing {strategy}: {str(e)}",
                                 style="red",
                             )
                     console.print(
-                        "\n=== Finetune splits registration complete ===",
+                        "\n=== Finetune splits upload & registration complete ===",
                         style="bold green",
                     )
                 case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:

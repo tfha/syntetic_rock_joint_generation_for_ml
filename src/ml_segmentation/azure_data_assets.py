@@ -668,6 +668,81 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
         sys.exit(1)
 
 
+def upload_finetune_split_data_to_azure_blob(
+    console: Console, experiment_strategy: str
+):
+    """Upload finetune split files to Azure Blob Storage under splits/<strategy>/.
+
+    Finetune splits are stored in data/model_ready/finetune_splits/{box|slope}/{strategy}/
+    and contain: train_all.json, train_synthetic.json, train_real.json, val.json, test.json
+    """
+    # Get storage config and connect to Azure Blob storage in one step
+    container_client, _, _, _ = get_azure_storage_client(console, require_key=True)
+    if container_client is None:
+        console.print(
+            "Failed to connect to Azure Blob Storage; cannot upload split files.",
+            style="error",
+        )
+        sys.exit(1)
+
+    # Determine dataset type (box or slope) from strategy name
+    if "box" in experiment_strategy:
+        dataset_type = "box"
+    elif "slope" in experiment_strategy:
+        dataset_type = "slope"
+    else:
+        console.print(
+            f"Error: Cannot determine dataset type from strategy '{experiment_strategy}'",
+            style="error",
+        )
+        sys.exit(1)
+
+    # Finetune splits are in data/model_ready/finetune_splits/{box|slope}/{strategy}/
+    split_dir = (
+        Path("data/model_ready/finetune_splits") / dataset_type / experiment_strategy
+    )
+
+    # Validate split directory exists
+    if not split_dir.exists():
+        console.print(
+            f"Error: Split directory '{split_dir}' not found. Generate splits first.",
+            style="error",
+        )
+        sys.exit(1)
+
+    # Validate required split files exist
+    required_files = [
+        "train_all.json",
+        "train_synthetic.json",
+        "train_real.json",
+        "val.json",
+        "test.json",
+    ]
+    for fname in required_files:
+        if not (split_dir / fname).exists():
+            console.print(
+                f"Error: Missing split file: {split_dir / fname}", style="error"
+            )
+            sys.exit(1)
+
+    try:
+        # Upload to splits/{strategy}/ to match registration expectations
+        blob_folder = f"splits/{experiment_strategy}"
+        upload_files(
+            container_client=container_client,
+            console=console,
+            local_folder_path=split_dir,
+            blob_folder=blob_folder,
+        )
+        console.print(
+            f"Uploaded finetune split files to Azure Blob Storage: {blob_folder}",
+            style="success",
+        )
+    except Exception as e:
+        console.print(f"Error uploading split files: {str(e)}", style="error")
+        sys.exit(1)
+
+
 def register_split_data_asset(
     ml_client: MLClient, console: Console, experiment_strategy: str
 ):
@@ -910,7 +985,7 @@ def prepare_and_save_dataset_splits(
     images_directory: str | Path,
     labels_directory: str | Path,
     experiment_strategy: str,
-    dataset_strategies: dict[str, dict[str, list[str]]],
+    dataset_strategies: dict[str, dict[str, list[str]]] | dict[str, Any],
     dataset_prefixes: dict[str, list[str]],
     train_fraction: float | None = None,
     val_fraction: float | None = None,
