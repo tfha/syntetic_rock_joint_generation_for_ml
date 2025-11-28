@@ -583,7 +583,7 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Early stopping check
-        early_stopping_stage1(current_metric)
+        early_stopping_stage1(current_metric, model)
         if early_stopping_stage1.early_stop:
             console.print(
                 f"\n[bold yellow]Stage 1 early stopping triggered at epoch {epoch}[/bold yellow]"
@@ -693,7 +693,7 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Early stopping check
-        early_stopping_stage2(current_metric)
+        early_stopping_stage2(current_metric, model)
         if early_stopping_stage2.early_stop:
             console.print(
                 f"\n[bold yellow]Stage 2 early stopping triggered at epoch {epoch}[/bold yellow]"
