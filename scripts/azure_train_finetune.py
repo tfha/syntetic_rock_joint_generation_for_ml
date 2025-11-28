@@ -571,14 +571,27 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Save predictions periodically
-        if epoch % 10 == 0 or epoch == 1:
-            viz_dir = output_dir / f"stage1_predictions_epoch{epoch}"
-            viz_dir.mkdir(parents=True, exist_ok=True)
+        if epoch % 5 == 0 or epoch == 1:
+            # Train predictions (synthetic) with original images
+            train_viz_dir = output_dir / f"stage1_train_predictions_epoch{epoch}"
+            train_viz_dir.mkdir(parents=True, exist_ok=True)
+            save_image_predictions(
+                model=model,
+                dataloader=train_synthetic_loader,
+                device=device,
+                save_dir=train_viz_dir,
+                num_samples=5,
+                show_original=True,
+            )
+
+            # Validation predictions
+            val_viz_dir = output_dir / f"stage1_val_predictions_epoch{epoch}"
+            val_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                save_dir=viz_dir,
+                save_dir=val_viz_dir,
                 num_samples=5,
             )
 
@@ -681,14 +694,27 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Save predictions periodically
-        if epoch % 10 == 0:
-            viz_dir = output_dir / f"stage2_predictions_epoch{epoch}"
-            viz_dir.mkdir(parents=True, exist_ok=True)
+        if epoch % 5 == 0:
+            # Train predictions (real) with original images
+            train_viz_dir = output_dir / f"stage2_train_predictions_epoch{epoch}"
+            train_viz_dir.mkdir(parents=True, exist_ok=True)
+            save_image_predictions(
+                model=model,
+                dataloader=train_real_loader,
+                device=device,
+                save_dir=train_viz_dir,
+                num_samples=5,
+                show_original=True,
+            )
+
+            # Validation predictions
+            val_viz_dir = output_dir / f"stage2_val_predictions_epoch{epoch}"
+            val_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                save_dir=viz_dir,
+                save_dir=val_viz_dir,
                 num_samples=5,
             )
 
