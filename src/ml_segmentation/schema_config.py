@@ -116,6 +116,21 @@ class ExperimentStrategy(str, Enum):
     DATASET_SIZE_TEST = "dataset_size_test"
     SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
     ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
+    # Wachter et al. (2026) Finetuning Experiments
+    FINETUNE_BOX_0 = "finetune_box_0"
+    FINETUNE_BOX_10 = "finetune_box_10"
+    FINETUNE_BOX_30 = "finetune_box_30"
+    FINETUNE_BOX_50 = "finetune_box_50"
+    FINETUNE_BOX_70 = "finetune_box_70"
+    FINETUNE_BOX_90 = "finetune_box_90"
+    FINETUNE_BOX_100 = "finetune_box_100"
+    FINETUNE_SLOPE_0 = "finetune_slope_0"
+    FINETUNE_SLOPE_10 = "finetune_slope_10"
+    FINETUNE_SLOPE_30 = "finetune_slope_30"
+    FINETUNE_SLOPE_50 = "finetune_slope_50"
+    FINETUNE_SLOPE_70 = "finetune_slope_70"
+    FINETUNE_SLOPE_90 = "finetune_slope_90"
+    FINETUNE_SLOPE_100 = "finetune_slope_100"
 
 
 class StrategySplitConfig(BaseModel):
@@ -171,17 +186,45 @@ class StrategySplitConfig(BaseModel):
         return self
 
 
+class DatasetStrategyConfig(BaseModel):
+    """Configuration for a dataset strategy."""
+
+    train_datasets: list[str] = Field(
+        default_factory=list,
+        description="List of dataset names used for training.",
+    )
+    test_datasets: list[str] = Field(
+        default_factory=list,
+        description="List of dataset names used for testing.",
+    )
+    use_custom_splits: bool = Field(
+        False,
+        description=(
+            "Whether to use custom dataset splits (for finetune experiments)."
+        ),
+    )
+    custom_splits_dir: str | None = Field(
+        None,
+        description=(
+            "Directory containing custom split JSON files "
+            "(train_all.json, train_synthetic.json, "
+            "train_real.json, val.json, test.json)."
+        ),
+    )
+
+
 class ExperimentConfig(BaseModel):
     experiment_strategy: ExperimentStrategy = Field(
         ..., description="The experiment strategy chosen for this run."
     )
-    dataset_strategies: dict[str, dict[str, list[str]]] = Field(
+    dataset_strategies: dict[str, DatasetStrategyConfig] = Field(
         ...,
         description=(
             "Mapping of experiment strategies to their corresponding dataset "
             "configurations. Each strategy includes 'train_datasets' and "
             "'test_datasets', which are lists of dataset names used for "
-            "training and testing respectively."
+            "training and testing respectively. For finetune experiments, "
+            "use_custom_splits and custom_splits_dir can be specified."
         ),
     )
     strategy_splits: dict[str, StrategySplitConfig] | None = Field(

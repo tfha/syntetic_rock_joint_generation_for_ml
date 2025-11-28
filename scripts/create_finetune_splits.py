@@ -228,7 +228,7 @@ def main(cfg: DictConfig) -> None:
     pcfg = ConfigSchema(**OmegaConf.to_container(cfg, resolve=True))
 
     # Output directory
-    output_base = Path(pcfg.data_paths.path_model_ready) / "finetune_splits"
+    output_base = Path("data/model_ready/finetune_splits")
     output_base.mkdir(parents=True, exist_ok=True)
 
     console.print(f"Output directory: {output_base}\n")
@@ -244,8 +244,8 @@ def main(cfg: DictConfig) -> None:
         dataset_prefixes=pcfg.dataset.prefixes,
     )
     synthetic_box_files, _ = get_data_files(
-        images_dir=Path(pcfg.data_paths.path_model_ready_images),
-        labels_dir=Path(pcfg.data_paths.path_model_ready_labels),
+        images_dir=Path(pcfg.dataset.path_images),
+        labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
         train_prefixes=synthetic_box_prefixes["train_prefixes"],
         test_prefixes=[],  # We want all files
     )
@@ -257,8 +257,8 @@ def main(cfg: DictConfig) -> None:
         dataset_prefixes=pcfg.dataset.prefixes,
     )
     real_box_files, _ = get_data_files(
-        images_dir=Path(pcfg.data_paths.path_model_ready_images),
-        labels_dir=Path(pcfg.data_paths.path_model_ready_labels),
+        images_dir=Path(pcfg.dataset.path_images),
+        labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
         train_prefixes=real_box_prefixes["train_prefixes"],
         test_prefixes=[],
     )
@@ -290,8 +290,8 @@ def main(cfg: DictConfig) -> None:
         dataset_prefixes=pcfg.dataset.prefixes,
     )
     synthetic_slope_files, _ = get_data_files(
-        images_dir=Path(pcfg.data_paths.path_model_ready_images),
-        labels_dir=Path(pcfg.data_paths.path_model_ready_labels),
+        images_dir=Path(pcfg.dataset.path_images),
+        labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
         train_prefixes=synthetic_slope_prefixes["train_prefixes"],
         test_prefixes=[],
     )
@@ -303,8 +303,8 @@ def main(cfg: DictConfig) -> None:
         dataset_prefixes=pcfg.dataset.prefixes,
     )
     real_slope_files, _ = get_data_files(
-        images_dir=Path(pcfg.data_paths.path_model_ready_images),
-        labels_dir=Path(pcfg.data_paths.path_model_ready_labels),
+        images_dir=Path(pcfg.dataset.path_images),
+        labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
         train_prefixes=real_slope_prefixes["train_prefixes"],
         test_prefixes=[],
     )

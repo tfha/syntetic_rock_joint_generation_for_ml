@@ -139,10 +139,14 @@ def main(cfg: DictConfig) -> None:
 
     # Check if this experiment strategy uses custom splits (Wachter et al. experiments)
     strategy_config = pcfg.experiment.dataset_strategies.get(
-        pcfg.experiment.experiment_strategy, {}
+        pcfg.experiment.experiment_strategy
     )
-    use_custom_splits = strategy_config.get("use_custom_splits", False)
-    custom_splits_dir = strategy_config.get("custom_splits_dir", None)
+    if strategy_config:
+        use_custom_splits = strategy_config.use_custom_splits
+        custom_splits_dir = strategy_config.custom_splits_dir
+    else:
+        use_custom_splits = False
+        custom_splits_dir = None
 
     # Determine split directory
     if use_custom_splits and custom_splits_dir:

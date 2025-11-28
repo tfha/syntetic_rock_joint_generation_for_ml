@@ -737,7 +737,7 @@ def split_data(
 
 def get_datasets_prefixes(
     experiment_strategy: str,
-    dataset_strategies: dict[str, dict[str, list[str]]],
+    dataset_strategies: dict[str, dict[str, list[str]]] | dict[str, Any],
     dataset_prefixes: dict[str, list[str]],
 ) -> dict[str, list[str]]:
     """
@@ -749,7 +749,8 @@ def get_datasets_prefixes(
     Args:
         experiment_strategy (str): The selected experiment strategy.
         dataset_strategies (dict): Dictionary of dataset strategies with train
-            and test datasets.
+            and test datasets. Can be dict[str, dict[str, list[str]]] (legacy)
+            or dict[str, DatasetStrategyConfig] (current).
         dataset_prefixes (dict): Dictionary of prefixes for each dataset.
 
     Returns:
@@ -773,11 +774,25 @@ def get_datasets_prefixes(
         raise ValueError(msg)
 
     # Initialize lists for prefixes
-    train_prefixes = []
-    test_prefixes = []
+    train_prefixes: list[str] = []
+    test_prefixes: list[str] = []
 
     # Get prefixes for training datasets
-    for dataset_name in datasets_used.get("train_datasets", []):
+    # Handle both dict and DatasetStrategyConfig model
+    train_datasets: list[str]
+    test_datasets: list[str]
+
+    if hasattr(datasets_used, "train_datasets"):
+        # DatasetStrategyConfig model
+        train_datasets = datasets_used.train_datasets  # type: ignore
+        test_datasets = datasets_used.test_datasets  # type: ignore
+    else:
+        # Legacy dict format
+        # type: ignore
+        train_datasets = datasets_used.get("train_datasets", [])
+        test_datasets = datasets_used.get("test_datasets", [])
+
+    for dataset_name in train_datasets:
         if dataset_name in dataset_prefixes:
             train_prefixes.extend(dataset_prefixes[dataset_name])
         else:
@@ -786,7 +801,7 @@ def get_datasets_prefixes(
             )
 
     # Get prefixes for testing datasets
-    for dataset_name in datasets_used.get("test_datasets", []):
+    for dataset_name in test_datasets:
         if dataset_name in dataset_prefixes:
             test_prefixes.extend(dataset_prefixes[dataset_name])
         else:
