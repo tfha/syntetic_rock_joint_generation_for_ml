@@ -512,6 +512,8 @@ class AzureDataAssetsCommand(str, Enum):
     REGISTER_SPLITS = "register-splits"
     # Process all split strategies in one operation: generate, upload, register
     PROCESS_ALL_SPLITS = "process-all-splits"
+    # Register all Wachter et al. (2026) finetune experiment splits
+    REGISTER_FINETUNE_SPLITS = "register-finetune-splits"
     BUILD_ENVIRONMENT = "build-environment"
 
 

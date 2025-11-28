@@ -55,6 +55,10 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
             "Process all experiment strategies: "
             "generate, upload, and register splits in one operation"
         ),
+        AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS: (
+            "Register all Wachter et al. (2026) finetune experiment splits "
+            "(14 experiments: 7 BOX + 7 SLOPE)"
+        ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",
         AzureDataAssetsCommand.COMPARE_ASSETS: ("Compare two versions of a data asset"),
         AzureDataAssetsCommand.UPLOAD_DATA: ("Upload local data to Azure Blob storage"),
@@ -153,6 +157,7 @@ def main(cfg: DictConfig) -> None:
             valid_commands_requiring_connection = [
                 AzureDataAssetsCommand.REGISTER_BASE_DATASETS,
                 AzureDataAssetsCommand.REGISTER_SPLITS,
+                AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS,
                 AzureDataAssetsCommand.LIST_ASSETS,
                 AzureDataAssetsCommand.COMPARE_ASSETS,
                 AzureDataAssetsCommand.BUILD_ENVIRONMENT,
@@ -242,6 +247,56 @@ def main(cfg: DictConfig) -> None:
                         ml_client,
                         console,
                         pcfg.experiment.experiment_strategy,
+                    )
+                case AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS:
+                    # Register all Wachter et al. finetune experiment splits
+                    finetune_strategies = [
+                        "finetune_box_0",
+                        "finetune_box_10",
+                        "finetune_box_30",
+                        "finetune_box_50",
+                        "finetune_box_70",
+                        "finetune_box_90",
+                        "finetune_box_100",
+                        "finetune_slope_0",
+                        "finetune_slope_10",
+                        "finetune_slope_30",
+                        "finetune_slope_50",
+                        "finetune_slope_70",
+                        "finetune_slope_90",
+                        "finetune_slope_100",
+                    ]
+                    console.print(
+                        "\n=== Registering Wachter et al. Finetune Splits ===",
+                        style="bold green",
+                    )
+                    console.print(
+                        f"Total experiments to register: {len(finetune_strategies)}\n",
+                        style="info",
+                    )
+                    for i, strategy in enumerate(finetune_strategies, 1):
+                        console.print(
+                            f"[{i}/{len(finetune_strategies)}] Registering {strategy}...",
+                            style="yellow",
+                        )
+                        try:
+                            register_split_data_asset(
+                                ml_client,
+                                console,
+                                strategy,
+                            )
+                            console.print(
+                                f"✓ Successfully registered {strategy}",
+                                style="green",
+                            )
+                        except Exception as e:
+                            console.print(
+                                f"✗ Error registering {strategy}: {str(e)}",
+                                style="red",
+                            )
+                    console.print(
+                        "\n=== Finetune splits registration complete ===",
+                        style="bold green",
                     )
                 case AzureDataAssetsCommand.PROCESS_ALL_SPLITS:
                     # List of experiment strategies to process
