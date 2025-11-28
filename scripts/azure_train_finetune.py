@@ -62,7 +62,10 @@ from torchinfo import summary  # noqa: E402
 from ml_segmentation.azure_core import (  # noqa: E402
     configure_azure_logging_and_warning,
 )
-from ml_segmentation.data_loading import RockJointDataset, get_transforms  # noqa: E402
+from ml_segmentation.data_loading import (  # noqa: E402
+    SegmentationDataset,
+    get_transforms,
+)
 from ml_segmentation.debug_functionality import better_traceback  # noqa: E402
 from ml_segmentation.define_model import choose_model  # noqa: E402
 from ml_segmentation.schema_config import ConfigSchema  # noqa: E402
@@ -149,28 +152,31 @@ def load_finetune_splits(splits_path: Path) -> tuple[list, list, list, list]:
     return train_synthetic, train_real, val_list, test_list
 
 
-def create_dataloader(
+def create_dataloader_from_files(
     file_list: list[str],
     images_dir: Path,
     labels_dir: Path,
-    transforms,
+    transform_dict,  # dict with "image" and "label" keys
     batch_size: int,
     num_workers: int,
     shuffle: bool = True,
+    pin_memory: bool = True,
+    persistent_workers: bool = False,
 ) -> DataLoader:
-    """Create a dataloader from a list of files."""
-    dataset = RockJointDataset(
-        image_files=file_list,
-        images_directory=images_dir,
-        labels_directory=labels_dir,
-        transforms=transforms,
+    """Create a dataloader from a list of files using SegmentationDataset."""
+    dataset = SegmentationDataset(
+        images_dir=images_dir,
+        labels_dir=labels_dir,
+        file_list=file_list,
+        transform=transform_dict,
     )
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
 
 
@@ -332,19 +338,33 @@ def main(cfg: DictConfig) -> None:
 
     # Get transforms
     train_transforms = get_transforms(
-        crop_size=pcfg.dataset.crop_size,
-        is_training=True,
+        optional_transforms=pcfg.experiment.optional_transforms,
+        transforms_parameters={
+            "crop_size": pcfg.dataset.crop_size,
+        },
     )
     val_transforms = get_transforms(
-        crop_size=pcfg.dataset.crop_size,
-        is_training=False,
+        optional_transforms=False,  # No augmentation for validation/test
+        transforms_parameters={
+            "crop_size": pcfg.dataset.crop_size,
+        },
+    )
+
+    # Determine DataLoader performance flags
+    pin_memory_flag = device.type == "cuda"
+    persistent_workers_flag = False  # Avoid shared memory issues in Azure ML
+
+    console.print(
+        f"DataLoader settings -> pin_memory={pin_memory_flag}, "
+        f"persistent_workers={persistent_workers_flag}",
+        style="info",
     )
 
     # Create dataloaders
     console.print("\n[bold]Creating dataloaders...[/bold]")
 
     # Stage 1: Synthetic data loader
-    train_synthetic_loader = create_dataloader(
+    train_synthetic_loader = create_dataloader_from_files(
         train_synthetic,
         images_path,
         masks_path,
@@ -352,10 +372,12 @@ def main(cfg: DictConfig) -> None:
         pcfg.model.batch_size,
         pcfg.experiment.num_workers,
         shuffle=True,
+        pin_memory=pin_memory_flag,
+        persistent_workers=persistent_workers_flag,
     )
 
     # Stage 2: Real data loader
-    train_real_loader = create_dataloader(
+    train_real_loader = create_dataloader_from_files(
         train_real,
         images_path,
         masks_path,
@@ -363,10 +385,12 @@ def main(cfg: DictConfig) -> None:
         pcfg.model.batch_size,
         pcfg.experiment.num_workers,
         shuffle=True,
+        pin_memory=pin_memory_flag,
+        persistent_workers=persistent_workers_flag,
     )
 
     # Validation and test loaders (100% real data)
-    val_loader = create_dataloader(
+    val_loader = create_dataloader_from_files(
         val_list,
         images_path,
         masks_path,
@@ -374,9 +398,11 @@ def main(cfg: DictConfig) -> None:
         pcfg.model.batch_size,
         pcfg.experiment.num_workers,
         shuffle=False,
+        pin_memory=pin_memory_flag,
+        persistent_workers=persistent_workers_flag,
     )
 
-    test_loader = create_dataloader(
+    test_loader = create_dataloader_from_files(
         test_list,
         images_path,
         masks_path,
@@ -384,6 +410,8 @@ def main(cfg: DictConfig) -> None:
         pcfg.model.batch_size,
         pcfg.experiment.num_workers,
         shuffle=False,
+        pin_memory=pin_memory_flag,
+        persistent_workers=persistent_workers_flag,
     )
 
     console.print(

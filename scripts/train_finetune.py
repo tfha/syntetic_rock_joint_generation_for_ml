@@ -21,7 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 from rich.console import Console
 from torch.utils.data import DataLoader
 
-from ml_segmentation.data_loading import RockJointDataset, get_transforms
+from ml_segmentation.data_loading import SegmentationDataset, get_transforms
 from ml_segmentation.models import get_model
 from ml_segmentation.schema_config import ConfigSchema
 from ml_segmentation.training import (
@@ -77,11 +77,11 @@ def create_dataloader(
     shuffle: bool = True,
 ) -> DataLoader:
     """Create a dataloader from a list of files."""
-    dataset = RockJointDataset(
-        image_files=file_list,
-        images_directory=images_dir,
-        labels_directory=labels_dir,
-        transforms=transforms,
+    dataset = SegmentationDataset(
+        images_dir=images_dir,
+        labels_dir=labels_dir,
+        file_list=file_list,
+        transform=transforms,
     )
     return DataLoader(
         dataset,
