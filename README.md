@@ -97,6 +97,61 @@ EXTRA:
 
 For all models, experiment with transfer learning using pretrained models as a backbone model. At least for DeepLabV3+ and Unet, different pretrained models are available.
 
+### Wachter et al. (2026) Hybrid Training Experiments
+
+Following the methodology from [Wachter et al. (2026)](https://arxiv.org/abs/2506.24093), we evaluate two mixed training strategies for combining synthetic and real data:
+
+- **SM (Simple Mixed)**: Train on synthetic and real data simultaneously, sampled randomly from both datasets
+- **FT (Fine-Tuned)**: Two-stage training - (1) pretrain on 100% synthetic data until real validation accuracy plateaus, (2) finetune on real data for remaining epochs
+
+**Experimental Design**: We test 7 different synthetic-to-real ratios (0%, 10%, 30%, 50%, 70%, 90%, 100% real) on two datasets:
+- **BOX experiments**: 200 training images total (180 train split + 20 test, all real)
+- **SLOPE experiments**: 3000 training images total (2700 train split + 300 test, all real)
+
+**Key Methodology** (Wachter et al., Section 3.6):
+- Dataset split: 60% train / 20% validation / 20% test
+- **Validation and test sets are 100% real data** (unchanged across all experiments)
+- Training set varies in synthetic/real ratio based on experiment
+- Total training images constant across SM and FT for fair comparison
+- SGD optimizer, LR=0.01, batch size=64, 100 epochs total
+- Early stopping: patience=10 epochs on real validation accuracy
+
+**Running the Experiments**:
+
+1. **Generate dataset splits**:
+   ```bash
+   poetry run python scripts/create_finetune_splits.py
+   ```
+   This creates splits in `data/model_ready/finetune_splits/{box,slope}/finetune_{box,slope}_{0,10,30,50,70,90,100}/`
+
+2. **Register splits in Azure ML**:
+   ```bash
+   poetry run python scripts/azure_manage_assets_and_resources.py register_splits
+   ```
+
+3. **Run experiments**:
+   ```bash
+   # SM strategy (simple mixed)
+   poetry run python scripts/azure_submit_job.py \
+     model=unet \
+     experiment.max_epochs=100 \
+     experiment.experiment_strategy=finetune_box_10 \
+     experiment.training_strategy=SM
+
+   # FT strategy (fine-tuned) - requires two-stage training implementation
+   poetry run python scripts/azure_submit_job.py \
+     model=unet \
+     experiment.max_epochs=100 \
+     experiment.experiment_strategy=finetune_box_10 \
+     experiment.training_strategy=FT
+   ```
+
+**Available Experiments**:
+- BOX: `finetune_box_0`, `finetune_box_10`, `finetune_box_30`, `finetune_box_50`, `finetune_box_70`, `finetune_box_90`, `finetune_box_100`
+- SLOPE: `finetune_slope_0`, `finetune_slope_10`, `finetune_slope_30`, `finetune_slope_50`, `finetune_slope_70`, `finetune_slope_90`, `finetune_slope_100`
+
+**Note**: The FT strategy two-stage training loop is not yet fully implemented in `train_eval.py`. Currently, the data loading infrastructure is in place, but the training needs to be split into stage 1 (pretrain on synthetic) and stage 2 (finetune on real).
+
 ## Key tools and technologies
 
 - The projects is developed as a classic software project with functionality structured as a **python package** in the `src` directory and entry points in the `scripts` directory.
