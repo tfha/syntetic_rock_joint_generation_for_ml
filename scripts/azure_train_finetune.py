@@ -205,9 +205,7 @@ def main(cfg: DictConfig) -> None:
     else:
         # Local execution
         mlflow.set_tracking_uri(str(pcfg.mlflow.tracking_uri))
-        experiment_name = (
-            f"{pcfg.model.architecture}-{pcfg.experiment.experiment_strategy}"
-        )
+        experiment_name = f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}"
         mlflow.set_experiment(experiment_name)
         mlflow.start_run()
 
@@ -293,7 +291,7 @@ def main(cfg: DictConfig) -> None:
     # Log configuration
     mlflow.log_params(
         {
-            "model": pcfg.model.architecture,
+            "model": pcfg.model.name,
             "experiment_strategy": str(pcfg.experiment.experiment_strategy),
             "training_mode": "finetune_two_stage",
             "max_epochs": pcfg.model.num_epochs,
@@ -423,20 +421,15 @@ def main(cfg: DictConfig) -> None:
 
     # Initialize model
     console.print("\n[bold]Initializing model...[/bold]")
-    model = choose_model(
-        architecture=pcfg.model.architecture,
-        encoder_name=pcfg.model.encoder_name,
-        encoder_weights=pcfg.model.encoder_weights,
-        in_channels=pcfg.model.in_channels,
-        classes=pcfg.model.classes,
-    ).to(device)
+    model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
 
     # Model summary
+    in_channels = pcfg.model.params.get("in_channels", 3)
     model_stats = summary(
         model,
         input_size=(
             1,
-            pcfg.model.in_channels,
+            in_channels,
             pcfg.dataset.crop_size,
             pcfg.dataset.crop_size,
         ),
@@ -445,49 +438,55 @@ def main(cfg: DictConfig) -> None:
     console.print(f"Model parameters: {model_stats.total_params:,}", style="info")
 
     # Loss function
+    criterion: nn.Module
     if str(pcfg.experiment.loss_function).lower() == "dice":
-        loss_fn = DiceLoss(mode="binary")
+        criterion = DiceLoss(mode="binary", from_logits=True)
+        console.print("Using Dice Loss", style="info")
+        mlflow.log_param("loss_function", "dice")
     elif str(pcfg.experiment.loss_function).lower() == "focal":
-        loss_fn = FocalLoss(
+        criterion = FocalLoss(
             mode="binary",
             alpha=pcfg.experiment.focal_alpha,
             gamma=pcfg.experiment.focal_gamma,
         )
+        console.print(
+            f"Using Focal Loss (alpha={pcfg.experiment.focal_alpha}, "
+            f"gamma={pcfg.experiment.focal_gamma})",
+            style="info",
+        )
+        mlflow.log_param("loss_function", "focal")
+        mlflow.log_param("focal_alpha", pcfg.experiment.focal_alpha)
+        mlflow.log_param("focal_gamma", pcfg.experiment.focal_gamma)
     else:
-        loss_fn = nn.BCEWithLogitsLoss()
+        criterion = nn.BCEWithLogitsLoss()
+        console.print("Using BCEWithLogits Loss", style="info")
+        mlflow.log_param("loss_function", "bce")
 
-    # Optimizer and scheduler
-    optimizer = optim.SGD(
-        model.parameters(),
-        lr=pcfg.model.learning_rate,
-        momentum=0.9,
-        weight_decay=1e-4,
-    )
+    # Optimizer
+    optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
 
+    # Mixed precision training
+    scaler = torch.amp.GradScaler(enabled=(device.type == "cuda"))
+
+    # Learning rate scheduler
     scheduler = ReduceLROnPlateau(
         optimizer,
-        mode="max",
-        factor=0.5,
-        patience=5,
-        verbose=True,
+        mode="min",
+        factor=pcfg.model.scheduler.gamma,
+        patience=pcfg.model.scheduler.patience,
     )
-
-    # Early stopping for stage 1 (patience=10 as per Wachter et al.)
     early_stopping_stage1 = EarlyStopping(
         patience=10,
-        mode="max",
+        verbose=True,
         delta=0.0,
     )
 
     # Early stopping for stage 2
     early_stopping_stage2 = EarlyStopping(
         patience=pcfg.experiment.early_stopping_patience,
-        mode="max",
-        delta=0.0,
+        verbose=True,
+        delta=pcfg.experiment.early_stopping_delta,
     )
-
-    # Mixed precision scaler
-    scaler = torch.cuda.amp.GradScaler()
 
     # TensorBoard writer
     tensorboard_dir = Path("outputs/tensorboard_logs")
@@ -521,7 +520,7 @@ def main(cfg: DictConfig) -> None:
         metrics_train = train_one_epoch(
             model=model,
             dataloader=train_synthetic_loader,
-            loss_fn=loss_fn,
+            loss_fn=criterion,
             optimizer=optimizer,
             device=device,
             scaler=scaler,
@@ -531,7 +530,7 @@ def main(cfg: DictConfig) -> None:
         metrics_val = validate_one_epoch(
             model=model,
             dataloader=val_loader,
-            loss_fn=loss_fn,
+            loss_fn=criterion,
             device=device,
         )
 
@@ -631,7 +630,7 @@ def main(cfg: DictConfig) -> None:
         metrics_train = train_one_epoch(
             model=model,
             dataloader=train_real_loader,
-            loss_fn=loss_fn,
+            loss_fn=criterion,
             optimizer=optimizer,
             device=device,
             scaler=scaler,
@@ -641,7 +640,7 @@ def main(cfg: DictConfig) -> None:
         metrics_val = validate_one_epoch(
             model=model,
             dataloader=val_loader,
-            loss_fn=loss_fn,
+            loss_fn=criterion,
             device=device,
         )
 
@@ -721,7 +720,7 @@ def main(cfg: DictConfig) -> None:
     metrics_test = validate_one_epoch(
         model=model,
         dataloader=test_loader,
-        loss_fn=loss_fn,
+        loss_fn=criterion,
         device=device,
     )
 

@@ -22,7 +22,7 @@ from rich.console import Console
 from torch.utils.data import DataLoader
 
 from ml_segmentation.data_loading import SegmentationDataset, get_transforms
-from ml_segmentation.models import get_model
+from ml_segmentation.define_model import choose_model
 from ml_segmentation.schema_config import ConfigSchema
 from ml_segmentation.training import (
     EarlyStopping,
@@ -231,13 +231,7 @@ def main(cfg: DictConfig) -> None:
 
         # Initialize model
         console.print("\n[bold]Initializing model...[/bold]")
-        model = get_model(
-            architecture=pcfg.model.architecture,
-            encoder_name=pcfg.model.encoder_name,
-            encoder_weights=pcfg.model.encoder_weights,
-            in_channels=pcfg.model.in_channels,
-            classes=pcfg.model.classes,
-        ).to(device)
+        model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
 
         # Loss function and metrics
         loss_fn = get_loss_function(
@@ -246,20 +240,18 @@ def main(cfg: DictConfig) -> None:
             focal_gamma=pcfg.experiment.focal_gamma,
         )
 
-        # Optimizer and scheduler
-        optimizer = torch.optim.SGD(
+        # Optimizer
+        optimizer = torch.optim.Adam(
             model.parameters(),
             lr=pcfg.model.learning_rate,
-            momentum=0.9,
-            weight_decay=1e-4,
         )
 
+        # Learning rate scheduler
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            mode="max",
-            factor=0.5,
-            patience=5,
-            verbose=True,
+            mode="min",
+            factor=pcfg.model.scheduler.gamma,
+            patience=pcfg.model.scheduler.patience,
         )
 
         # Early stopping for stage 1 (patience=10 as per Wachter et al.)
