@@ -132,6 +132,7 @@ def create_dataloader_from_files(
     shuffle: bool = True,
     pin_memory: bool = True,
     persistent_workers: bool = False,
+    return_original: bool = False,
 ) -> DataLoader:
     """Create a dataloader from a list of files using SegmentationDataset."""
     dataset = SegmentationDataset(
@@ -139,6 +140,7 @@ def create_dataloader_from_files(
         labels_dir=labels_dir,
         file_list=file_list,
         transform=transform_dict,
+        return_original=return_original,
     )
     return DataLoader(
         dataset,
@@ -372,6 +374,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=True,
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
+        return_original=True,
     )
 
     # Stage 2: Real data loader
@@ -385,6 +388,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=True,
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
+        return_original=True,
     )
 
     # Validation and test loaders (100% real data)
@@ -580,7 +584,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=train_synthetic_loader,
                 device=device,
                 save_dir=train_viz_dir,
-                num_samples=5,
+                num_samples=10,
                 show_original=True,
             )
 
@@ -592,7 +596,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=val_loader,
                 device=device,
                 save_dir=val_viz_dir,
-                num_samples=5,
+                num_samples=10,
             )
 
         # Early stopping check
@@ -703,7 +707,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=train_real_loader,
                 device=device,
                 save_dir=train_viz_dir,
-                num_samples=5,
+                num_samples=10,
                 show_original=True,
             )
 
@@ -715,7 +719,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=val_loader,
                 device=device,
                 save_dir=val_viz_dir,
-                num_samples=5,
+                num_samples=10,
             )
 
         # Early stopping check
