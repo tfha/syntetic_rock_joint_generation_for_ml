@@ -136,9 +136,27 @@ def main(cfg: DictConfig) -> None:
             )
             train_command = "python scripts/azure_smoke_test.py"
     else:
+        # Determine which training script to use based on experiment strategy
+        experiment_name = str(pcfg.experiment.experiment_strategy.value)
+
+        if experiment_name.startswith("finetune_"):
+            # Use two-stage FT training script for finetune_* experiments
+            training_script = "azure_train_finetune.py"
+            console.print(
+                f"Using two-stage FT training script for {experiment_name}",
+                style="info",
+            )
+        else:
+            # Use standard training for simplemixed_* and other experiments
+            training_script = "azure_train_eval.py"
+            console.print(
+                f"Using standard training script for {experiment_name}",
+                style="info",
+            )
+
         # Pass data inputs as Hydra config overrides using ${{inputs.*}}
         train_command = (
-            f"python scripts/azure_train_eval.py "
+            f"python scripts/{training_script} "
             f"model={pcfg.model.name} "
             f"model.num_epochs={pcfg.model.num_epochs} "
             f"experiment.experiment_strategy="
