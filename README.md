@@ -116,6 +116,17 @@ Following the methodology from [Wachter et al. (2026)](https://arxiv.org/abs/250
 - SGD optimizer, LR=0.01, batch size=64, 100 epochs total
 - Early stopping: patience=10 epochs on real validation accuracy
 
+**Dataset Split Files**:
+
+Each experiment generates 5 JSON files containing image filenames:
+- **`train_all.json`**: Combined synthetic + real data (shuffled) - used by **SM strategy**
+- **`train_synthetic.json`**: Synthetic-only data - used by **FT strategy stage 1** (pretrain)
+- **`train_real.json`**: Real-only data - used by **FT strategy stage 2** (finetune)
+- **`val.json`**: 100% real validation data (shared by both strategies)
+- **`test.json`**: 100% real test data (same as validation, per Wachter et al.)
+
+Note: `train_all` contains the exact same images as `train_synthetic` + `train_real` combined, but randomly shuffled together. The total training data is identical between SM and FT - only the training order and staging differs.
+
 **Running the Experiments**:
 
 1. **Generate dataset splits**:
