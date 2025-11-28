@@ -68,6 +68,10 @@ experiment:
   # IMPORTANT: After label inversion (1-label), mask=1 is joints (minority), mask=0 is background
   # use alpha=0.75 to give MORE weight to the minority class (joints)
   focal_alpha: 0.75 # Focal loss class balancing (0.75 = more weight on minority class)
+  # Prediction threshold for binary classification
+  # For severe class imbalance, lower threshold makes model more sensitive to joints
+  # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
+  prediction_threshold: 0.3  # Lower threshold = more likely to predict joints
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
   # Option 1: Fraction-based splits (default)
@@ -97,7 +101,7 @@ experiment:
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
   early_stopping_patience: 10  # Increased from 3 to allow more exploration
-  early_stopping_delta: 0.005 # delta threshold for the loss metric in early stopping
+  early_stopping_delta: 0.005  # Min improvement in compare_metric (dice_joints)
   # Note: After metrics fix, consider changing compare_metric from 'loss' to 'iou_joints' or 'dice_joints'
   optional_transforms:
     random_crop: true

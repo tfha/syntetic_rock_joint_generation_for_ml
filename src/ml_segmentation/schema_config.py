@@ -224,8 +224,8 @@ class ExperimentConfig(BaseModel):
         "dice",
         description=(
             "Loss function to use for training. Options: "
-            "'dice' (Dice Loss from V-Net 2016, segmentation_models_pytorch), "
-            "'focal' (Focal Loss from Lin et al. 2017, segmentation_models_pytorch)"
+            "'dice' (Dice Loss from V-Net 2016, smp), "
+            "'focal' (Focal Loss from Lin et al. 2017, smp)"
         ),
     )
     focal_gamma: float = Field(
@@ -237,9 +237,17 @@ class ExperimentConfig(BaseModel):
         description=(
             "Focal loss alpha parameter (class balance). "
             "For binary segmentation: alpha is weight for positive class (mask=1). "
-            "Since mask=1 is background (majority) and mask=0 is joints (minority), "
-            "use alpha=0.75 to give LESS weight to majority class. "
+            "Since mask=1 is joints (minority after inversion), "
+            "use alpha=0.75 to give MORE weight to minority class. "
             "Range: 0.5-0.9 for minority class focus."
+        ),
+    )
+    prediction_threshold: float = Field(
+        0.5,
+        description=(
+            "Threshold for binary predictions (sigmoid > threshold = joint). "
+            "For class imbalance, lower values (0.3-0.4) favor minority class. "
+            "Default 0.5 is neutral. Range: 0.1-0.9."
         ),
     )
     num_workers: int = Field(..., description="Number of workers for data loading.")

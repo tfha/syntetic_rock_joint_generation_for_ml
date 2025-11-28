@@ -345,14 +345,14 @@ def main(cfg: DictConfig) -> None:
     # Select loss function based on configuration
     criterion: nn.Module
     if pcfg.experiment.loss_function == "focal":
-        # Focal Loss (based on Lin et al. 2017) from segmentation_models_pytorch
+        # Focal Loss (based on Lin et al. 2017) from smp
         criterion = FocalLoss(
             mode="binary",
             alpha=pcfg.experiment.focal_alpha,
             gamma=pcfg.experiment.focal_gamma,
         )
     else:  # Default to "dice"
-        # Dice Loss (based on V-Net, Milletari et al. 2016) from segmentation_models_pytorch
+        # Dice Loss (based on V-Net, Milletari et al. 2016) from smp
         criterion = DiceLoss(mode="binary", from_logits=True)
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
     scaler = torch.amp.GradScaler(
@@ -404,7 +404,7 @@ def main(cfg: DictConfig) -> None:
                 optimizer=optimizer,
                 device=device,
                 scaler=scaler,
-                threshold=0.5,
+                threshold=pcfg.experiment.prediction_threshold,
                 max_batches=pcfg.experiment.sanity_check_num_batches,
             )
             console.print(
@@ -424,7 +424,7 @@ def main(cfg: DictConfig) -> None:
                     dataloader=val_loader,
                     criterion=criterion,
                     device=device,
-                    threshold=0.5,
+                    threshold=pcfg.experiment.prediction_threshold,
                     max_batches=pcfg.experiment.sanity_check_num_batches,
                 )
 
@@ -510,7 +510,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=test_loader,
                 criterion=criterion,
                 device=device,
-                threshold=0.5,
+                threshold=pcfg.experiment.prediction_threshold,
                 max_batches=None,  # Evaluate on full test set
             )
             console.print(
