@@ -520,7 +520,7 @@ def main(cfg: DictConfig) -> None:
         metrics_train = train_one_epoch(
             model=model,
             dataloader=train_synthetic_loader,
-            loss_fn=criterion,
+            criterion=criterion,
             optimizer=optimizer,
             device=device,
             scaler=scaler,
@@ -530,7 +530,7 @@ def main(cfg: DictConfig) -> None:
         metrics_val = validate_one_epoch(
             model=model,
             dataloader=val_loader,
-            loss_fn=criterion,
+            criterion=criterion,
             device=device,
         )
 
@@ -630,7 +630,7 @@ def main(cfg: DictConfig) -> None:
         metrics_train = train_one_epoch(
             model=model,
             dataloader=train_real_loader,
-            loss_fn=criterion,
+            criterion=criterion,
             optimizer=optimizer,
             device=device,
             scaler=scaler,
@@ -640,7 +640,7 @@ def main(cfg: DictConfig) -> None:
         metrics_val = validate_one_epoch(
             model=model,
             dataloader=val_loader,
-            loss_fn=criterion,
+            criterion=criterion,
             device=device,
         )
 
@@ -720,7 +720,7 @@ def main(cfg: DictConfig) -> None:
     metrics_test = validate_one_epoch(
         model=model,
         dataloader=test_loader,
-        loss_fn=criterion,
+        criterion=criterion,
         device=device,
     )
 
