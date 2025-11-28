@@ -578,7 +578,7 @@ def main(cfg: DictConfig) -> None:
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                output_dir=viz_dir,
+                save_dir=viz_dir,
                 num_samples=5,
             )
 
@@ -688,7 +688,7 @@ def main(cfg: DictConfig) -> None:
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                output_dir=viz_dir,
+                save_dir=viz_dir,
                 num_samples=5,
             )
 
@@ -737,7 +737,7 @@ def main(cfg: DictConfig) -> None:
         model=model,
         dataloader=test_loader,
         device=device,
-        output_dir=final_viz_dir,
+        save_dir=final_viz_dir,
         num_samples=10,
     )
 
