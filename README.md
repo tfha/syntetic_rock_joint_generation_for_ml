@@ -126,8 +126,9 @@ Following the methodology from [Wachter et al. (2026)](https://arxiv.org/abs/250
 
 2. **Register splits in Azure ML**:
    ```bash
-   poetry run python scripts/azure_manage_assets_and_resources.py register_splits
+   poetry run python scripts/azure_manage_assets_and_resources.py azure_data_assets.command=register-finetune-splits
    ```
+   This registers all 14 finetune experiment splits (7 BOX + 7 SLOPE) in Azure ML.
 
 3. **Run experiments**:
    ```bash
