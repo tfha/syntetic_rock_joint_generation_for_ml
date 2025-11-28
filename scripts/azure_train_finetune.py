@@ -85,36 +85,6 @@ from ml_segmentation.utility import (  # noqa: E402
 console = get_custom_console()
 
 
-def detect_azure_mount_paths(cfg_path_images, cfg_path_masks, cfg_path_splits):
-    """Detect Azure ML mounted dataset paths with fallback logic."""
-    # Check if running in Azure ML environment
-    is_azure = os.environ.get("AZUREML_RUN_ID") is not None
-
-    if not is_azure:
-        # Local execution - use config paths as-is
-        return (
-            Path(cfg_path_images),
-            Path(cfg_path_masks),
-            Path(cfg_path_splits),
-        )
-
-    # Azure ML execution - try mounted paths
-    # Try INPUT_* environment variables (SDK v2)
-    images_path = os.environ.get("INPUT_images_data")
-    masks_path = os.environ.get("INPUT_masks_data")
-    splits_path = os.environ.get("INPUT_splits_data")
-
-    # Fallback to config paths if env vars not set
-    if not images_path:
-        images_path = cfg_path_images
-    if not masks_path:
-        masks_path = cfg_path_masks
-    if not splits_path:
-        splits_path = cfg_path_splits
-
-    return Path(images_path), Path(masks_path), Path(splits_path)
-
-
 def load_finetune_splits(splits_path: Path) -> tuple[list, list, list, list]:
     """Load FT-specific splits from Azure mounted path."""
     train_synthetic_json = splits_path / "train_synthetic.json"
@@ -258,38 +228,67 @@ def main(cfg: DictConfig) -> None:
     hydra_output_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"Hydra outputs will be saved to: {hydra_output_dir}", style="info")
 
-    # Detect Azure mounted paths
-    console.print("Loading train/test data from Azure ML inputs...", style="info")
+    # Get Azure ML mounted paths from config
+    # These are set via Hydra overrides in azure_submit_job.py:
+    # +dataset.azure_images_path=${{inputs.images_data}}
+    # +dataset.azure_masks_path=${{inputs.masks_data}}
+    # +dataset.azure_splits_path=${{inputs.splits_data}}
+    images_path = pcfg.dataset.azure_images_path
+    masks_path = pcfg.dataset.azure_masks_path
+    splits_path = pcfg.dataset.azure_splits_path
 
-    images_path, masks_path, splits_path = detect_azure_mount_paths(
-        pcfg.dataset.path_images,
-        pcfg.dataset.path_processed_mask_labels,
-        getattr(cfg.dataset, "azure_splits_path", ""),
-    )
-
-    console.print(f"Images path from config: {pcfg.dataset.path_images}", style="info")
-    console.print(
-        f"Masks path from config: {pcfg.dataset.path_processed_mask_labels}",
-        style="info",
-    )
-    console.print(
-        f"Splits path from config: {getattr(cfg.dataset, 'azure_splits_path', 'N/A')}",
-        style="info",
-    )
-    console.print(f"Mounted images path: {images_path}", style="info")
-    console.print(f"Mounted masks path: {masks_path}", style="info")
-    console.print(f"Mounted splits path: {splits_path}", style="info")
+    console.print(f"Images path from config: {images_path}", style="info")
+    console.print(f"Masks path from config: {masks_path}", style="info")
+    console.print(f"Splits path from config: {splits_path}", style="info")
 
     # Validate mounted paths exist
+    if images_path is None:
+        console.print(
+            "Missing Azure ML input 'images_data'. "
+            "Ensure +dataset.azure_images_path=${{inputs.images_data}} is set.",
+            style="danger",
+        )
+        raise ValueError("Azure ML input 'images_data' is not mounted.")
+
     if not images_path.exists():
-        console.print(f"[red]Error: Images path not found: {images_path}[/red]")
-        sys.exit(1)
+        console.print(
+            f"Images path not found: {images_path}. "
+            f"Please ensure the 'images_data' input is correctly configured.",
+            style="danger",
+        )
+        raise ValueError(f"Images directory does not exist: {images_path}")
+
+    if masks_path is None:
+        console.print(
+            "Missing Azure ML input 'masks_data'. "
+            "Ensure +dataset.azure_masks_path=${{inputs.masks_data}} is set.",
+            style="danger",
+        )
+        raise ValueError("Azure ML input 'masks_data' is not mounted.")
+
     if not masks_path.exists():
-        console.print(f"[red]Error: Masks path not found: {masks_path}[/red]")
-        sys.exit(1)
+        console.print(
+            f"Masks path not found: {masks_path}. "
+            f"Please ensure the 'masks_data' input is correctly configured.",
+            style="danger",
+        )
+        raise ValueError(f"Masks directory does not exist: {masks_path}")
+
+    if splits_path is None:
+        console.print(
+            "Missing Azure ML input 'splits_data'. "
+            "Ensure +dataset.azure_splits_path=${{inputs.splits_data}} is set.",
+            style="danger",
+        )
+        raise ValueError("Azure ML input 'splits_data' is not mounted.")
+
     if not splits_path.exists():
-        console.print(f"[red]Error: Splits path not found: {splits_path}[/red]")
-        sys.exit(1)
+        console.print(
+            f"Splits path not found: {splits_path}. "
+            f"Please ensure the 'splits_data' input is correctly configured.",
+            style="danger",
+        )
+        raise ValueError(f"Splits directory does not exist: {splits_path}")
 
     # Log configuration
     mlflow.log_params(
