@@ -72,6 +72,13 @@ experiment:
   # For severe class imbalance, lower threshold makes model more sensitive to joints
   # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
   prediction_threshold: 0.3  # Lower threshold = more likely to predict joints
+  # Finetuning strategy (Wachter et al. 2026)
+  # None: standard training (verification/main experiments)
+  # 'SM' (simple mixed): train on synth+real simultaneously
+  # 'FT' (fine-tuned): pretrain on synth, then finetune on real
+  training_strategy: null  # Options: null, SM, FT
+  finetune_pretrain_patience: 10  # Early stopping patience for FT stage 1 (pretrain on synthetic)
+  # Note: use_custom_splits and custom_splits_dir are set per-experiment in dataset_strategies
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
   # Option 1: Fraction-based splits (default)
@@ -178,6 +185,78 @@ experiment:
       train_datasets:
         - "real_world_rock_slope"
       test_datasets: []
+    # Wachter et al. (2026) Finetuning Experiments - BOX
+    finetune_box_0:
+      train_datasets: []  # Loaded from custom splits
+      test_datasets: []   # Loaded from custom splits
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_0"
+    finetune_box_10:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_10"
+    finetune_box_30:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_30"
+    finetune_box_50:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_50"
+    finetune_box_70:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_70"
+    finetune_box_90:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_90"
+    finetune_box_100:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/box/finetune_box_100"
+    # Wachter et al. (2026) Finetuning Experiments - SLOPE
+    finetune_slope_0:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_0"
+    finetune_slope_10:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_10"
+    finetune_slope_30:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_30"
+    finetune_slope_50:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_50"
+    finetune_slope_70:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_70"
+    finetune_slope_90:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_90"
+    finetune_slope_100:
+      train_datasets: []
+      test_datasets: []
+      use_custom_splits: true
+      custom_splits_dir: "data/model_ready/finetune_splits/slope/finetune_slope_100"
 
 dataset:
   path_images: ${path_project}/Data/rockmass

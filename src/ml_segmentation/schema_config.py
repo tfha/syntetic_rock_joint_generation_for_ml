@@ -250,6 +250,22 @@ class ExperimentConfig(BaseModel):
             "Default 0.5 is neutral. Range: 0.1-0.9."
         ),
     )
+    training_strategy: str | None = Field(
+        None,
+        description=(
+            "Training strategy for hybrid datasets (Wachter et al. 2026). "
+            "None: standard training (verification/main experiments). "
+            "'SM' (Simple Mixed): train on synthetic+real simultaneously. "
+            "'FT' (Fine-Tuned): pretrain on synthetic, then finetune on real."
+        ),
+    )
+    finetune_pretrain_patience: int = Field(
+        10,
+        description=(
+            "Early stopping patience for FT strategy stage 1 (pretrain on synthetic). "
+            "Training stops if real validation accuracy doesn't improve for this many epochs."
+        ),
+    )
     num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float | None = Field(
         None,

@@ -137,22 +137,78 @@ def main(cfg: DictConfig) -> None:
         },
     )
 
-    # Determine split subfolder based on experiment_strategy
-    split_subfolder = (
-        pcfg.experiment.experiment_strategy.lower().replace(".", "_").replace(" ", "_")
+    # Check if this experiment strategy uses custom splits (Wachter et al. experiments)
+    strategy_config = pcfg.experiment.dataset_strategies.get(
+        pcfg.experiment.experiment_strategy, {}
     )
-    split_dir = Path("data/model_ready/splits") / split_subfolder
-    split_dir.mkdir(parents=True, exist_ok=True)
+    use_custom_splits = strategy_config.get("use_custom_splits", False)
+    custom_splits_dir = strategy_config.get("custom_splits_dir", None)
 
-    # Check if split JSONs exist
-    train_json = split_dir / "train.json"
-    val_json = split_dir / "val.json"
-    test_json = split_dir / "test.json"
+    # Determine split directory
+    if use_custom_splits and custom_splits_dir:
+        split_dir = Path(str(custom_splits_dir))
+        console.print(
+            f"Using custom splits from {split_dir} (Wachter et al. experiment)",
+            style="info",
+        )
+    else:
+        split_subfolder = (
+            pcfg.experiment.experiment_strategy.lower()
+            .replace(".", "_")
+            .replace(" ", "_")
+        )
+        split_dir = Path("data/model_ready/splits") / split_subfolder
+        split_dir.mkdir(parents=True, exist_ok=True)
 
-    if train_json.exists() and val_json.exists() and test_json.exists():
+    # Determine which split files to load based on training strategy
+    if pcfg.experiment.training_strategy == "FT":
+        # FT strategy uses separate files for two stages
+        train_synthetic_json = split_dir / "train_synthetic.json"
+        train_real_json = split_dir / "train_real.json"
+        val_json = split_dir / "val.json"
+        test_json = split_dir / "test.json"
+        splits_exist = all(
+            [
+                train_synthetic_json.exists(),
+                train_real_json.exists(),
+                val_json.exists(),
+                test_json.exists(),
+            ]
+        )
+    elif pcfg.experiment.training_strategy == "SM":
+        # SM strategy uses mixed file
+        train_json = split_dir / "train_all.json"
+        val_json = split_dir / "val.json"
+        test_json = split_dir / "test.json"
+        splits_exist = all([train_json.exists(), val_json.exists(), test_json.exists()])
+    else:
+        # Standard training (no Wachter strategy)
+        train_json = split_dir / "train.json"
+        val_json = split_dir / "val.json"
+        test_json = split_dir / "test.json"
+        splits_exist = all([train_json.exists(), val_json.exists(), test_json.exists()])
+
+    if splits_exist:
         console.print(f"Loading dataset splits from {split_dir}", style="info")
-        with open(train_json) as f:
-            train_list = json.load(f)
+
+        if pcfg.experiment.training_strategy == "FT":
+            # Load FT strategy splits (will use them in two-stage training)
+            with open(train_synthetic_json) as f:
+                train_synthetic_list = json.load(f)
+            with open(train_real_json) as f:
+                train_real_list = json.load(f)
+            # For now, use combined for initial dataloader setup
+            # (will be properly handled in FT training loop implementation)
+            train_list = train_synthetic_list + train_real_list
+        elif pcfg.experiment.training_strategy == "SM":
+            # Load SM strategy mixed split
+            with open(train_json) as f:
+                train_list = json.load(f)
+        else:
+            # Standard training
+            with open(train_json) as f:
+                train_list = json.load(f)
+
         with open(val_json) as f:
             val_list = json.load(f)
         with open(test_json) as f:
