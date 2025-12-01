@@ -77,7 +77,6 @@ experiment:
   # 'SM' (simple mixed): train on synth+real simultaneously
   # 'FT' (fine-tuned): pretrain on synth, then finetune on real
   training_strategy: null  # Options: null, SM, FT
-  finetune_pretrain_patience: 10  # Early stopping patience for FT stage 1 (pretrain on synthetic)
   # Note: use_custom_splits and custom_splits_dir are set per-experiment in dataset_strategies
   num_workers: 2 # number of workers for data loading (reduced from 4 to avoid shared memory issues in Azure ML)
   # Dataset split configuration - use EITHER fractions OR counts, not both
@@ -107,8 +106,10 @@ experiment:
     #   train_fraction: 1.0  # Use ALL synthetic data for training
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
-  early_stopping_patience: 10  # Increased from 3 to allow more exploration
+  # Early stopping configuration
+  early_stopping_patience: 10  # General early stopping patience (SimpleMixed, FT Stage 2)
   early_stopping_delta: 0.005  # Min improvement in compare_metric (dice_joints)
+  finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
   # Note: After metrics fix, consider changing compare_metric from 'loss' to 'iou_joints' or 'dice_joints'
   optional_transforms:
     random_crop: true

@@ -482,7 +482,7 @@ def main(cfg: DictConfig) -> None:
     )
     # Early stopping for stage 1 (pretraining on synthetic, validated on real)
     early_stopping_stage1 = EarlyStopping(
-        patience=pcfg.experiment.early_stopping_patience,
+        patience=pcfg.experiment.finetune_pretrain_patience,
         verbose=True,
         delta=0.0,
     )
