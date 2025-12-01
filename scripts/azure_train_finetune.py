@@ -480,13 +480,14 @@ def main(cfg: DictConfig) -> None:
         factor=pcfg.model.scheduler.gamma,
         patience=pcfg.model.scheduler.patience,
     )
+    # Early stopping for stage 1 (pretraining on synthetic, validated on real)
     early_stopping_stage1 = EarlyStopping(
-        patience=10,
+        patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=0.0,
     )
 
-    # Early stopping for stage 2
+    # Early stopping for stage 2 (finetuning on real)
     early_stopping_stage2 = EarlyStopping(
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
@@ -512,7 +513,8 @@ def main(cfg: DictConfig) -> None:
         "\n[bold yellow]═══ STAGE 1: Pretraining on Synthetic Data ═══[/bold yellow]"
     )
     console.print(
-        "Training until real validation accuracy plateaus (patience=10 epochs)\n"
+        f"Training until real validation accuracy plateaus "
+        f"(patience={pcfg.experiment.early_stopping_patience} epochs)\n"
     )
 
     best_stage1_metric = 0.0
