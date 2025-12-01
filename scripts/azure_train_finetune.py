@@ -16,6 +16,7 @@ Usage:
     Submitted via azure_submit_job.py with finetune_* experiment strategies
 """
 
+import csv
 import json
 import os
 import subprocess
@@ -501,6 +502,9 @@ def main(cfg: DictConfig) -> None:
     output_dir = Path("outputs/models")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Initialize metrics tracking for CSV export
+    metrics_history = []
+
     # ====================================================================
     # STAGE 1: PRETRAIN ON SYNTHETIC DATA
     # ====================================================================
@@ -545,6 +549,7 @@ def main(cfg: DictConfig) -> None:
         console.print(create_results_table(epoch, metrics_val, session="Stage1-Val"))
 
         # Log to MLflow and TensorBoard
+        metrics_train["learning_rate"] = optimizer.param_groups[0]["lr"]
         log_metrics_to_tensorboard(
             writer=writer, metrics=metrics_train, prefix="stage1_train", epoch=epoch
         )
@@ -556,6 +561,14 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_metric(f"stage1_train_{key}", value, step=epoch)
         for key, value in metrics_val.items():
             mlflow.log_metric(f"stage1_val_{key}", value, step=epoch)
+
+        # Store metrics for CSV export
+        epoch_metrics = {"epoch": epoch, "stage": 1}
+        for name, value in metrics_train.items():
+            epoch_metrics[f"train_{name}"] = value
+        for name, value in metrics_val.items():
+            epoch_metrics[f"val_{name}"] = value
+        metrics_history.append(epoch_metrics)
 
         # Scheduler step
         current_metric = metrics_val[pcfg.experiment.compare_metric]
@@ -668,6 +681,7 @@ def main(cfg: DictConfig) -> None:
         console.print(create_results_table(epoch, metrics_val, session="Stage2-Val"))
 
         # Log to MLflow and TensorBoard
+        metrics_train["learning_rate"] = optimizer.param_groups[0]["lr"]
         log_metrics_to_tensorboard(
             writer=writer, metrics=metrics_train, prefix="stage2_train", epoch=epoch
         )
@@ -679,6 +693,14 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_metric(f"stage2_train_{key}", value, step=epoch)
         for key, value in metrics_val.items():
             mlflow.log_metric(f"stage2_val_{key}", value, step=epoch)
+
+        # Store metrics for CSV export
+        epoch_metrics = {"epoch": epoch, "stage": 2}
+        for name, value in metrics_train.items():
+            epoch_metrics[f"train_{name}"] = value
+        for name, value in metrics_val.items():
+            epoch_metrics[f"val_{name}"] = value
+        metrics_history.append(epoch_metrics)
 
         # Scheduler step
         current_metric = metrics_val[pcfg.experiment.compare_metric]
@@ -788,6 +810,27 @@ def main(cfg: DictConfig) -> None:
         f"Final Test {pcfg.experiment.compare_metric}: "
         f"{metrics_test[pcfg.experiment.compare_metric]:.4f}"
     )
+
+    # Save metrics history to CSV
+    if metrics_history:
+        run_name = f"{pcfg.model.name}_{pcfg.experiment.experiment_strategy}"
+        metrics_csv_path = output_dir / f"{run_name}_metrics.csv"
+
+        console.print(
+            f"Creating metrics CSV with {len(metrics_history)} rows",
+            style="info",
+        )
+
+        with open(metrics_csv_path, "w", newline="") as f:
+            fieldnames = metrics_history[0].keys()
+            writer_csv = csv.DictWriter(f, fieldnames=fieldnames)
+            writer_csv.writeheader()
+            writer_csv.writerows(metrics_history)
+
+        console.print(f"Metrics saved to {metrics_csv_path}", style="green")
+
+        # Log CSV to MLflow
+        mlflow.log_artifact(str(metrics_csv_path))
 
     # Log artifacts to MLflow
     mlflow.log_artifact(str(final_model_path))
