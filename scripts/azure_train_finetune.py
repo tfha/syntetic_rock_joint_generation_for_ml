@@ -499,9 +499,14 @@ def main(cfg: DictConfig) -> None:
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
     writer = SummaryWriter(str(tensorboard_dir))
 
-    # Output directory for model checkpoints
+    # Output directory for model checkpoints and images
     output_dir = Path("outputs/models")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create directory for example images (unified structure with SimpleMixed)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    example_images_dir = output_dir / "example_images" / timestamp
+    example_images_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize metrics tracking for CSV export
     metrics_history = []
@@ -592,7 +597,7 @@ def main(cfg: DictConfig) -> None:
         # Save predictions periodically
         if epoch % 5 == 0 or epoch == 1:
             # Train predictions (synthetic) with original images
-            train_viz_dir = output_dir / f"stage1_train_predictions_epoch{epoch}"
+            train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage1_train"
             train_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
@@ -604,7 +609,7 @@ def main(cfg: DictConfig) -> None:
             )
 
             # Validation predictions
-            val_viz_dir = output_dir / f"stage1_val_predictions_epoch{epoch}"
+            val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage1_val"
             val_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
@@ -724,7 +729,7 @@ def main(cfg: DictConfig) -> None:
         # Save predictions periodically
         if epoch % 5 == 0:
             # Train predictions (real) with original images
-            train_viz_dir = output_dir / f"stage2_train_predictions_epoch{epoch}"
+            train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_train"
             train_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
@@ -736,7 +741,7 @@ def main(cfg: DictConfig) -> None:
             )
 
             # Validation predictions
-            val_viz_dir = output_dir / f"stage2_val_predictions_epoch{epoch}"
+            val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_val"
             val_viz_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model=model,
@@ -785,7 +790,7 @@ def main(cfg: DictConfig) -> None:
         mlflow.log_metric(f"test_{key}", value)
 
     # Save final predictions
-    final_viz_dir = output_dir / "final_test_predictions"
+    final_viz_dir = example_images_dir / "final" / "test"
     final_viz_dir.mkdir(parents=True, exist_ok=True)
     save_image_predictions(
         model=model,

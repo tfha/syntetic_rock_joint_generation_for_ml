@@ -240,8 +240,8 @@ def main(cfg: DictConfig) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)
 
-    # Create directory for example images
-    example_images_dir = output_dir / "example_images" / timestamp
+    # Create directory for example images (unified structure with FineTune)
+    example_images_dir = models_dir / "example_images" / timestamp
     example_images_dir.mkdir(parents=True, exist_ok=True)
 
     # 3. Set random seed and device
@@ -680,18 +680,40 @@ def main(cfg: DictConfig) -> None:
 
         # Save end-of-training predictions on validation set (if not empty)
         if len(val_loader.dataset) > 0:
-            end_of_training_dir = plots_dir / "end_of_training"
-            end_of_training_dir.mkdir(parents=True, exist_ok=True)
+            final_val_dir = example_images_dir / "final" / "validation"
+            final_val_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
                 model,
                 val_loader,
                 device,
                 num_samples=10,
-                save_dir=end_of_training_dir,
+                save_dir=final_val_dir,
             )
-            mlflow.log_artifacts(
-                str(end_of_training_dir), "end_of_training_predictions"
-            )
+            mlflow.log_artifacts(str(final_val_dir), "final_validation_predictions")
+
+        # Save final test predictions
+        final_test_dir = example_images_dir / "final" / "test"
+        final_test_dir.mkdir(parents=True, exist_ok=True)
+        save_image_predictions(
+            model,
+            test_loader,
+            device,
+            num_samples=10,
+            save_dir=final_test_dir,
+        )
+        mlflow.log_artifacts(str(final_test_dir), "final_test_predictions")
+
+        # Save final model
+        final_test_dir = example_images_dir / "final" / "test"
+        final_test_dir.mkdir(parents=True, exist_ok=True)
+        save_image_predictions(
+            model,
+            test_loader,
+            device,
+            num_samples=10,
+            save_dir=final_test_dir,
+        )
+        mlflow.log_artifacts(str(final_test_dir), "final_test_predictions")
 
         # Save final model
         final_model_path = models_dir / "final_model.pth"
