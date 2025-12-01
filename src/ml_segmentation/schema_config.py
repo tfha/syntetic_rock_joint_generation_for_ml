@@ -360,6 +360,14 @@ class ExperimentConfig(BaseModel):
             "improvement for early stopping."
         ),
     )
+    finetune_pretrain_patience: int = Field(
+        10,
+        description=(
+            "Patience for early stopping in Stage 1 (synthetic pretraining) "
+            "of fine-tuning experiments. Monitors validation performance on "
+            "real data."
+        ),
+    )
     optional_transforms: bool | TransformConfig = Field(
         False,
         description=(

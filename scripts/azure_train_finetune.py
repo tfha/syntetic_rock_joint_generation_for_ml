@@ -570,16 +570,18 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_metric(f"stage1_val_{key}", value, step=epoch)
 
         # Store metrics for CSV export
-        epoch_metrics = {"epoch": epoch, "stage": 1}
+        epoch_metrics: dict[str, int | float] = {"epoch": epoch, "stage": 1}
         for name, value in metrics_train.items():
             epoch_metrics[f"train_{name}"] = value
         for name, value in metrics_val.items():
             epoch_metrics[f"val_{name}"] = value
         metrics_history.append(epoch_metrics)
 
-        # Scheduler step
+        # Scheduler step (monitor validation loss like SimpleMixed)
+        scheduler.step(metrics_val["loss"])
+
+        # Track metric for early stopping and best model
         current_metric = metrics_val[pcfg.experiment.compare_metric]
-        scheduler.step(current_metric)
 
         # Track best model
         if current_metric > best_stage1_metric:
@@ -709,9 +711,11 @@ def main(cfg: DictConfig) -> None:
             epoch_metrics[f"val_{name}"] = value
         metrics_history.append(epoch_metrics)
 
-        # Scheduler step
+        # Scheduler step (monitor validation loss like SimpleMixed)
+        scheduler.step(metrics_val["loss"])
+
+        # Track metric for early stopping and best model
         current_metric = metrics_val[pcfg.experiment.compare_metric]
-        scheduler.step(current_metric)
 
         # Track best model
         if current_metric > best_stage2_metric:
