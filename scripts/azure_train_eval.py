@@ -689,7 +689,9 @@ def main(cfg: DictConfig) -> None:
                 num_samples=10,
                 save_dir=final_val_dir,
             )
-            mlflow.log_artifacts(str(final_val_dir), "final_validation_predictions")
+            mlflow.log_artifacts(
+                str(final_val_dir), f"example_images/{timestamp}/final/validation"
+            )
 
         # Save final test predictions
         final_test_dir = example_images_dir / "final" / "test"
@@ -701,19 +703,9 @@ def main(cfg: DictConfig) -> None:
             num_samples=10,
             save_dir=final_test_dir,
         )
-        mlflow.log_artifacts(str(final_test_dir), "final_test_predictions")
-
-        # Save final model
-        final_test_dir = example_images_dir / "final" / "test"
-        final_test_dir.mkdir(parents=True, exist_ok=True)
-        save_image_predictions(
-            model,
-            test_loader,
-            device,
-            num_samples=10,
-            save_dir=final_test_dir,
+        mlflow.log_artifacts(
+            str(final_test_dir), f"example_images/{timestamp}/final/test"
         )
-        mlflow.log_artifacts(str(final_test_dir), "final_test_predictions")
 
         # Save final model
         final_model_path = models_dir / "final_model.pth"
