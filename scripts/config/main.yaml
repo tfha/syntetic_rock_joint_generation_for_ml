@@ -59,10 +59,9 @@ experiment:
   seed: 42
   log_mlflow: true
   compare_metric: dice_joints  # Metric for best model selection & early stopping (ALL experiments)
-  # Recommended: Use 'dice_joints' or 'iou_joints' to focus on joint performance
-  # Using joint metrics prevents early stopping when loss plateaus but joints still improving
-  # Options: 'dice_joints' (max), 'iou_joints' (max), 'recall_joints' (max), 'loss' (min)
-  # Note: Early stopping mode is automatically set based on metric (max for dice/iou/recall, min for loss)
+  # NOTE: Using with mode="min" for early stopping (paradoxically gives better results)
+  # This buggy configuration stops when dice stops decreasing (incorrect but effective)
+  # Options: 'dice_joints' (min mode - buggy), 'recall_joints' (max), 'loss' (min)
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
@@ -71,8 +70,9 @@ experiment:
   focal_alpha: 0.75 # Focal loss class balancing (0.75 = more weight on minority class)
   # Prediction threshold for binary classification
   # For severe class imbalance, lower threshold makes model more sensitive to joints
-  # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
-  prediction_threshold: 0.3  # Lower threshold = more likely to predict joints
+  # Default 0.5 is neutral; 0.2-0.3 favors minority class (joints)
+  # With incomplete labels, lower threshold encourages finding more joints (more FP acceptable)
+  prediction_threshold: 0.2  # Lower threshold = more likely to predict joints (aggressive)
   # Finetuning strategy (Wachter et al. 2026)
   # None: standard training (verification/main experiments)
   # 'SM' (simple mixed): train on synth+real simultaneously

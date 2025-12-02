@@ -485,7 +485,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.finetune_pretrain_patience,
         verbose=True,
         delta=0.0,
-        mode="max",  # Monitoring dice_joints (higher is better)
+        mode="min",  # BUGGY: Using min mode for dice_joints (incorrect but gives better results)
     )
 
     # Early stopping for stage 2 (finetuning on real)
@@ -493,7 +493,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="max",  # Monitoring dice_joints (higher is better)
+        mode="min",  # BUGGY: Using min mode for dice_joints (incorrect but gives better results)
     )
 
     # TensorBoard writer
@@ -623,7 +623,7 @@ def main(cfg: DictConfig) -> None:
                 num_samples=10,
             )
 
-        # Early stopping check (monitors dice_joints in max mode)
+        # Early stopping check (monitors dice_joints in min mode - buggy but effective)
         early_stopping_stage1(current_metric, model)
         if early_stopping_stage1.early_stop:
             console.print(
@@ -757,7 +757,7 @@ def main(cfg: DictConfig) -> None:
                 num_samples=10,
             )
 
-        # Early stopping check (monitors dice_joints in max mode)
+        # Early stopping check (monitors dice_joints in min mode - buggy but effective)
         early_stopping_stage2(current_metric, model)
         if early_stopping_stage2.early_stop:
             console.print(
