@@ -439,6 +439,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
+        mode="max",  # Monitoring dice_joints (higher is better)
     )
 
     # Initialize metrics tracking for CSV export
@@ -620,7 +621,9 @@ def main(cfg: DictConfig) -> None:
 
             # Check early stopping condition
             if not pcfg.experiment.sanity_check_num_batches:
-                early_stopping(metrics_validation["loss"], model)
+                early_stopping(
+                    metrics_validation[pcfg.experiment.compare_metric], model
+                )  # Monitor dice_joints (max mode)
                 if early_stopping.early_stop:
                     console.print("Early stopping triggered", style="warning")
                     break

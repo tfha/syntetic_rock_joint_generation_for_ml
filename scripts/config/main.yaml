@@ -58,10 +58,11 @@ azure_data_assets:
 experiment:
   seed: 42
   log_mlflow: true
-  compare_metric: dice_joints  # Metric for best model selection & early stopping
+  compare_metric: dice_joints  # Metric for best model selection & early stopping (ALL experiments)
   # Recommended: Use 'dice_joints' or 'iou_joints' to focus on joint performance
   # Using joint metrics prevents early stopping when loss plateaus but joints still improving
-  # Options: 'loss' (min), 'iou_joints' (max), 'dice_joints' (max), 'recall_joints' (max)
+  # Options: 'dice_joints' (max), 'iou_joints' (max), 'recall_joints' (max), 'loss' (min)
+  # Note: Early stopping mode is automatically set based on metric (max for dice/iou/recall, min for loss)
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
@@ -110,7 +111,6 @@ experiment:
   early_stopping_patience: 10  # General early stopping patience (SimpleMixed, FT Stage 2)
   early_stopping_delta: 0.005  # Min improvement in compare_metric (dice_joints)
   finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
-  # Note: After metrics fix, consider changing compare_metric from 'loss' to 'iou_joints' or 'dice_joints'
   optional_transforms:
     random_crop: true
     horizontal_flip: true
