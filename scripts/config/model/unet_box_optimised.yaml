@@ -5,6 +5,7 @@ num_epochs: 50
 batch_size: 4
 learning_rate: 0.00030906469407023527
 scheduler:
+  mode: max      # Correct mode for dice_joints (should increase)
   patience: 7
   gamma: 0.11197940328365186
 params:

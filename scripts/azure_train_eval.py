@@ -429,7 +429,7 @@ def main(cfg: DictConfig) -> None:
     # Learning rate scheduler
     scheduler = ReduceLROnPlateau(
         optimizer,
-        mode="min",
+        mode=pcfg.model.scheduler.mode,  # Use mode from config (max for dice_joints)
         factor=pcfg.model.scheduler.gamma,
         patience=pcfg.model.scheduler.patience,
     )

@@ -3,8 +3,9 @@ num_epochs: 100  # Increased from 50 to give more time for joint learning
 batch_size: 8  # Matching UNet and DeepLabV3+ batch size (reduced from 64 due to memory constraints)
 learning_rate: 0.001
 scheduler:
-  patience: 3  # Wait 3 epochs before reducing LR (was 5)
-  gamma: 0.5   # Reduce LR by 2x instead of 10x (was 0.1)
+  mode: max      # Correct mode for dice_joints (should increase)
+  patience: 5    # Increased from 3 to allow more exploration before LR reduction
+  gamma: 0.5     # Reduce LR by 2x instead of 10x (was 0.1)
 params:
   encoder_name: 'resnet34'
   encoder_depth: 5
