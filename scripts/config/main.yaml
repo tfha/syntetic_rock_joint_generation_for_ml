@@ -58,10 +58,10 @@ azure_data_assets:
 experiment:
   seed: 42
   log_mlflow: true
-  compare_metric: dice_joints  # Metric for best model selection & early stopping (ALL experiments)
-  # Monitor dice_joints to balance finding unlabeled joints (recall) with limiting noise (precision)
-  # With mode=max + delta=0.005, stops when dice improvements <0.5% (prevents thick joints from overfitting)
-  # Options: 'loss' (min), 'dice_joints' (max - balanced), 'dice' (max), 'recall_joints' (max)
+  compare_metric: dice_joints  # Metric for best model selection & early stopping
+  # kind_carnival paradox: mode=min with dice_joints creates fixed 10-epoch timer
+  # This worked better than mode=max because it avoids metric volatility
+  # Best model still saved correctly via hardcoded > comparison (mode=max behavior)
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
@@ -107,8 +107,8 @@ experiment:
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
   # Early stopping configuration
-  early_stopping_patience: 5  # SimpleMixed and FT Stage 2 patience
-  early_stopping_delta: 0.005  # Min improvement in compare_metric (0.5% threshold)
+  early_stopping_patience: 10  # Fixed timer: always runs for 10 epochs in Stage 2 (kind_carnival)
+  early_stopping_delta: 0.005  # Not used with mode=min for dice_joints (backwards logic)
   finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
   optional_transforms:
     random_crop: true

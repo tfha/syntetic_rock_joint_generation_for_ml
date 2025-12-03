@@ -439,7 +439,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="max",  # Correct mode for dice_joints (stops when improvements plateau)
+        mode="min",  # Creates fixed timer (kind_carnival setting)
     )
 
     # Initialize metrics tracking for CSV export

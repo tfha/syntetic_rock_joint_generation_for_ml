@@ -485,7 +485,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.finetune_pretrain_patience,
         verbose=True,
         delta=0.0,
-        mode="max",  # Correct mode for dice_joints (prevents overfitting)
+        mode="min",  # Creates fixed timer - stops after patience epochs regardless of dice_joints
     )
 
     # Early stopping for stage 2 (finetuning on real)
@@ -493,7 +493,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="max",  # Correct mode for dice_joints (stops when improvements plateau, prevents thick joints)
+        mode="min",  # Creates fixed 10-epoch timer (kind_carnival setting that worked better)
     )
 
     # TensorBoard writer
@@ -579,11 +579,9 @@ def main(cfg: DictConfig) -> None:
             epoch_metrics[f"val_{name}"] = value
         metrics_history.append(epoch_metrics)
 
-        # Scheduler step (monitor validation loss like SimpleMixed)
-        scheduler.step(metrics_val["loss"])
-
-        # Track metric for early stopping and best model
+        # Scheduler step
         current_metric = metrics_val[pcfg.experiment.compare_metric]
+        scheduler.step(current_metric)
 
         # Track best model
         if current_metric > best_stage1_metric:
@@ -599,7 +597,7 @@ def main(cfg: DictConfig) -> None:
             )
 
         # Save predictions periodically
-        if epoch % 5 == 0 or epoch == 1:
+        if epoch % 5 == 0:
             # Train predictions (synthetic) with original images
             train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage1_train"
             train_viz_dir.mkdir(parents=True, exist_ok=True)
@@ -713,11 +711,9 @@ def main(cfg: DictConfig) -> None:
             epoch_metrics[f"val_{name}"] = value
         metrics_history.append(epoch_metrics)
 
-        # Scheduler step (monitor validation loss like SimpleMixed)
-        scheduler.step(metrics_val["loss"])
-
-        # Track metric for early stopping and best model
+        # Scheduler step
         current_metric = metrics_val[pcfg.experiment.compare_metric]
+        scheduler.step(current_metric)
 
         # Track best model
         if current_metric > best_stage2_metric:
@@ -732,31 +728,32 @@ def main(cfg: DictConfig) -> None:
                 style="green",
             )
 
-        # Save predictions every epoch in Stage 2 to track progression
-        # Train predictions (real) with original images
-        train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_train"
-        train_viz_dir.mkdir(parents=True, exist_ok=True)
-        save_image_predictions(
-            model=model,
-            dataloader=train_real_loader,
-            device=device,
-            save_dir=train_viz_dir,
-            num_samples=10,
-            show_original=True,
-        )
+        # Save predictions periodically
+        if epoch % 5 == 0:
+            # Train predictions (real) with original images
+            train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_train"
+            train_viz_dir.mkdir(parents=True, exist_ok=True)
+            save_image_predictions(
+                model=model,
+                dataloader=train_real_loader,
+                device=device,
+                save_dir=train_viz_dir,
+                num_samples=10,
+                show_original=True,
+            )
 
-        # Validation predictions
-        val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_val"
-        val_viz_dir.mkdir(parents=True, exist_ok=True)
-        save_image_predictions(
-            model=model,
-            dataloader=val_loader,
-            device=device,
-            save_dir=val_viz_dir,
-            num_samples=10,
-        )
+            # Validation predictions
+            val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_val"
+            val_viz_dir.mkdir(parents=True, exist_ok=True)
+            save_image_predictions(
+                model=model,
+                dataloader=val_loader,
+                device=device,
+                save_dir=val_viz_dir,
+                num_samples=10,
+            )
 
-        # Early stopping check (monitors dice_joints in min mode - buggy but effective)
+        # Early stopping check
         early_stopping_stage2(current_metric, model)
         if early_stopping_stage2.early_stop:
             console.print(
