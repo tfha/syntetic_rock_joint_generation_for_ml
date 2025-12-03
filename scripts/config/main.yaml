@@ -70,9 +70,8 @@ experiment:
   focal_alpha: 0.75 # Focal loss class balancing (0.75 = more weight on minority class)
   # Prediction threshold for binary classification
   # For severe class imbalance, lower threshold makes model more sensitive to joints
-  # Default 0.5 is neutral; 0.2-0.3 favors minority class (joints)
-  # With incomplete labels, lower threshold encourages finding more joints (more FP acceptable)
-  prediction_threshold: 0.2  # Lower threshold = more likely to predict joints (aggressive)
+  # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
+  prediction_threshold: 0.3  # Lower threshold = more likely to predict joints (kind_carnival setting)
   # Finetuning strategy (Wachter et al. 2026)
   # None: standard training (verification/main experiments)
   # 'SM' (simple mixed): train on synth+real simultaneously
@@ -109,7 +108,7 @@ experiment:
     #   test_fraction: 1.0    # Use ALL real-world data for testing
   # Early stopping configuration
   early_stopping_patience: 10  # SimpleMixed and FT Stage 2 patience
-  early_stopping_delta: 0.0  # No minimum improvement threshold
+  early_stopping_delta: 0.005  # Min improvement in compare_metric (kind_carnival setting)
   finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
   optional_transforms:
     random_crop: true
