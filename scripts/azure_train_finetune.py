@@ -732,30 +732,29 @@ def main(cfg: DictConfig) -> None:
                 style="green",
             )
 
-        # Save predictions periodically
-        if epoch % 5 == 0:
-            # Train predictions (real) with original images
-            train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_train"
-            train_viz_dir.mkdir(parents=True, exist_ok=True)
-            save_image_predictions(
-                model=model,
-                dataloader=train_real_loader,
-                device=device,
-                save_dir=train_viz_dir,
-                num_samples=10,
-                show_original=True,
-            )
+        # Save predictions every epoch in Stage 2 to track progression
+        # Train predictions (real) with original images
+        train_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_train"
+        train_viz_dir.mkdir(parents=True, exist_ok=True)
+        save_image_predictions(
+            model=model,
+            dataloader=train_real_loader,
+            device=device,
+            save_dir=train_viz_dir,
+            num_samples=10,
+            show_original=True,
+        )
 
-            # Validation predictions
-            val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_val"
-            val_viz_dir.mkdir(parents=True, exist_ok=True)
-            save_image_predictions(
-                model=model,
-                dataloader=val_loader,
-                device=device,
-                save_dir=val_viz_dir,
-                num_samples=10,
-            )
+        # Validation predictions
+        val_viz_dir = example_images_dir / f"epoch_{epoch}" / "stage2_val"
+        val_viz_dir.mkdir(parents=True, exist_ok=True)
+        save_image_predictions(
+            model=model,
+            dataloader=val_loader,
+            device=device,
+            save_dir=val_viz_dir,
+            num_samples=10,
+        )
 
         # Early stopping check (monitors dice_joints in min mode - buggy but effective)
         early_stopping_stage2(current_metric, model)
