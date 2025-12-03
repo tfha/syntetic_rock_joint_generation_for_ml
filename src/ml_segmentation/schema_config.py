@@ -54,6 +54,7 @@ def _require_hydra() -> "hydra":
 
 
 class Scheduler(BaseModel):
+    mode: str = "max"  # "min" or "max" - direction for improvement detection
     patience: int
     gamma: float
 
