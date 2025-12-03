@@ -108,7 +108,7 @@ experiment:
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
   # Early stopping configuration
-  early_stopping_patience: 5  # Standard patience - best model saved automatically
+  early_stopping_patience: 10  # SimpleMixed and FT Stage 2 patience
   early_stopping_delta: 0.0  # No minimum improvement threshold
   finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
   optional_transforms:
