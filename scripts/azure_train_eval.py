@@ -439,7 +439,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="min",  # BUGGY: Using min mode for dice_joints (incorrect but gives better results)
+        mode="max",  # Correct mode for dice_joints (stops when improvements plateau)
     )
 
     # Initialize metrics tracking for CSV export

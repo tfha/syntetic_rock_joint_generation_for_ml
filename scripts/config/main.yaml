@@ -60,8 +60,8 @@ experiment:
   log_mlflow: true
   compare_metric: dice_joints  # Metric for best model selection & early stopping (ALL experiments)
   # Monitor dice_joints to balance finding unlabeled joints (recall) with limiting noise (precision)
-  # Dice = 2*TP/(2*TP+FP+FN) encourages high recall while penalizing excessive false positives
-  # Options: 'loss' (min - conservative), 'dice_joints' (max - balanced), 'recall_joints' (max - aggressive)
+  # With mode=max + delta=0.005, stops when dice improvements <0.5% (prevents thick joints from overfitting)
+  # Options: 'loss' (min), 'dice_joints' (max - balanced), 'dice' (max), 'recall_joints' (max)
   # Loss function configuration (using standard segmentation_models_pytorch library)
   loss_function: dice # Options: dice (V-Net 2016), focal (Lin et al. 2017)
   focal_gamma: 2.0  # Focal loss focusing parameter (default from paper: 2.0)
@@ -107,8 +107,8 @@ experiment:
     #   val_fraction: 0.0     # No validation (test is different distribution)
     #   test_fraction: 1.0    # Use ALL real-world data for testing
   # Early stopping configuration
-  early_stopping_patience: 10  # SimpleMixed and FT Stage 2 patience
-  early_stopping_delta: 0.005  # Min improvement in compare_metric (kind_carnival setting)
+  early_stopping_patience: 5  # SimpleMixed and FT Stage 2 patience
+  early_stopping_delta: 0.005  # Min improvement in compare_metric (0.5% threshold)
   finetune_pretrain_patience: 10  # Early stopping patience for FT Stage 1 (pretrain on synthetic)
   optional_transforms:
     random_crop: true

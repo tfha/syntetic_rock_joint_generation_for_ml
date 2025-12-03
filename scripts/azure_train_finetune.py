@@ -485,7 +485,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.finetune_pretrain_patience,
         verbose=True,
         delta=0.0,
-        mode="min",  # Using min mode for dice_joints (matches kind_carnival default)
+        mode="max",  # Correct mode for dice_joints (prevents overfitting)
     )
 
     # Early stopping for stage 2 (finetuning on real)
@@ -493,7 +493,7 @@ def main(cfg: DictConfig) -> None:
         patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="min",  # Using min mode for dice_joints (matches kind_carnival default)
+        mode="max",  # Correct mode for dice_joints (stops when improvements plateau, prevents thick joints)
     )
 
     # TensorBoard writer
