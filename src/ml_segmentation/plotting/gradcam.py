@@ -90,6 +90,10 @@ class GradCAM:
         # Set to eval mode but ensure gradients are enabled for GradCAM
         self.model.eval()
 
+        # Ensure model parameters require gradients (critical for backward pass)
+        for param in self.model.parameters():
+            param.requires_grad = True
+
         # Ensure input requires gradients
         input_image = input_image.requires_grad_(True)
 
