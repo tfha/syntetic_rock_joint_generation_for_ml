@@ -144,7 +144,7 @@ class GradCAM:
         )
 
         # Normalize to [0, 1]
-        cam_np = cam.squeeze().cpu().numpy()
+        cam_np = cam.squeeze().detach().cpu().numpy()
         cam_np = cam_np - cam_np.min()
         cam_max = cam_np.max()
         if cam_max > 0:

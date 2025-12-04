@@ -79,9 +79,6 @@ from ml_segmentation.azure_data_loading import (  # noqa: E402
 from ml_segmentation.data_loading import get_datasets_prefixes  # noqa: E402
 from ml_segmentation.debug_functionality import better_traceback  # noqa: E402
 from ml_segmentation.define_model import choose_model  # noqa: E402
-from ml_segmentation.plotting.gradcam import (  # noqa: E402
-    generate_gradcam_visualizations,
-)
 from ml_segmentation.schema_config import ConfigSchema  # noqa: E402
 from ml_segmentation.train_eval_funcs import (  # noqa: E402
     EarlyStopping,
@@ -860,31 +857,6 @@ def main(cfg: DictConfig) -> None:
             mlflow.log_artifact(str(output_dir / "best_metrics.txt"))
 
         # Generate GradCAM visualizations if enabled
-        if pcfg.experiment.generate_gradcam:
-            console.print(
-                "\n[bold blue]═══ Generating GradCAM Visualizations ═══[/bold blue]"
-            )
-            try:
-                generate_gradcam_visualizations(
-                    model=model,
-                    dataloader=val_loader,
-                    device=device,
-                    save_dir=output_dir,
-                    num_samples=pcfg.experiment.gradcam_samples,
-                    threshold=pcfg.experiment.prediction_threshold,
-                )
-                # Log GradCAM artifacts to MLflow
-                gradcam_dir = output_dir / "gradcam"
-                if gradcam_dir.exists():
-                    mlflow.log_artifacts(str(gradcam_dir), artifact_path="gradcam")
-                    console.print(
-                        "[green]✓ GradCAM visualizations logged to MLflow[/green]"
-                    )
-            except Exception as e:
-                console.print(
-                    f"[yellow]Warning: GradCAM generation failed: {e}[/yellow]"
-                )
-
         # Mark training as completed
         mlflow.log_param("training_status", "completed")
         mlflow.log_metric("total_training_time", time.time() - start_time)
