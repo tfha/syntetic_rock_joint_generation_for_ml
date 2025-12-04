@@ -92,6 +92,7 @@ def setup_azure_dataloader(
     device: torch.device | None = None,
     pin_memory: bool | None = None,
     persistent_workers: bool | None = None,
+    generator: torch.Generator | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
@@ -104,7 +105,12 @@ def setup_azure_dataloader(
         batch_size: Batch size for the dataloaders
         num_workers: Number of workers for data loading
         optional_transforms: Whether to use optional data augmentation
+        transforms_parameters: Dictionary of transform parameters (e.g., crop_size)
         splits_path: Path to the directory containing registered splits
+        device: Device to use for determining pin_memory setting
+        pin_memory: Whether to use pinned memory (None for auto-detect)
+        persistent_workers: Whether to use persistent workers (None for auto-detect)
+        generator: Random generator for reproducible shuffling
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
@@ -261,6 +267,7 @@ def setup_azure_dataloader(
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
+        generator=generator,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -269,6 +276,7 @@ def setup_azure_dataloader(
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
+        generator=generator,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -277,6 +285,7 @@ def setup_azure_dataloader(
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
+        generator=generator,
     )
 
     return train_loader, val_loader, test_loader

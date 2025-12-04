@@ -137,6 +137,7 @@ def create_dataloader_from_files(
     pin_memory: bool = True,
     persistent_workers: bool = False,
     return_original: bool = False,
+    generator: torch.Generator | None = None,
 ) -> DataLoader:
     """Create a dataloader from a list of files using SegmentationDataset."""
     dataset = SegmentationDataset(
@@ -153,6 +154,7 @@ def create_dataloader_from_files(
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
+        generator=generator,
     )
 
 
@@ -179,6 +181,11 @@ def main(cfg: DictConfig) -> None:
 
     # Setup
     seed_everything(pcfg.experiment.seed)
+
+    # Create generator for reproducible DataLoader
+    generator = torch.Generator()
+    generator.manual_seed(pcfg.experiment.seed)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
 
@@ -379,6 +386,7 @@ def main(cfg: DictConfig) -> None:
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
         return_original=True,
+        generator=generator,
     )
 
     # Stage 2: Real data loader
@@ -393,6 +401,7 @@ def main(cfg: DictConfig) -> None:
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
         return_original=True,
+        generator=generator,
     )
 
     # Validation and test loaders (100% real data)
@@ -406,6 +415,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=False,
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
+        generator=generator,
     )
 
     test_loader = create_dataloader_from_files(
@@ -418,6 +428,7 @@ def main(cfg: DictConfig) -> None:
         shuffle=False,
         pin_memory=pin_memory_flag,
         persistent_workers=persistent_workers_flag,
+        generator=generator,
     )
 
     console.print(

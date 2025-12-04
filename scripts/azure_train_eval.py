@@ -250,6 +250,11 @@ def main(cfg: DictConfig) -> None:
     # 3. Set random seed and device
     ########################################################################
     seed_everything(pcfg.experiment.seed)
+
+    # Create generator for reproducible DataLoader
+    generator = torch.Generator()
+    generator.manual_seed(pcfg.experiment.seed)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     console.print(f"Using device: {device}", style="info")
 
@@ -369,6 +374,7 @@ def main(cfg: DictConfig) -> None:
         device=device,  # let function decide pin_memory
         pin_memory=None,  # auto: True on CUDA, False on CPU
         persistent_workers=None,  # auto: True if num_workers > 0
+        generator=generator,
     )
 
     # 6. Initialize model architecture
