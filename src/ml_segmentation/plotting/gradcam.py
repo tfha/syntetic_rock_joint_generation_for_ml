@@ -11,12 +11,21 @@ References:
 
 from pathlib import Path
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 from numpy.typing import NDArray
+
+# Optional dependency: OpenCV (cv2)
+# If not available, GradCAM visualization will be skipped
+try:
+    import cv2
+
+    HAS_OPENCV = True
+except ImportError:
+    HAS_OPENCV = False
+    cv2 = None  # type: ignore
 
 
 class GradCAM:
@@ -146,7 +155,7 @@ def overlay_heatmap(
     image: NDArray[np.uint8],
     heatmap: NDArray[np.float32],
     alpha: float = 0.4,
-    colormap: int = cv2.COLORMAP_JET,
+    colormap: int | None = None,
 ) -> NDArray[np.uint8]:
     """
     Overlay GradCAM heatmap on original image.
@@ -156,14 +165,23 @@ def overlay_heatmap(
         heatmap: GradCAM heatmap (H, W) in range [0, 1]
         alpha: Blending factor (0=only image, 1=only heatmap)
         colormap: OpenCV colormap (default: JET = red=high, blue=low)
+                 Only used if OpenCV is available
 
     Returns:
         Overlayed image (H, W, 3) in range [0, 255]
     """
-    # Convert heatmap to RGB using colormap
-    heatmap_uint8 = (heatmap * 255).astype(np.uint8)
-    heatmap_colored = cv2.applyColorMap(heatmap_uint8, colormap)
-    heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+    if not HAS_OPENCV:
+        # Fallback: simple matplotlib-based colormap if OpenCV not available
+        import matplotlib.cm as cm
+
+        heatmap_colored = (cm.jet(heatmap)[:, :, :3] * 255).astype(np.uint8)
+    else:
+        # Convert heatmap to RGB using OpenCV colormap
+        if colormap is None:
+            colormap = cv2.COLORMAP_JET  # type: ignore
+        heatmap_uint8 = (heatmap * 255).astype(np.uint8)
+        heatmap_colored = cv2.applyColorMap(heatmap_uint8, colormap)  # type: ignore
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)  # type: ignore
 
     # Blend image and heatmap
     overlayed = (1 - alpha) * image + alpha * heatmap_colored
@@ -191,6 +209,12 @@ def generate_gradcam_visualizations(
         num_samples: Number of samples to visualize
         threshold: Prediction threshold
     """
+    if not HAS_OPENCV:
+        print(
+            "Warning: OpenCV (cv2) not available. GradCAM will use matplotlib "
+            "colormap fallback (slightly different colors than OpenCV JET)."
+        )
+
     # Identify target layer (last encoder layer for U-Net with ResNet)
     target_layer = _get_target_layer(model)
 

@@ -33,6 +33,7 @@ RUN python -m pip install \
     "pandas==2.2.3" \
     "pillow==11.0.0" \
     "matplotlib==3.9.2" \
+    "opencv-python==4.10.0.84" \
     "colorama==0.4.6" \
     "rich==13.4.2" \
     "toml==0.10.2"
@@ -59,7 +60,7 @@ faulthandler.enable()
 checks = (
     "numpy","scipy","torch","matplotlib","pandas",
     "segmentation_models_pytorch","timm",
-    "azure.ai.ml","marshmallow",
+    "azure.ai.ml","marshmallow","cv2",
 )
 for m in checks:
     try:
