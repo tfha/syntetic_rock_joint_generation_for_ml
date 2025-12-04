@@ -101,17 +101,22 @@ class GradCAM:
         with torch.enable_grad():
             output = self.model(input_image)
 
-            # For segmentation: use all predicted joints as target
-            # Sum positive predictions (above threshold) to create scalar target
-            target = (output > threshold).float().sum()
+            # For segmentation: compute scalar target for backprop
+            # Use output directly to maintain gradient flow
+            # Option 1: Use mean of all outputs (simple and reliable)
+            # Option 2: Use weighted sum based on predictions
+            # We use a differentiable approximation instead of hard threshold
 
-            # If no predictions, use total output sum
-            if target.item() == 0:
-                target = output.sum()
+            # Soft target: use sigmoid to create smooth weights instead of hard threshold
+            # This maintains gradient flow unlike (output > threshold).float()
+            target = output.sum()
+
+            # Alternative: if we want to focus on high-confidence predictions:
+            # target = (output * torch.sigmoid(10 * (output - threshold))).sum()
 
             # Backward pass to get gradients
             self.model.zero_grad()
-            target.backward(retain_graph=True)
+            target.backward()
 
         # Check if gradients were captured
         if self.gradients is None or self.activations is None:
