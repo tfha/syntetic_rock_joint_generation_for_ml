@@ -309,6 +309,20 @@ class ExperimentConfig(BaseModel):
             "Default 0.5 is neutral. Range: 0.1-0.9."
         ),
     )
+    generate_gradcam: bool = Field(
+        False,
+        description=(
+            "Whether to generate GradCAM visualizations for model explainability. "
+            "Creates heatmaps showing which image regions influence predictions."
+        ),
+    )
+    gradcam_samples: int = Field(
+        20,
+        description=(
+            "Number of validation samples to visualize with GradCAM. "
+            "Only used if generate_gradcam=True."
+        ),
+    )
     num_workers: int = Field(..., description="Number of workers for data loading.")
     train_fraction: float | None = Field(
         None,

@@ -72,6 +72,9 @@ experiment:
   # For severe class imbalance, lower threshold makes model more sensitive to joints
   # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
   prediction_threshold: 0.3  # Lower threshold = more likely to predict joints (kind_carnival setting)
+  # GradCAM explainability visualization
+  generate_gradcam: false  # Enable GradCAM heatmaps for model explainability
+  gradcam_samples: 20      # Number of validation samples to visualize with GradCAM
   # Finetuning strategy (Wachter et al. 2026)
   # None: standard training (verification/main experiments)
   # 'SM' (simple mixed): train on synth+real simultaneously
