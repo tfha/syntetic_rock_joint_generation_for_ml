@@ -87,22 +87,27 @@ class GradCAM:
         Returns:
             Normalized heatmap as numpy array (H, W) with values in [0, 1]
         """
+        # Set to eval mode but ensure gradients are enabled for GradCAM
         self.model.eval()
 
-        # Forward pass
-        output = self.model(input_image)
+        # Ensure input requires gradients
+        input_image = input_image.requires_grad_(True)
 
-        # For segmentation: use all predicted joints as target
-        # Sum positive predictions (above threshold) to create scalar target
-        target = (output > threshold).float().sum()
+        # Forward pass (must be inside torch.enable_grad())
+        with torch.enable_grad():
+            output = self.model(input_image)
 
-        # If no predictions, use total output sum
-        if target.item() == 0:
-            target = output.sum()
+            # For segmentation: use all predicted joints as target
+            # Sum positive predictions (above threshold) to create scalar target
+            target = (output > threshold).float().sum()
 
-        # Backward pass to get gradients
-        self.model.zero_grad()
-        target.backward(retain_graph=True)
+            # If no predictions, use total output sum
+            if target.item() == 0:
+                target = output.sum()
+
+            # Backward pass to get gradients
+            self.model.zero_grad()
+            target.backward(retain_graph=True)
 
         # Check if gradients were captured
         if self.gradients is None or self.activations is None:
@@ -253,9 +258,8 @@ def generate_gradcam_visualizations(
             # Process single image
             single_image = images[i : i + 1]
 
-            # Generate GradCAM heatmap
-            with torch.enable_grad():
-                cam = gradcam.generate_cam(single_image, threshold=threshold)
+            # Generate GradCAM heatmap (handles gradient enabling internally)
+            cam = gradcam.generate_cam(single_image, threshold=threshold)
 
             # Generate prediction
             with torch.no_grad():
