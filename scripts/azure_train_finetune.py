@@ -493,18 +493,18 @@ def main(cfg: DictConfig) -> None:
     )
     # Early stopping for stage 1 (pretraining on synthetic, validated on real)
     early_stopping_stage1 = EarlyStopping(
-        patience=pcfg.experiment.finetune_pretrain_patience,
+        patience=pcfg.experiment.early_stopping_patience,
         verbose=True,
-        delta=0.0,
-        mode="min",  # Creates fixed timer - stops after patience epochs regardless of dice_joints
+        delta=pcfg.experiment.early_stopping_delta,
+        mode="max",  # Maximize dice_joints
     )
 
     # Early stopping for stage 2 (finetuning on real)
     early_stopping_stage2 = EarlyStopping(
-        patience=pcfg.experiment.early_stopping_patience,
+        patience=pcfg.experiment.finetune_stage2_patience,
         verbose=True,
         delta=pcfg.experiment.early_stopping_delta,
-        mode="min",  # Creates fixed 10-epoch timer (kind_carnival setting that worked better)
+        mode="max",  # Maximize dice_joints
     )
 
     # TensorBoard writer
@@ -532,7 +532,7 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Training until real validation accuracy plateaus "
-        f"(patience={pcfg.experiment.early_stopping_patience} epochs)\n"
+        f"(patience={pcfg.experiment.finetune_stage2_patience} epochs)\n"
     )
 
     best_stage1_metric = 0.0
@@ -663,6 +663,19 @@ def main(cfg: DictConfig) -> None:
     console.print(
         "\n[bold yellow]═══ STAGE 2: Finetuning on Real Data ═══[/bold yellow]"
     )
+
+    # Cap learning rate for Stage 2 to prevent overfitting
+    max_stage2_lr = 3.125e-5
+    current_lr = optimizer.param_groups[0]["lr"]
+    if current_lr > max_stage2_lr:
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = max_stage2_lr
+        console.print(
+            f"[yellow]Learning rate capped: {current_lr:.2e} → {max_stage2_lr:.2e}[/yellow]"
+        )
+    else:
+        console.print(f"[green]Stage 2 learning rate: {current_lr:.2e}[/green]")
+
     remaining_epochs = pcfg.model.num_epochs - epoch
     console.print(f"Training for {remaining_epochs} more epochs on real data\n")
 

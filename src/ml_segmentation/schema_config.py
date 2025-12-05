@@ -366,7 +366,11 @@ class ExperimentConfig(BaseModel):
         ),
     )
     early_stopping_patience: int = Field(
-        ..., description="Patience for early stopping in training."
+        ...,
+        description=(
+            "Patience for early stopping in standard training "
+            "(SimpleMixed, verification experiments, and FT Stage 1)."
+        ),
     )
     early_stopping_delta: float = Field(
         ...,
@@ -375,12 +379,12 @@ class ExperimentConfig(BaseModel):
             "improvement for early stopping."
         ),
     )
-    finetune_pretrain_patience: int = Field(
-        10,
+    finetune_stage2_patience: int = Field(
+        5,
         description=(
-            "Patience for early stopping in Stage 1 (synthetic pretraining) "
-            "of fine-tuning experiments. Monitors validation performance on "
-            "real data."
+            "Patience for early stopping in Stage 2 (real fine-tuning) "
+            "of fine-tuning experiments only. Lower to prevent overfitting "
+            "with limited real data."
         ),
     )
     optional_transforms: bool | TransformConfig = Field(
