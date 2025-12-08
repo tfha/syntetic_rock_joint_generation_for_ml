@@ -1,0 +1,8 @@
+# Azure ML Batch Jobs Configuration - TEST
+# Test configuration with 2 jobs for validation
+
+# SimpleMixed - Box 50%
+unet simplemixed_box_50
+
+# Finetune - Box 50%
+unet finetune_box_50
