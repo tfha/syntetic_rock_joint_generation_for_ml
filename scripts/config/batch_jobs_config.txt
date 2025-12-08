@@ -3,5 +3,373 @@
 # Lines starting with # are comments and will be ignored
 # Empty lines are also ignored
 
-deeplabv3plus finetune_larvik_10
+# Wachter et al. (2026) - All 280 Experiments (140 strategies × 2 models)
+# Format: model experiment_strategy
+
+# ============================================================================
+# UNet Model - All 140 Experiments
+# ============================================================================
+
+# Simple Mixed (SM) - BOX (7 experiments)
+unet simplemixed_box_0
+unet simplemixed_box_10
+unet simplemixed_box_30
+unet simplemixed_box_50
+unet simplemixed_box_70
+unet simplemixed_box_90
+unet simplemixed_box_100
+
+# Simple Mixed (SM) - SLOPE (7 experiments)
+unet simplemixed_slope_0
+unet simplemixed_slope_10
+unet simplemixed_slope_30
+unet simplemixed_slope_50
+unet simplemixed_slope_70
+unet simplemixed_slope_90
+unet simplemixed_slope_100
+
+# Simple Mixed (SM) - Generalisation Pattern Box (7 experiments)
+unet simplemixed_generalisation_pattern_box_0
+unet simplemixed_generalisation_pattern_box_10
+unet simplemixed_generalisation_pattern_box_30
+unet simplemixed_generalisation_pattern_box_50
+unet simplemixed_generalisation_pattern_box_70
+unet simplemixed_generalisation_pattern_box_90
+unet simplemixed_generalisation_pattern_box_100
+
+# Simple Mixed (SM) - Pattern Box (7 experiments)
+unet simplemixed_pattern_box_0
+unet simplemixed_pattern_box_10
+unet simplemixed_pattern_box_30
+unet simplemixed_pattern_box_50
+unet simplemixed_pattern_box_70
+unet simplemixed_pattern_box_90
+unet simplemixed_pattern_box_100
+
+# Simple Mixed (SM) - Generalisation Cardboard Box (7 experiments)
+unet simplemixed_generalisation_cardboard_box_0
+unet simplemixed_generalisation_cardboard_box_10
+unet simplemixed_generalisation_cardboard_box_30
+unet simplemixed_generalisation_cardboard_box_50
+unet simplemixed_generalisation_cardboard_box_70
+unet simplemixed_generalisation_cardboard_box_90
+unet simplemixed_generalisation_cardboard_box_100
+
+# Simple Mixed (SM) - Cardboard Box (7 experiments)
+unet simplemixed_cardboard_box_0
+unet simplemixed_cardboard_box_10
+unet simplemixed_cardboard_box_30
+unet simplemixed_cardboard_box_50
+unet simplemixed_cardboard_box_70
+unet simplemixed_cardboard_box_90
+unet simplemixed_cardboard_box_100
+
+# Simple Mixed (SM) - Generalisation Larvik (7 experiments)
+unet simplemixed_generalisation_larvik_0
+unet simplemixed_generalisation_larvik_10
+unet simplemixed_generalisation_larvik_30
+unet simplemixed_generalisation_larvik_50
+unet simplemixed_generalisation_larvik_70
+unet simplemixed_generalisation_larvik_90
+unet simplemixed_generalisation_larvik_100
+
+# Simple Mixed (SM) - Larvik (7 experiments)
+unet simplemixed_larvik_0
+unet simplemixed_larvik_10
+unet simplemixed_larvik_30
+unet simplemixed_larvik_50
+unet simplemixed_larvik_70
+unet simplemixed_larvik_90
+unet simplemixed_larvik_100
+
+# Simple Mixed (SM) - Generalisation RV4 (7 experiments)
+unet simplemixed_generalisation_rv4_0
+unet simplemixed_generalisation_rv4_10
+unet simplemixed_generalisation_rv4_30
+unet simplemixed_generalisation_rv4_50
+unet simplemixed_generalisation_rv4_70
+unet simplemixed_generalisation_rv4_90
+unet simplemixed_generalisation_rv4_100
+
+# Simple Mixed (SM) - RV4 (7 experiments)
+unet simplemixed_rv4_0
+unet simplemixed_rv4_10
+unet simplemixed_rv4_30
+unet simplemixed_rv4_50
+unet simplemixed_rv4_70
+unet simplemixed_rv4_90
+unet simplemixed_rv4_100
+
+# Finetune (FT) - BOX (7 experiments)
+unet finetune_box_0
+unet finetune_box_10
+unet finetune_box_30
+unet finetune_box_50
+unet finetune_box_70
+unet finetune_box_90
+unet finetune_box_100
+
+# Finetune (FT) - SLOPE (7 experiments)
+unet finetune_slope_0
+unet finetune_slope_10
+unet finetune_slope_30
+unet finetune_slope_50
+unet finetune_slope_70
+unet finetune_slope_90
+unet finetune_slope_100
+
+# Finetune (FT) - Generalisation Pattern Box (7 experiments)
+unet finetune_generalisation_pattern_box_0
+unet finetune_generalisation_pattern_box_10
+unet finetune_generalisation_pattern_box_30
+unet finetune_generalisation_pattern_box_50
+unet finetune_generalisation_pattern_box_70
+unet finetune_generalisation_pattern_box_90
+unet finetune_generalisation_pattern_box_100
+
+# Finetune (FT) - Pattern Box (7 experiments)
+unet finetune_pattern_box_0
+unet finetune_pattern_box_10
+unet finetune_pattern_box_30
+unet finetune_pattern_box_50
+unet finetune_pattern_box_70
+unet finetune_pattern_box_90
+unet finetune_pattern_box_100
+
+# Finetune (FT) - Generalisation Cardboard Box (7 experiments)
+unet finetune_generalisation_cardboard_box_0
+unet finetune_generalisation_cardboard_box_10
+unet finetune_generalisation_cardboard_box_30
+unet finetune_generalisation_cardboard_box_50
+unet finetune_generalisation_cardboard_box_70
+unet finetune_generalisation_cardboard_box_90
+unet finetune_generalisation_cardboard_box_100
+
+# Finetune (FT) - Cardboard Box (7 experiments)
+unet finetune_cardboard_box_0
+unet finetune_cardboard_box_10
+unet finetune_cardboard_box_30
+unet finetune_cardboard_box_50
+unet finetune_cardboard_box_70
+unet finetune_cardboard_box_90
+unet finetune_cardboard_box_100
+
+# Finetune (FT) - Generalisation Larvik (7 experiments)
+unet finetune_generalisation_larvik_0
+unet finetune_generalisation_larvik_10
+unet finetune_generalisation_larvik_30
+unet finetune_generalisation_larvik_50
+unet finetune_generalisation_larvik_70
+unet finetune_generalisation_larvik_90
+unet finetune_generalisation_larvik_100
+
+# Finetune (FT) - Larvik (7 experiments)
+unet finetune_larvik_0
+unet finetune_larvik_10
+unet finetune_larvik_30
+unet finetune_larvik_50
+unet finetune_larvik_70
+unet finetune_larvik_90
+unet finetune_larvik_100
+
+# Finetune (FT) - Generalisation RV4 (7 experiments)
+unet finetune_generalisation_rv4_0
+unet finetune_generalisation_rv4_10
+unet finetune_generalisation_rv4_30
+unet finetune_generalisation_rv4_50
+unet finetune_generalisation_rv4_70
+unet finetune_generalisation_rv4_90
+unet finetune_generalisation_rv4_100
+
+# Finetune (FT) - RV4 (7 experiments)
+unet finetune_rv4_0
+unet finetune_rv4_10
+unet finetune_rv4_30
+unet finetune_rv4_50
+unet finetune_rv4_70
+unet finetune_rv4_90
+unet finetune_rv4_100
+
+# ============================================================================
+# DeepLabV3+ Model - All 140 Experiments
+# ============================================================================
+
+# Simple Mixed (SM) - BOX (7 experiments)
+deeplabv3plus simplemixed_box_0
+deeplabv3plus simplemixed_box_10
+deeplabv3plus simplemixed_box_30
+deeplabv3plus simplemixed_box_50
+deeplabv3plus simplemixed_box_70
+deeplabv3plus simplemixed_box_90
+deeplabv3plus simplemixed_box_100
+
+# Simple Mixed (SM) - SLOPE (7 experiments)
+deeplabv3plus simplemixed_slope_0
+deeplabv3plus simplemixed_slope_10
+deeplabv3plus simplemixed_slope_30
+deeplabv3plus simplemixed_slope_50
+deeplabv3plus simplemixed_slope_70
+deeplabv3plus simplemixed_slope_90
+deeplabv3plus simplemixed_slope_100
+
+# Simple Mixed (SM) - Generalisation Pattern Box (7 experiments)
+deeplabv3plus simplemixed_generalisation_pattern_box_0
+deeplabv3plus simplemixed_generalisation_pattern_box_10
+deeplabv3plus simplemixed_generalisation_pattern_box_30
 deeplabv3plus simplemixed_generalisation_pattern_box_50
+deeplabv3plus simplemixed_generalisation_pattern_box_70
+deeplabv3plus simplemixed_generalisation_pattern_box_90
+deeplabv3plus simplemixed_generalisation_pattern_box_100
+
+# Simple Mixed (SM) - Pattern Box (7 experiments)
+deeplabv3plus simplemixed_pattern_box_0
+deeplabv3plus simplemixed_pattern_box_10
+deeplabv3plus simplemixed_pattern_box_30
+deeplabv3plus simplemixed_pattern_box_50
+deeplabv3plus simplemixed_pattern_box_70
+deeplabv3plus simplemixed_pattern_box_90
+deeplabv3plus simplemixed_pattern_box_100
+
+# Simple Mixed (SM) - Generalisation Cardboard Box (7 experiments)
+deeplabv3plus simplemixed_generalisation_cardboard_box_0
+deeplabv3plus simplemixed_generalisation_cardboard_box_10
+deeplabv3plus simplemixed_generalisation_cardboard_box_30
+deeplabv3plus simplemixed_generalisation_cardboard_box_50
+deeplabv3plus simplemixed_generalisation_cardboard_box_70
+deeplabv3plus simplemixed_generalisation_cardboard_box_90
+deeplabv3plus simplemixed_generalisation_cardboard_box_100
+
+# Simple Mixed (SM) - Cardboard Box (7 experiments)
+deeplabv3plus simplemixed_cardboard_box_0
+deeplabv3plus simplemixed_cardboard_box_10
+deeplabv3plus simplemixed_cardboard_box_30
+deeplabv3plus simplemixed_cardboard_box_50
+deeplabv3plus simplemixed_cardboard_box_70
+deeplabv3plus simplemixed_cardboard_box_90
+deeplabv3plus simplemixed_cardboard_box_100
+
+# Simple Mixed (SM) - Generalisation Larvik (7 experiments)
+deeplabv3plus simplemixed_generalisation_larvik_0
+deeplabv3plus simplemixed_generalisation_larvik_10
+deeplabv3plus simplemixed_generalisation_larvik_30
+deeplabv3plus simplemixed_generalisation_larvik_50
+deeplabv3plus simplemixed_generalisation_larvik_70
+deeplabv3plus simplemixed_generalisation_larvik_90
+deeplabv3plus simplemixed_generalisation_larvik_100
+
+# Simple Mixed (SM) - Larvik (7 experiments)
+deeplabv3plus simplemixed_larvik_0
+deeplabv3plus simplemixed_larvik_10
+deeplabv3plus simplemixed_larvik_30
+deeplabv3plus simplemixed_larvik_50
+deeplabv3plus simplemixed_larvik_70
+deeplabv3plus simplemixed_larvik_90
+deeplabv3plus simplemixed_larvik_100
+
+# Simple Mixed (SM) - Generalisation RV4 (7 experiments)
+deeplabv3plus simplemixed_generalisation_rv4_0
+deeplabv3plus simplemixed_generalisation_rv4_10
+deeplabv3plus simplemixed_generalisation_rv4_30
+deeplabv3plus simplemixed_generalisation_rv4_50
+deeplabv3plus simplemixed_generalisation_rv4_70
+deeplabv3plus simplemixed_generalisation_rv4_90
+deeplabv3plus simplemixed_generalisation_rv4_100
+
+# Simple Mixed (SM) - RV4 (7 experiments)
+deeplabv3plus simplemixed_rv4_0
+deeplabv3plus simplemixed_rv4_10
+deeplabv3plus simplemixed_rv4_30
+deeplabv3plus simplemixed_rv4_50
+deeplabv3plus simplemixed_rv4_70
+deeplabv3plus simplemixed_rv4_90
+deeplabv3plus simplemixed_rv4_100
+
+# Finetune (FT) - BOX (7 experiments)
+deeplabv3plus finetune_box_0
+deeplabv3plus finetune_box_10
+deeplabv3plus finetune_box_30
+deeplabv3plus finetune_box_50
+deeplabv3plus finetune_box_70
+deeplabv3plus finetune_box_90
+deeplabv3plus finetune_box_100
+
+# Finetune (FT) - SLOPE (7 experiments)
+deeplabv3plus finetune_slope_0
+deeplabv3plus finetune_slope_10
+deeplabv3plus finetune_slope_30
+deeplabv3plus finetune_slope_50
+deeplabv3plus finetune_slope_70
+deeplabv3plus finetune_slope_90
+deeplabv3plus finetune_slope_100
+
+# Finetune (FT) - Generalisation Pattern Box (7 experiments)
+deeplabv3plus finetune_generalisation_pattern_box_0
+deeplabv3plus finetune_generalisation_pattern_box_10
+deeplabv3plus finetune_generalisation_pattern_box_30
+deeplabv3plus finetune_generalisation_pattern_box_50
+deeplabv3plus finetune_generalisation_pattern_box_70
+deeplabv3plus finetune_generalisation_pattern_box_90
+deeplabv3plus finetune_generalisation_pattern_box_100
+
+# Finetune (FT) - Pattern Box (7 experiments)
+deeplabv3plus finetune_pattern_box_0
+deeplabv3plus finetune_pattern_box_10
+deeplabv3plus finetune_pattern_box_30
+deeplabv3plus finetune_pattern_box_50
+deeplabv3plus finetune_pattern_box_70
+deeplabv3plus finetune_pattern_box_90
+deeplabv3plus finetune_pattern_box_100
+
+# Finetune (FT) - Generalisation Cardboard Box (7 experiments)
+deeplabv3plus finetune_generalisation_cardboard_box_0
+deeplabv3plus finetune_generalisation_cardboard_box_10
+deeplabv3plus finetune_generalisation_cardboard_box_30
+deeplabv3plus finetune_generalisation_cardboard_box_50
+deeplabv3plus finetune_generalisation_cardboard_box_70
+deeplabv3plus finetune_generalisation_cardboard_box_90
+deeplabv3plus finetune_generalisation_cardboard_box_100
+
+# Finetune (FT) - Cardboard Box (7 experiments)
+deeplabv3plus finetune_cardboard_box_0
+deeplabv3plus finetune_cardboard_box_10
+deeplabv3plus finetune_cardboard_box_30
+deeplabv3plus finetune_cardboard_box_50
+deeplabv3plus finetune_cardboard_box_70
+deeplabv3plus finetune_cardboard_box_90
+deeplabv3plus finetune_cardboard_box_100
+
+# Finetune (FT) - Generalisation Larvik (7 experiments)
+deeplabv3plus finetune_generalisation_larvik_0
+deeplabv3plus finetune_generalisation_larvik_10
+deeplabv3plus finetune_generalisation_larvik_30
+deeplabv3plus finetune_generalisation_larvik_50
+deeplabv3plus finetune_generalisation_larvik_70
+deeplabv3plus finetune_generalisation_larvik_90
+deeplabv3plus finetune_generalisation_larvik_100
+
+# Finetune (FT) - Larvik (7 experiments)
+deeplabv3plus finetune_larvik_0
+deeplabv3plus finetune_larvik_10
+deeplabv3plus finetune_larvik_30
+deeplabv3plus finetune_larvik_50
+deeplabv3plus finetune_larvik_70
+deeplabv3plus finetune_larvik_90
+deeplabv3plus finetune_larvik_100
+
+# Finetune (FT) - Generalisation RV4 (7 experiments)
+deeplabv3plus finetune_generalisation_rv4_0
+deeplabv3plus finetune_generalisation_rv4_10
+deeplabv3plus finetune_generalisation_rv4_30
+deeplabv3plus finetune_generalisation_rv4_50
+deeplabv3plus finetune_generalisation_rv4_70
+deeplabv3plus finetune_generalisation_rv4_90
+deeplabv3plus finetune_generalisation_rv4_100
+
+# Finetune (FT) - RV4 (7 experiments)
+deeplabv3plus finetune_rv4_0
+deeplabv3plus finetune_rv4_10
+deeplabv3plus finetune_rv4_30
+deeplabv3plus finetune_rv4_50
+deeplabv3plus finetune_rv4_70
+deeplabv3plus finetune_rv4_90
+deeplabv3plus finetune_rv4_100
