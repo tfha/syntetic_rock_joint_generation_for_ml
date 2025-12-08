@@ -58,7 +58,7 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
         ),
         AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS: (
             "Register all Wachter et al. (2026) finetune experiment splits "
-            "(14 experiments: 7 BOX + 7 SLOPE)"
+            "(140 experiments: 70 SM + 70 FT)"
         ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",
         AzureDataAssetsCommand.COMPARE_ASSETS: ("Compare two versions of a data asset"),
@@ -251,7 +251,7 @@ def main(cfg: DictConfig) -> None:
                     )
                 case AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS:
                     # Upload and register all Wachter et al. experiment splits
-                    # 28 total: 14 Simple Mixed (SM) + 14 Fine-Tuned (FT)
+                    # 140 total: 70 Simple Mixed (SM) + 70 Fine-Tuned (FT)
                     wachter_strategies = [
                         # Simple Mixed (SM) - BOX
                         "simplemixed_box_0",
@@ -269,6 +269,70 @@ def main(cfg: DictConfig) -> None:
                         "simplemixed_slope_70",
                         "simplemixed_slope_90",
                         "simplemixed_slope_100",
+                        # Simple Mixed (SM) - GENERALISATION PATTERN BOX
+                        "simplemixed_generalisation_pattern_box_0",
+                        "simplemixed_generalisation_pattern_box_10",
+                        "simplemixed_generalisation_pattern_box_30",
+                        "simplemixed_generalisation_pattern_box_50",
+                        "simplemixed_generalisation_pattern_box_70",
+                        "simplemixed_generalisation_pattern_box_90",
+                        "simplemixed_generalisation_pattern_box_100",
+                        # Simple Mixed (SM) - PATTERN BOX
+                        "simplemixed_pattern_box_0",
+                        "simplemixed_pattern_box_10",
+                        "simplemixed_pattern_box_30",
+                        "simplemixed_pattern_box_50",
+                        "simplemixed_pattern_box_70",
+                        "simplemixed_pattern_box_90",
+                        "simplemixed_pattern_box_100",
+                        # Simple Mixed (SM) - GENERALISATION CARDBOARD BOX
+                        "simplemixed_generalisation_cardboard_box_0",
+                        "simplemixed_generalisation_cardboard_box_10",
+                        "simplemixed_generalisation_cardboard_box_30",
+                        "simplemixed_generalisation_cardboard_box_50",
+                        "simplemixed_generalisation_cardboard_box_70",
+                        "simplemixed_generalisation_cardboard_box_90",
+                        "simplemixed_generalisation_cardboard_box_100",
+                        # Simple Mixed (SM) - CARDBOARD BOX
+                        "simplemixed_cardboard_box_0",
+                        "simplemixed_cardboard_box_10",
+                        "simplemixed_cardboard_box_30",
+                        "simplemixed_cardboard_box_50",
+                        "simplemixed_cardboard_box_70",
+                        "simplemixed_cardboard_box_90",
+                        "simplemixed_cardboard_box_100",
+                        # Simple Mixed (SM) - GENERALISATION LARVIK
+                        "simplemixed_generalisation_larvik_0",
+                        "simplemixed_generalisation_larvik_10",
+                        "simplemixed_generalisation_larvik_30",
+                        "simplemixed_generalisation_larvik_50",
+                        "simplemixed_generalisation_larvik_70",
+                        "simplemixed_generalisation_larvik_90",
+                        "simplemixed_generalisation_larvik_100",
+                        # Simple Mixed (SM) - LARVIK
+                        "simplemixed_larvik_0",
+                        "simplemixed_larvik_10",
+                        "simplemixed_larvik_30",
+                        "simplemixed_larvik_50",
+                        "simplemixed_larvik_70",
+                        "simplemixed_larvik_90",
+                        "simplemixed_larvik_100",
+                        # Simple Mixed (SM) - GENERALISATION RV4
+                        "simplemixed_generalisation_rv4_0",
+                        "simplemixed_generalisation_rv4_10",
+                        "simplemixed_generalisation_rv4_30",
+                        "simplemixed_generalisation_rv4_50",
+                        "simplemixed_generalisation_rv4_70",
+                        "simplemixed_generalisation_rv4_90",
+                        "simplemixed_generalisation_rv4_100",
+                        # Simple Mixed (SM) - RV4
+                        "simplemixed_rv4_0",
+                        "simplemixed_rv4_10",
+                        "simplemixed_rv4_30",
+                        "simplemixed_rv4_50",
+                        "simplemixed_rv4_70",
+                        "simplemixed_rv4_90",
+                        "simplemixed_rv4_100",
                         # Fine-Tuned (FT) - BOX
                         "finetune_box_0",
                         "finetune_box_10",
@@ -285,6 +349,70 @@ def main(cfg: DictConfig) -> None:
                         "finetune_slope_70",
                         "finetune_slope_90",
                         "finetune_slope_100",
+                        # Fine-Tuned (FT) - GENERALISATION PATTERN BOX
+                        "finetune_generalisation_pattern_box_0",
+                        "finetune_generalisation_pattern_box_10",
+                        "finetune_generalisation_pattern_box_30",
+                        "finetune_generalisation_pattern_box_50",
+                        "finetune_generalisation_pattern_box_70",
+                        "finetune_generalisation_pattern_box_90",
+                        "finetune_generalisation_pattern_box_100",
+                        # Fine-Tuned (FT) - PATTERN BOX
+                        "finetune_pattern_box_0",
+                        "finetune_pattern_box_10",
+                        "finetune_pattern_box_30",
+                        "finetune_pattern_box_50",
+                        "finetune_pattern_box_70",
+                        "finetune_pattern_box_90",
+                        "finetune_pattern_box_100",
+                        # Fine-Tuned (FT) - GENERALISATION CARDBOARD BOX
+                        "finetune_generalisation_cardboard_box_0",
+                        "finetune_generalisation_cardboard_box_10",
+                        "finetune_generalisation_cardboard_box_30",
+                        "finetune_generalisation_cardboard_box_50",
+                        "finetune_generalisation_cardboard_box_70",
+                        "finetune_generalisation_cardboard_box_90",
+                        "finetune_generalisation_cardboard_box_100",
+                        # Fine-Tuned (FT) - CARDBOARD BOX
+                        "finetune_cardboard_box_0",
+                        "finetune_cardboard_box_10",
+                        "finetune_cardboard_box_30",
+                        "finetune_cardboard_box_50",
+                        "finetune_cardboard_box_70",
+                        "finetune_cardboard_box_90",
+                        "finetune_cardboard_box_100",
+                        # Fine-Tuned (FT) - GENERALISATION LARVIK
+                        "finetune_generalisation_larvik_0",
+                        "finetune_generalisation_larvik_10",
+                        "finetune_generalisation_larvik_30",
+                        "finetune_generalisation_larvik_50",
+                        "finetune_generalisation_larvik_70",
+                        "finetune_generalisation_larvik_90",
+                        "finetune_generalisation_larvik_100",
+                        # Fine-Tuned (FT) - LARVIK
+                        "finetune_larvik_0",
+                        "finetune_larvik_10",
+                        "finetune_larvik_30",
+                        "finetune_larvik_50",
+                        "finetune_larvik_70",
+                        "finetune_larvik_90",
+                        "finetune_larvik_100",
+                        # Fine-Tuned (FT) - GENERALISATION RV4
+                        "finetune_generalisation_rv4_0",
+                        "finetune_generalisation_rv4_10",
+                        "finetune_generalisation_rv4_30",
+                        "finetune_generalisation_rv4_50",
+                        "finetune_generalisation_rv4_70",
+                        "finetune_generalisation_rv4_90",
+                        "finetune_generalisation_rv4_100",
+                        # Fine-Tuned (FT) - RV4
+                        "finetune_rv4_0",
+                        "finetune_rv4_10",
+                        "finetune_rv4_30",
+                        "finetune_rv4_50",
+                        "finetune_rv4_70",
+                        "finetune_rv4_90",
+                        "finetune_rv4_100",
                     ]
                     console.print(
                         "\n=== Uploading & Registering Wachter et al. Splits ===",
@@ -292,7 +420,7 @@ def main(cfg: DictConfig) -> None:
                     )
                     console.print(
                         f"Total experiments: {len(wachter_strategies)} "
-                        "(14 SM + 14 FT)\n",
+                        "(70 SM + 70 FT)\n",
                         style="info",
                     )
                     for i, strategy in enumerate(wachter_strategies, 1):

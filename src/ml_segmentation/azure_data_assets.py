@@ -686,14 +686,46 @@ def upload_finetune_split_data_to_azure_blob(
         sys.exit(1)
 
     # Determine strategy type and dataset type from experiment name
-    if experiment_strategy.startswith("simplemixed_box"):
+    if experiment_strategy.startswith("simplemixed_box_"):
         subdir = "sm_box"
-    elif experiment_strategy.startswith("simplemixed_slope"):
+    elif experiment_strategy.startswith("simplemixed_slope_"):
         subdir = "sm_slope"
-    elif experiment_strategy.startswith("finetune_box"):
+    elif experiment_strategy.startswith("simplemixed_generalisation_pattern_box"):
+        subdir = "sm_gen_pattern_box"
+    elif experiment_strategy.startswith("simplemixed_pattern_box"):
+        subdir = "sm_pattern_box"
+    elif experiment_strategy.startswith("simplemixed_generalisation_cardboard_box"):
+        subdir = "sm_gen_cardboard_box"
+    elif experiment_strategy.startswith("simplemixed_cardboard_box"):
+        subdir = "sm_cardboard_box"
+    elif experiment_strategy.startswith("simplemixed_generalisation_larvik"):
+        subdir = "sm_gen_larvik"
+    elif experiment_strategy.startswith("simplemixed_larvik"):
+        subdir = "sm_larvik"
+    elif experiment_strategy.startswith("simplemixed_generalisation_rv4"):
+        subdir = "sm_gen_rv4"
+    elif experiment_strategy.startswith("simplemixed_rv4"):
+        subdir = "sm_rv4"
+    elif experiment_strategy.startswith("finetune_box_"):
         subdir = "ft_box"
-    elif experiment_strategy.startswith("finetune_slope"):
+    elif experiment_strategy.startswith("finetune_slope_"):
         subdir = "ft_slope"
+    elif experiment_strategy.startswith("finetune_generalisation_pattern_box"):
+        subdir = "ft_gen_pattern_box"
+    elif experiment_strategy.startswith("finetune_pattern_box"):
+        subdir = "ft_pattern_box"
+    elif experiment_strategy.startswith("finetune_generalisation_cardboard_box"):
+        subdir = "ft_gen_cardboard_box"
+    elif experiment_strategy.startswith("finetune_cardboard_box"):
+        subdir = "ft_cardboard_box"
+    elif experiment_strategy.startswith("finetune_generalisation_larvik"):
+        subdir = "ft_gen_larvik"
+    elif experiment_strategy.startswith("finetune_larvik"):
+        subdir = "ft_larvik"
+    elif experiment_strategy.startswith("finetune_generalisation_rv4"):
+        subdir = "ft_gen_rv4"
+    elif experiment_strategy.startswith("finetune_rv4"):
+        subdir = "ft_rv4"
     else:
         console.print(
             f"Error: Unknown Wachter strategy pattern '{experiment_strategy}'",

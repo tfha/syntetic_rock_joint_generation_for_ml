@@ -1287,8 +1287,8 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Get real pattern files for generalisation experiments
-    # Using Box_drone_pattern and Box_camera_pattern
-    pattern_prefixes = ["Box_drone_pattern", "Box_camera_pattern"]
+    # Using Box-drone-pattern and Box-camera-pattern
+    pattern_prefixes = ["Box-drone-pattern", "Box-camera-pattern"]
     pattern_files, _ = get_data_files(
         images_dir=Path(pcfg.dataset.path_images),
         labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
@@ -1314,7 +1314,7 @@ def main(cfg: DictConfig) -> None:
         test_prefixes=[],
     )
 
-    # Get Rv4 files
+    # Get Rv4 files (matches both "Rv4" and "Rv4_P" prefixes)
     rv4_prefixes = ["Rv4"]
     rv4_files, _ = get_data_files(
         images_dir=Path(pcfg.dataset.path_images),
