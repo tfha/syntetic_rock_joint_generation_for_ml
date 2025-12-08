@@ -298,15 +298,22 @@ def main(cfg: DictConfig) -> None:
 
     # 7. Stream job logs
     ###########################################
-    console.print("Streaming job logs...", style="info")
+    import os
 
-    try:
-        ml_client.jobs.stream(job_run.name)
-        console.print("✓ Log streaming completed", style="success")
-    except KeyboardInterrupt:
-        console.print("Log streaming interrupted by user", style="warning")
-    except Exception as stream_error:
-        handle_log_streaming_error(console, stream_error, job_run)
+    skip_streaming = os.getenv("AZURE_BATCH_MODE", "false").lower() == "true"
+
+    if not skip_streaming:
+        console.print("Streaming job logs...", style="info")
+
+        try:
+            ml_client.jobs.stream(job_run.name)
+            console.print("✓ Log streaming completed", style="success")
+        except KeyboardInterrupt:
+            console.print("Log streaming interrupted by user", style="warning")
+        except Exception as stream_error:
+            handle_log_streaming_error(console, stream_error, job_run)
+    else:
+        console.print("⏭️  Skipping log streaming (batch mode)", style="info")
 
     # 8. Download outputs if requested
     ###########################################

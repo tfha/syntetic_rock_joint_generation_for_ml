@@ -1,0 +1,12 @@
+# Azure ML Batch Jobs Configuration
+# Each line defines one job: model experiment_strategy
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+
+unet finetune_box_0
+unet finetune_box_10
+unet finetune_box_30
+unet finetune_box_50
+unet finetune_box_70
+unet finetune_box_90
+unet finetune_box_100

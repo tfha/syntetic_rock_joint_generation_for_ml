@@ -699,6 +699,8 @@ For production workflows, implement the following data asset registration strate
 
 #### Submitting Training Jobs to Azure ML
 
+##### Single Job Submission
+
 To submit a job to Azure ML, use the `azure_submit_job.py` script:
 
 ```sh
@@ -707,6 +709,57 @@ python scripts/azure_submit_job.py
 
 # Submit with custom configuration
 python scripts/azure_submit_job.py model=deeplabv3 experiment.experiment_strategy=verification_box
+```
+
+##### Batch Job Submission
+
+For submitting multiple training jobs efficiently, use the batch submission system:
+
+```sh
+# Submit all jobs defined in the config file
+poetry run python scripts/submit_batch_jobs.py --config scripts/config/batch_jobs_config.txt
+
+# Preview what will be submitted without actually running (dry-run mode)
+poetry run python scripts/submit_batch_jobs.py --dry-run --config scripts/config/batch_jobs_config.txt
+
+# Stop immediately if any job fails to submit
+poetry run python scripts/submit_batch_jobs.py --stop-on-error --config scripts/config/batch_jobs_config.txt
+```
+
+**Batch Configuration File Format**
+
+Edit `scripts/config/batch_jobs_config.txt` with a simple format (one job per line):
+
+```
+# Azure ML Batch Jobs - Finetune Box Experiments
+unet finetune_box_0
+unet finetune_box_10
+unet finetune_box_30
+unet finetune_box_50
+unet finetune_box_70
+unet finetune_box_90
+unet finetune_box_100
+
+# You can add comments with #
+# deeplabv3plus finetune_slope_10
+```
+
+Each line contains: `model experiment_strategy`
+
+**Batch Submission Features**
+
+- **Validation**: Checks that all models and experiment strategies exist before submitting
+- **Progress tracking**: Shows parsing and submission progress (e.g., "Parsed job 3/7")
+- **No log streaming**: Jobs submit quickly (~30 seconds each) without waiting for training to complete
+- **Parallel execution**: All submitted jobs run in parallel on Azure ML
+- **Error reporting**: Clear summary of successful and failed submissions
+
+**Common Use Cases**
+
+```sh
+# Copy jobs from Excel: Just paste two columns (model, strategy) into the config file
+# Run all finetune experiments with different synthetic/real ratios
+# Test multiple models with the same experiment strategy
 ```
 
 ##### Quick smoke test on Azure compute
