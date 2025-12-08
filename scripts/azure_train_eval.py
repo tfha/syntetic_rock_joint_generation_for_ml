@@ -586,8 +586,10 @@ def main(cfg: DictConfig) -> None:
                     show_original=False,
                 )
 
-                # Save validation predictions if available
-                if len(val_loader.dataset) > 0:
+                # Save validation predictions only for finetune experiments
+                # (SimpleMixed uses test set as validation, so skip redundant folder)
+                is_finetune = pcfg.experiment.experiment_strategy.startswith("finetune")
+                if len(val_loader.dataset) > 0 and is_finetune:
                     val_pred_dir = (
                         example_images_dir / f"epoch_{epoch + 1}" / "validation"
                     )
@@ -687,8 +689,10 @@ def main(cfg: DictConfig) -> None:
                 style="warning",
             )
 
-        # Save end-of-training predictions on validation set (if not empty)
-        if len(val_loader.dataset) > 0:
+        # Save end-of-training predictions on validation set (only for finetune)
+        # SimpleMixed uses test set as validation, so skip redundant folder
+        is_finetune = pcfg.experiment.experiment_strategy.startswith("finetune")
+        if len(val_loader.dataset) > 0 and is_finetune:
             final_val_dir = example_images_dir / "final" / "validation"
             final_val_dir.mkdir(parents=True, exist_ok=True)
             save_image_predictions(
