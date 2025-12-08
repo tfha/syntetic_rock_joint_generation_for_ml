@@ -444,12 +444,12 @@ def main(cfg: DictConfig) -> None:
                                 strategy,
                             )
                             console.print(
-                                f"✓ Successfully processed {strategy}",
+                                f"[OK] Successfully processed {strategy}",
                                 style="green",
                             )
                         except Exception as e:
                             console.print(
-                                f"✗ Error processing {strategy}: {str(e)}",
+                                f"[ERROR] Error processing {strategy}: {str(e)}",
                                 style="red",
                             )
                     console.print(

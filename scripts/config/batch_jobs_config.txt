@@ -3,10 +3,5 @@
 # Lines starting with # are comments and will be ignored
 # Empty lines are also ignored
 
-unet finetune_box_0
-unet finetune_box_10
-unet finetune_box_30
-unet finetune_box_50
-unet finetune_box_70
-unet finetune_box_90
-unet finetune_box_100
+deeplabv3plus finetune_larvik_10
+deeplabv3plus simplemixed_generalisation_pattern_box_50
