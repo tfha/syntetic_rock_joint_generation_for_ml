@@ -289,7 +289,7 @@ def main(cfg: DictConfig) -> None:
 
     try:
         job_run = submit_job_with_retry(job)
-        console.print(f"✓ Job submitted: {job_run.name}", style="success")
+        console.print(f"[OK] Job submitted: {job_run.name}", style="success")
         job_url = job_run.services.get("Studio").endpoint
         console.print(f"Job URL: {job_url}", style="info")
     except Exception as e:
@@ -307,13 +307,13 @@ def main(cfg: DictConfig) -> None:
 
         try:
             ml_client.jobs.stream(job_run.name)
-            console.print("✓ Log streaming completed", style="success")
+            console.print("[OK] Log streaming completed", style="success")
         except KeyboardInterrupt:
             console.print("Log streaming interrupted by user", style="warning")
         except Exception as stream_error:
             handle_log_streaming_error(console, stream_error, job_run)
     else:
-        console.print("⏭️  Skipping log streaming (batch mode)", style="info")
+        console.print("[SKIP] Skipping log streaming (batch mode)", style="info")
 
     # 8. Download outputs if requested
     ###########################################
@@ -324,7 +324,7 @@ def main(cfg: DictConfig) -> None:
     ###########################################
     get_job_details(ml_client, console, job_run)
 
-    console.print("✅ Azure ML job completed successfully!", style="success")
+    console.print("[OK] Azure ML job completed successfully!", style="success")
 
 
 if __name__ == "__main__":
