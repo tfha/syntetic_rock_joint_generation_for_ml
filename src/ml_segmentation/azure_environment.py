@@ -285,7 +285,7 @@ def test_environment_export(output_path: str | None = None) -> None:
         )
 
         if result_path and os.path.exists(result_path):
-            print(f"✓ Environment export test successful: {result_path}")
+            print(f"[OK] Environment export test successful: {result_path}")
 
             # Show first few lines
             with open(result_path) as f:
@@ -294,10 +294,10 @@ def test_environment_export(output_path: str | None = None) -> None:
                 for line in lines:
                     print(f"  {line.rstrip()}")
         else:
-            print("✗ Environment export test failed")
+            print("[ERROR] Environment export test failed")
 
     except Exception as e:
-        print(f"✗ Environment export test failed: {e}")
+        print(f"[ERROR] Environment export test failed: {e}")
 
 
 def build_and_register_environment(
@@ -337,7 +337,7 @@ def build_and_register_environment(
         environment = ml_client.environments.create_or_update(env)
 
         console.print(
-            f"✓ Environment registered: {environment.name} (v{environment.version})",
+            f"[OK] Environment registered: {environment.name} (v{environment.version})",
             style="success",
         )
 

@@ -35,7 +35,7 @@ def download_job_outputs(
             download_path="./outputs",
         )
 
-        console.print("✓ Job outputs downloaded to ./outputs", style="success")
+        console.print("[OK] Job outputs downloaded to ./outputs", style="success")
 
     except Exception as e:
         console.print(f"Failed to download job outputs: {str(e)}", style="warning")

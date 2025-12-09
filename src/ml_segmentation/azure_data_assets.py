@@ -1256,14 +1256,16 @@ def retrieve_and_validate_data_assets(
 
         # Log dataset information
         console.print(
-            f"✓ Using split asset: {split_asset_name} (v{splits_dataset.version})",
+            f"[OK] Using split asset: {split_asset_name} (v{splits_dataset.version})",
             style="success",
         )
         console.print(
-            f"✓ Using images dataset version: {images_dataset.version}", style="success"
+            f"[OK] Using images dataset version: {images_dataset.version}",
+            style="success",
         )
         console.print(
-            f"✓ Using masks dataset version: {masks_dataset.version}", style="success"
+            f"[OK] Using masks dataset version: {masks_dataset.version}",
+            style="success",
         )
 
         # Verify data asset permissions
@@ -1297,7 +1299,7 @@ def _validate_data_asset_permissions(ml_client: MLClient, console: Console) -> N
         assets = ml_client.data.list()
         asset_count = sum(1 for _ in assets)
         console.print(
-            f"✓ Verified access to {asset_count} data assets", style="success"
+            f"[OK] Verified access to {asset_count} data assets", style="success"
         )
     except Exception as perm_e:
         console.print(

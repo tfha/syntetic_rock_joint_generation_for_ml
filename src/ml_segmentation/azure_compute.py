@@ -46,19 +46,19 @@ def check_compute_permissions(
             permissions["has_identity"] = True
             permissions["identity_type"] = compute.identity.type
             console.print(
-                f"✓ Compute has {compute.identity.type} identity", style="success"
+                f"[OK] Compute has {compute.identity.type} identity", style="success"
             )
         else:
-            console.print("⚠ Compute lacks managed identity", style="warning")
+            console.print("[WARNING] Compute lacks managed identity", style="warning")
 
         # Test basic workspace access
         try:
             # Some SDK versions don't support max_results; just iterate one item
             _ = next(iter(ml_client.datastores.list()), None)
             permissions["workspace_access"] = True
-            console.print("✓ Workspace access confirmed", style="success")
+            console.print("[OK] Workspace access confirmed", style="success")
         except Exception:
-            console.print("⚠ Limited workspace access", style="warning")
+            console.print("[WARNING] Limited workspace access", style="warning")
 
         # Note: Storage and log streaming access would require additional API calls
         # that may not be available or may require specific permissions
@@ -170,7 +170,9 @@ def _provide_compute_guidance(console: Console, permissions: dict[str, Any]) -> 
 
     # Identity validation
     if not permissions["has_identity"]:
-        console.print("⚠ Compute cluster lacks managed identity", style="warning")
+        console.print(
+            "[WARNING] Compute cluster lacks managed identity", style="warning"
+        )
         console.print(
             "Solution: Enable system-assigned identity in Azure Portal > "
             "Compute > Identity tab",
@@ -180,20 +182,23 @@ def _provide_compute_guidance(console: Console, permissions: dict[str, Any]) -> 
         _provide_compute_identity_setup_guidance(console)
     else:
         console.print(
-            f"✓ Compute identity type: {permissions['identity_type']}", style="success"
+            f"[OK] Compute identity type: {permissions['identity_type']}",
+            style="success",
         )
 
     # Workspace access validation
     if permissions["workspace_access"]:
-        console.print("✓ Compute has workspace access", style="success")
+        console.print("[OK] Compute has workspace access", style="success")
     else:
-        console.print("⚠ Could not verify workspace access", style="warning")
+        console.print("[WARNING] Could not verify workspace access", style="warning")
 
     # Log streaming access validation
     if permissions.get("log_streaming_access", False):
-        console.print("✓ Compute configured for log streaming", style="success")
+        console.print("[OK] Compute configured for log streaming", style="success")
     else:
-        console.print("⚠ Compute may lack log streaming permissions", style="warning")
+        console.print(
+            "[WARNING] Compute may lack log streaming permissions", style="warning"
+        )
         console.print(
             "Solution: Ensure managed identity has:\n"
             "  1. 'Storage Blob Data Reader' on workspace storage\n"

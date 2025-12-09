@@ -87,10 +87,10 @@ def _test_permission_check(ml_client: MLClient, console: Console) -> None:
     workspace_ok = validate_workspace_permissions(ml_client, console)
 
     if workspace_ok:
-        console.print("✓ Permission check test passed", style="success")
+        console.print("[OK] Permission check test passed", style="success")
     else:
         console.print(
-            "⚠ Permission check test completed with warnings", style="warning"
+            "[WARNING] Permission check test completed with warnings", style="warning"
         )
 
 
@@ -106,12 +106,14 @@ def _test_data_asset_retrieval(ml_client: MLClient, console: Console) -> None:
 
         if assets:
             asset = assets[0]
-            console.print(f"✓ Found data asset: {asset.name}", style="success")
+            console.print(f"[OK] Found data asset: {asset.name}", style="success")
         else:
-            console.print("⚠ No data assets found in workspace", style="warning")
+            console.print(
+                "[WARNING] No data assets found in workspace", style="warning"
+            )
 
     except Exception as e:
-        console.print(f"⚠ Data asset test failed: {str(e)}", style="warning")
+        console.print(f"[WARNING] Data asset test failed: {str(e)}", style="warning")
 
 
 def _test_compute_validation(ml_client: MLClient, console: Console) -> None:
@@ -130,16 +132,21 @@ def _test_compute_validation(ml_client: MLClient, console: Console) -> None:
             permissions = validate_and_refresh_compute(ml_client, console, compute_name)
 
             if permissions:
-                console.print("✓ Compute validation test passed", style="success")
+                console.print("[OK] Compute validation test passed", style="success")
             else:
                 console.print(
-                    "⚠ Compute validation test completed with warnings", style="warning"
+                    "[WARNING] Compute validation test completed with warnings",
+                    style="warning",
                 )
         else:
-            console.print("⚠ No compute clusters found in workspace", style="warning")
+            console.print(
+                "[WARNING] No compute clusters found in workspace", style="warning"
+            )
 
     except Exception as e:
-        console.print(f"⚠ Compute validation test failed: {str(e)}", style="warning")
+        console.print(
+            f"[WARNING] Compute validation test failed: {str(e)}", style="warning"
+        )
 
 
 def _test_job_submission_and_logging(ml_client: MLClient, console: Console) -> None:
@@ -151,11 +158,13 @@ def _test_job_submission_and_logging(ml_client: MLClient, console: Console) -> N
 
     try:
         # Test job configuration logic
-        console.print("✓ Job configuration structure validated", style="success")
+        console.print("[OK] Job configuration structure validated", style="success")
         console.print("Note: Actual job submission skipped in test mode", style="info")
 
     except Exception as e:
-        console.print(f"⚠ Job configuration test failed: {str(e)}", style="warning")
+        console.print(
+            f"[WARNING] Job configuration test failed: {str(e)}", style="warning"
+        )
 
 
 def run_azure_diagnostic_tests(
@@ -207,14 +216,14 @@ def run_azure_diagnostic_tests(
         _test_compute_validation(ml_client, console)
         _test_job_submission_and_logging(ml_client, console)
 
-        console.print("\n✅ Diagnostic tests completed", style="bold green")
+        console.print("\n[OK] Diagnostic tests completed", style="bold green")
         console.print(
             "Review any warnings above and consult the documentation for solutions",
             style="info",
         )
 
     except Exception as e:
-        console.print(f"\n❌ Diagnostic tests failed: {str(e)}", style="bold red")
+        console.print(f"\n[X] Diagnostic tests failed: {str(e)}", style="bold red")
         console.print("Check your Azure configuration and authentication", style="info")
         sys.exit(1)
 
