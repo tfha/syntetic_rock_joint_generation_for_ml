@@ -26,8 +26,10 @@ import argparse
 import json
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 
 import yaml
 
@@ -161,6 +163,18 @@ def main() -> None:
         default=Path(__file__).parent / "config" / "batch_jobs_config.txt",
         help="Path to config file (default: config/batch_jobs_config.txt)",
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0.0,
+        help="Delay in seconds between job submissions (default: 0.0, no delay)",
+    )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of jobs to submit in parallel (default: 1, sequential). Use 4-8 for faster batch submission.",
+    )
     args = parser.parse_args()
 
     # Load jobs from text config file
@@ -257,7 +271,23 @@ def main() -> None:
     success_count = 0
     failed_jobs = []
 
-    for i, (model, strategy) in enumerate(jobs, 1):
+    import time
+
+    # Thread-safe lock for manifest updates
+    manifest_lock = Lock()
+
+    def submit_single_job(
+        job_info: tuple[int, str, str],
+    ) -> tuple[int, str, str, bool, str | None]:
+        """Submit a single job (used for parallel execution).
+
+        Args:
+            job_info: Tuple of (index, model, strategy)
+
+        Returns:
+            Tuple of (index, model, strategy, success, job_name)
+        """
+        i, model, strategy = job_info
         print(f"\n[{i}/{len(jobs)}] Model: {model}, Strategy: {strategy}")
 
         command = [
@@ -270,31 +300,92 @@ def main() -> None:
         ]
 
         success, job_name = run_command(command, dry_run=args.dry_run)
+        return i, model, strategy, success, job_name
 
-        # Record job in manifest
-        job_record = {
-            "index": i,
-            "model": model,
-            "experiment_strategy": strategy,
-            "status": "submitted" if success else "failed",
-            "job_name": job_name,
-            "submission_time": datetime.now().isoformat(),
-        }
-        job_manifest["jobs"].append(job_record)
+    # Prepare job list with indices
+    job_list = [(i, model, strategy) for i, (model, strategy) in enumerate(jobs, 1)]
 
-        # Save manifest incrementally (in case of interruption)
-        with open(manifest_file, "w", encoding="utf-8") as f:
-            json.dump(job_manifest, f, indent=2)
+    # Submit jobs (parallel or sequential)
+    if args.parallel > 1:
+        print(f"\n🚀 Using parallel submission with {args.parallel} workers\n")
+        with ThreadPoolExecutor(max_workers=args.parallel) as executor:
+            # Submit all jobs
+            future_to_job = {
+                executor.submit(submit_single_job, job_info): job_info
+                for job_info in job_list
+            }
 
-        if success:
-            success_count += 1
-        else:
-            failed_jobs.append((model, strategy))
-            if args.stop_on_error:
-                print("\nStopping due to error (--stop-on-error enabled)")
-                break
+            # Process completed jobs as they finish
+            for future in as_completed(future_to_job):
+                i, model, strategy, success, job_name = future.result()
 
-    # Summary
+                # Record job in manifest (thread-safe)
+                job_record = {
+                    "index": i,
+                    "model": model,
+                    "experiment_strategy": strategy,
+                    "status": "submitted" if success else "failed",
+                    "job_name": job_name,
+                    "submission_time": datetime.now().isoformat(),
+                }
+
+                with manifest_lock:
+                    job_manifest["jobs"].append(job_record)
+                    # Save manifest incrementally
+                    with open(manifest_file, "w", encoding="utf-8") as f:
+                        json.dump(job_manifest, f, indent=2)
+
+                if success:
+                    success_count += 1
+                else:
+                    failed_jobs.append((model, strategy))
+                    if args.stop_on_error:
+                        print("\nError detected (--stop-on-error enabled)")
+                        # Note: Can't easily stop other threads mid-execution
+                        break
+    else:
+        # Sequential submission (original behavior)
+        for i, (model, strategy) in enumerate(jobs, 1):
+            print(f"\n[{i}/{len(jobs)}] Model: {model}, Strategy: {strategy}")
+
+            command = [
+                "poetry",
+                "run",
+                "python",
+                str(submit_script),
+                f"model={model}",
+                f"experiment.experiment_strategy={strategy}",
+            ]
+
+            success, job_name = run_command(command, dry_run=args.dry_run)
+
+            # Record job in manifest
+            job_record = {
+                "index": i,
+                "model": model,
+                "experiment_strategy": strategy,
+                "status": "submitted" if success else "failed",
+                "job_name": job_name,
+                "submission_time": datetime.now().isoformat(),
+            }
+            job_manifest["jobs"].append(job_record)
+
+            # Save manifest incrementally (in case of interruption)
+            with open(manifest_file, "w", encoding="utf-8") as f:
+                json.dump(job_manifest, f, indent=2)
+
+            if success:
+                success_count += 1
+            else:
+                failed_jobs.append((model, strategy))
+                if args.stop_on_error:
+                    print("\nStopping due to error (--stop-on-error enabled)")
+                    break
+
+            # Delay before next submission (if configured)
+            if args.delay > 0 and i < len(jobs):
+                print(f"  Waiting {args.delay}s before next submission...")
+                time.sleep(args.delay)  # Summary
     print(f"\n{'=' * 80}")
     print("Batch submission complete")
     print(f"{'=' * 80}")
