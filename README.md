@@ -716,8 +716,14 @@ python scripts/azure_submit_job.py model=deeplabv3 experiment.experiment_strateg
 For submitting multiple training jobs efficiently, use the batch submission system:
 
 ```sh
-# Submit all jobs defined in the config file
+# Submit all jobs sequentially (default, safest)
 poetry run python scripts/submit_batch_jobs.py --config scripts/config/batch_jobs_config.txt
+
+# Submit jobs in parallel (faster, recommended: 4-8 workers)
+poetry run python scripts/submit_batch_jobs.py --config scripts/config/batch_jobs_config.txt --parallel 8
+
+# Add delay between submissions (helps with rate limiting)
+poetry run python scripts/submit_batch_jobs.py --config scripts/config/batch_jobs_config.txt --parallel 8 --delay 1.0
 
 # Preview what will be submitted without actually running (dry-run mode)
 poetry run python scripts/submit_batch_jobs.py --dry-run --config scripts/config/batch_jobs_config.txt
@@ -725,6 +731,13 @@ poetry run python scripts/submit_batch_jobs.py --dry-run --config scripts/config
 # Stop immediately if any job fails to submit
 poetry run python scripts/submit_batch_jobs.py --stop-on-error --config scripts/config/batch_jobs_config.txt
 ```
+
+**Parallel Submission Tips**
+
+- **Default**: Sequential submission (1 job at a time) - slowest but most reliable
+- **Recommended**: `--parallel 4` to `--parallel 8` - good balance of speed and reliability
+- **Maximum**: `--parallel 8` - higher values may hit Azure ML API rate limits and cause failures
+- **With delay**: Add `--delay 0.5` or `--delay 1.0` for extra safety when using parallel submission
 
 **Batch Configuration File Format**
 
