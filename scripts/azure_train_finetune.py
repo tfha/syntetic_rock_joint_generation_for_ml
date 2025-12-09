@@ -439,6 +439,22 @@ def main(cfg: DictConfig) -> None:
     console.print("\n[bold]Initializing model...[/bold]")
     model = choose_model(pcfg.model.name, pcfg.model.params).to(device)
 
+    # Fix for DeepLabV3Plus BatchNorm issue with small images
+    # Set ASPP BatchNorm layers to eval mode to avoid 1x1 spatial dimension error
+    if pcfg.model.name.lower() == "deeplabv3plus":
+        if hasattr(model, "decoder") and hasattr(model.decoder, "aspp"):
+            for module in model.decoder.aspp.modules():
+                if isinstance(module, nn.BatchNorm2d):
+                    module.eval()
+                    # Disable gradient tracking for these layers
+                    for param in module.parameters():
+                        param.requires_grad = False
+            console.print(
+                "  [WARNING] Set DeepLabV3Plus ASPP BatchNorm to eval mode "
+                "(fixes 1x1 spatial dimension issue)",
+                style="warning",
+            )
+
     # Model summary
     in_channels = pcfg.model.params.get("in_channels", 3)
     model_stats = summary(
