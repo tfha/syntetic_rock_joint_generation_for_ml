@@ -4,7 +4,7 @@ num_epochs: 100  # Increased from 50 to give more time for joint learning
 batch_size: 8
 learning_rate: 0.001
 scheduler:
-  mode: max      # Correct mode for dice_joints (should increase)
+  mode: min      # Changed to min for finetune/simplemixed experiments
   patience: 5    # Increased from 3 to allow more exploration before LR reduction
   gamma: 0.5
 params:
