@@ -115,7 +115,9 @@ def connect_to_azure_ml(
             workspace_name=workspace_name,
         )
 
-        console.print("✓ Successfully connected to Azure ML workspace", style="success")
+        console.print(
+            "[OK] Successfully connected to Azure ML workspace", style="success"
+        )
         return ml_client
 
     except Exception as e:
@@ -147,7 +149,7 @@ def validate_workspace_permissions(ml_client: MLClient, console: Console) -> boo
 
         # Test basic workspace operations
         _ = list(ml_client.datastores.list())
-        console.print("✓ Workspace access verified", style="success")
+        console.print("[OK] Workspace access verified", style="success")
         return True
 
     except Exception as perm_error:

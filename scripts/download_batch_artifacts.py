@@ -49,16 +49,16 @@ from rich.console import Console
 from rich.progress import track
 
 
-def find_latest_manifest(base_dir: Path) -> Path | None:
+def find_latest_manifest(project_root: Path) -> Path | None:
     """Find the most recent job manifest file.
 
     Args:
-        base_dir: Base directory containing scripts
+        project_root: Project root directory
 
     Returns:
         Path to latest manifest, or None if not found
     """
-    manifest_dir = base_dir / "experiments" / "batch_submissions"
+    manifest_dir = project_root / "experiments" / "batch_submissions"
     if not manifest_dir.exists():
         return None
 
@@ -245,7 +245,8 @@ def main() -> None:
     args = parser.parse_args()
 
     console = Console()
-    base_dir = Path(__file__).parent
+    scripts_dir = Path(__file__).parent
+    project_root = scripts_dir.parent
 
     # Find or load manifest
     if args.manifest:
@@ -254,7 +255,7 @@ def main() -> None:
             console.print(f"Error: Manifest not found: {manifest_path}", style="danger")
             sys.exit(1)
     else:
-        manifest_path = find_latest_manifest(base_dir)
+        manifest_path = find_latest_manifest(project_root)
         if not manifest_path:
             console.print(
                 "Error: No manifest files found in experiments/batch_submissions/",
@@ -295,7 +296,9 @@ def main() -> None:
         output_base = args.output_dir
     else:
         manifest_timestamp = manifest["submission_time"]
-        output_base = base_dir / "experiments" / "batch_downloads" / manifest_timestamp
+        output_base = (
+            project_root / "experiments" / "batch_downloads" / manifest_timestamp
+        )
 
     console.print(f"\nOutput directory: {output_base}", style="info")
 

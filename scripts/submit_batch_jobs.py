@@ -217,8 +217,9 @@ def main() -> None:
     print(f"Validating {len(jobs)} jobs from: {config_path.name}")
     print(f"{'=' * 80}")
 
-    base_dir = Path(__file__).parent
-    is_valid, validation_errors = validate_config(jobs, base_dir)
+    scripts_dir = Path(__file__).parent
+    project_root = scripts_dir.parent
+    is_valid, validation_errors = validate_config(jobs, scripts_dir)
 
     if not is_valid:
         print("\n❌ Validation failed with the following errors:\n", file=sys.stderr)
@@ -237,11 +238,11 @@ def main() -> None:
     print(f"{'=' * 80}")
 
     # Base command
-    submit_script = base_dir / "azure_submit_job.py"
+    submit_script = scripts_dir / "azure_submit_job.py"
 
-    # Prepare job manifest
+    # Prepare job manifest (save to project root, not scripts dir)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    manifest_dir = base_dir / "experiments" / "batch_submissions"
+    manifest_dir = project_root / "experiments" / "batch_submissions"
     manifest_dir.mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_dir / f"job_manifest_{timestamp}.json"
 
@@ -315,7 +316,7 @@ def main() -> None:
     with open(manifest_file, "w", encoding="utf-8") as f:
         json.dump(job_manifest, f, indent=2)
 
-    print(f"\n📄 Job manifest saved to: {manifest_file.relative_to(base_dir)}")
+    print(f"\n📄 Job manifest saved to: {manifest_file.relative_to(project_root)}")
     print("   Use job names from manifest to download artifacts later")
 
     if failed_jobs:
