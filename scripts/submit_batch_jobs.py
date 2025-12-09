@@ -23,8 +23,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -90,33 +92,52 @@ def validate_config(
     return is_valid, errors
 
 
-def run_command(command: list[str], dry_run: bool = False) -> bool:
-    """Run a command and return success status.
+def run_command(command: list[str], dry_run: bool = False) -> tuple[bool, str | None]:
+    """Run a command and return success status and job name.
 
     Args:
         command: Command and arguments as a list
         dry_run: If True, print command without executing
 
     Returns:
-        True if command succeeded (or dry_run), False otherwise
+        Tuple of (success, job_name)
+        - success: True if command succeeded (or dry_run), False otherwise
+        - job_name: Azure ML job name if successful, None otherwise
     """
     cmd_str = " ".join(command)
     print(f"\n{'[DRY RUN] ' if dry_run else ''}Running: {cmd_str}")
 
     if dry_run:
-        return True
+        return True, "dry_run_job_name"
 
     try:
         import os
 
         env = os.environ.copy()
         env["AZURE_BATCH_MODE"] = "true"
-        subprocess.run(command, check=True, capture_output=False, text=True, env=env)
+        result = subprocess.run(
+            command, check=True, capture_output=True, text=True, env=env
+        )
+
+        # Parse job name from output (look for "✓ Job submitted: <job_name>")
+        job_name = None
+        for line in result.stdout.split("\n"):
+            if "✓ Job submitted:" in line or "Job submitted:" in line:
+                # Extract job name after the colon
+                parts = line.split(":")
+                if len(parts) >= 2:
+                    job_name = parts[-1].strip()
+                    break
+
         print("✓ Job submitted successfully")
-        return True
+        if job_name:
+            print(f"  Job name: {job_name}")
+        return True, job_name
     except subprocess.CalledProcessError as e:
         print(f"✗ Job submission failed with exit code {e.returncode}", file=sys.stderr)
-        return False
+        if e.stderr:
+            print(f"  Error: {e.stderr}", file=sys.stderr)
+        return False, None
 
 
 def main() -> None:
@@ -218,6 +239,20 @@ def main() -> None:
     # Base command
     submit_script = base_dir / "azure_submit_job.py"
 
+    # Prepare job manifest
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    manifest_dir = base_dir / "experiments" / "batch_submissions"
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_file = manifest_dir / f"job_manifest_{timestamp}.json"
+
+    job_manifest = {
+        "submission_time": timestamp,
+        "config_file": str(config_path.name),
+        "total_jobs": len(jobs),
+        "dry_run": args.dry_run,
+        "jobs": [],
+    }
+
     success_count = 0
     failed_jobs = []
 
@@ -233,7 +268,22 @@ def main() -> None:
             f"experiment.experiment_strategy={strategy}",
         ]
 
-        success = run_command(command, dry_run=args.dry_run)
+        success, job_name = run_command(command, dry_run=args.dry_run)
+
+        # Record job in manifest
+        job_record = {
+            "index": i,
+            "model": model,
+            "experiment_strategy": strategy,
+            "status": "submitted" if success else "failed",
+            "job_name": job_name,
+            "submission_time": datetime.now().isoformat(),
+        }
+        job_manifest["jobs"].append(job_record)
+
+        # Save manifest incrementally (in case of interruption)
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            json.dump(job_manifest, f, indent=2)
 
         if success:
             success_count += 1
@@ -254,9 +304,24 @@ def main() -> None:
         print("\nFailed jobs:")
         for model, strategy in failed_jobs:
             print(f"  - model={model} experiment.experiment_strategy={strategy}")
+
+    # Final manifest update
+    job_manifest["summary"] = {
+        "successful": success_count,
+        "failed": len(failed_jobs),
+        "completion_time": datetime.now().isoformat(),
+    }
+
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump(job_manifest, f, indent=2)
+
+    print(f"\n📄 Job manifest saved to: {manifest_file.relative_to(base_dir)}")
+    print("   Use job names from manifest to download artifacts later")
+
+    if failed_jobs:
         sys.exit(1)
     else:
-        print("All jobs submitted successfully!")
+        print("\n✅ All jobs submitted successfully!")
 
 
 if __name__ == "__main__":
