@@ -73,6 +73,15 @@ Python style and libraries:
 - Strings via f-strings
 - prefer `match/case` over long `if/elif` chains when appropriate
 
+Windows compatibility and encoding:
+
+- **CRITICAL**: Never use Unicode symbols (✓, ✗, ⚠, ✅, ❌, etc.) in code that may be captured by `subprocess.run()`
+- Windows default encoding (cp1252) cannot handle Unicode symbols in subprocess output
+- Use ASCII alternatives instead: `[OK]`, `[ERROR]`, `[WARNING]`, `[SKIP]`, `[X]`, `[FILE]`
+- This applies to all user-facing messages, log output, and status indicators
+- Reason: `subprocess.run(capture_output=True, text=True)` uses system encoding, which fails with Unicode on Windows
+- Safe for direct `print()` statements, but avoid in any code that might be called via subprocess
+
 ### Repository structure (orientation)
 
 - `src/ml_segmentation/`: library code (keep Hydra out of here)
