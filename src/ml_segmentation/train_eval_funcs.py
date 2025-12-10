@@ -19,6 +19,24 @@ from torchmetrics import JaccardIndex, Precision, Recall
 from torchmetrics.classification import BinaryF1Score
 
 
+def _fix_deeplabv3plus_aspp_batchnorm(model: nn.Module) -> None:
+    """Re-apply ASPP BatchNorm fix for DeepLabV3Plus after model.train() is called.
+
+    This function sets ASPP BatchNorm layers to eval mode to avoid the
+    1x1 spatial dimension error that occurs with small batch sizes in Stage 2.
+    Must be called after model.train() to ensure the fix persists.
+
+    Args:
+        model: The model to fix (only affects DeepLabV3Plus models)
+    """
+    if hasattr(model, "decoder") and hasattr(model.decoder, "aspp"):
+        for module in model.decoder.aspp.modules():
+            if isinstance(module, nn.BatchNorm2d):
+                module.eval()
+                for param in module.parameters():
+                    param.requires_grad = False
+
+
 def _to_float(x: Any) -> float:
     """Coerce torchmetrics ``compute()`` results to ``float``.
 
@@ -138,6 +156,9 @@ def train_one_epoch(
         (IoU, Dice, Precision, Recall).
     """
     model.train()
+    # Re-apply ASPP BatchNorm fix after model.train() (DeepLabV3Plus only)
+    _fix_deeplabv3plus_aspp_batchnorm(model)
+
     running_loss = 0.0
 
     # Initialize metrics
