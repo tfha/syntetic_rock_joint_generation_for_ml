@@ -190,8 +190,8 @@ def download_job_images(
         if not should_download:
             continue
 
-        # Create output directory structure with descriptive names for stage 2
-        # Structure: {output_dir}/{display_name}/{epoch_folder}/{stage}/
+        # Create flattened output directory structure
+        # Structure: {output_dir}/{display_name}/{epoch_folder}/
         epoch_num = parse_epoch_number(epoch_folder)
         if (
             strategy == "finetune"
@@ -208,7 +208,7 @@ def download_job_images(
         else:
             renamed_epoch_folder = epoch_folder
 
-        output_subdir = output_dir / display_name / renamed_epoch_folder / stage_folder
+        output_subdir = output_dir / display_name / renamed_epoch_folder
         output_subdir.mkdir(parents=True, exist_ok=True)
 
         output_path = output_subdir / filename
@@ -219,7 +219,7 @@ def download_job_images(
             with open(output_path, "wb") as f:
                 f.write(blob_client.download_blob().readall())
             downloaded += 1
-            print(f"  Downloaded: {renamed_epoch_folder}/{stage_folder}/{filename}")
+            print(f"  Downloaded: {renamed_epoch_folder}/{filename}")
         except Exception as e:
             print(f"  Error downloading {blob_name}: {e}")
 
