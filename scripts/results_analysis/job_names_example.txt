@@ -1,8 +1,0 @@
-# Example job names file
-# Add one job name per line
-# Lines starting with # are ignored
-
-sleepy_brake_t3hrf7ydqm
-serene_comb_lr6h5l5q5t
-khaki_ticket_pgb6c0zshd
-coral_parsnip_1l84nqsk31
