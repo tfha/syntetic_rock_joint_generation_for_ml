@@ -234,7 +234,7 @@ def plot_individual_experiment(
         ax.set_xticklabels([])
 
     if show_ylabel:
-        ax.set_ylabel("val_dice_joint", fontsize=9)
+        ax.set_ylabel("val_dice_joints", fontsize=9)
     else:
         ax.set_yticklabels([])
 
