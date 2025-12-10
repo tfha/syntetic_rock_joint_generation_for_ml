@@ -46,9 +46,9 @@ EXPERIMENT_MARKERS = {
     "Generalisation Cardboard Box": "P",  # Plus (+)
     "Slope": "o",  # Circle
     "Larvik": "s",  # Square
-    "RV4": "^",  # Triangle up
+    "Rv 4": "^",  # Triangle up
     "Generalisation Larvik": "X",  # Cross (X)
-    "Generalisation RV4": "P",  # Plus (+)
+    "Generalisation Rv 4": "P",  # Plus (+)
 }
 
 # Marker face colors for strategy (filled vs hollow)
@@ -155,11 +155,11 @@ def normalize_experiment_name(exp: str) -> str:
         "generalization_cardboard_box": "Generalisation Cardboard Box",
         "slope": "Slope",
         "larvik": "Larvik",
-        "rv4": "RV4",
+        "rv4": "Rv 4",
         "generalisation_larvik": "Generalisation Larvik",
         "generalization_larvik": "Generalisation Larvik",
-        "generalisation_rv4": "Generalisation RV4",
-        "generalization_rv4": "Generalisation RV4",
+        "generalisation_rv4": "Generalisation Rv 4",
+        "generalization_rv4": "Generalisation Rv 4",
     }
     return mappings.get(exp, exp)
 
@@ -386,9 +386,9 @@ def main() -> None:
     slope_experiments = [
         "Slope",
         "Larvik",
-        "RV4",
+        "Rv 4",
         "Generalisation Larvik",
-        "Generalisation RV4",
+        "Generalisation Rv 4",
     ]
 
     print("\nGenerating 5x2 grid plot...")
