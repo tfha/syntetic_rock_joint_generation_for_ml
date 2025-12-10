@@ -66,20 +66,25 @@ def crop_composite_image(
 ) -> tuple[Image.Image, Image.Image, Image.Image]:
     """Crop a composite image into its three components.
 
+    The composite images have layout: original | ground_truth | prediction
+    with white padding between components.
+
     Args:
-        img: Composite image with 3 columns (original, mask, prediction)
+        img: Composite image with 3 columns (original, ground_truth, prediction)
 
     Returns:
-        Tuple of (original, mask, prediction) images
+        Tuple of (original, ground_truth, prediction) in display order
     """
-    width, height = img.size
-    third_width = width // 3
+    # Exact crop coordinates based on actual content boundaries:
+    # Original: (188, 82) to (530, 423)
+    # Ground Truth: (598, 82) to (940, 423)
+    # Prediction: (1008, 82) to (1350, 423)
 
-    original = img.crop((0, 0, third_width, height))
-    mask = img.crop((third_width, 0, 2 * third_width, height))
-    prediction = img.crop((2 * third_width, 0, width, height))
+    original = img.crop((188, 82, 530, 423))
+    ground_truth = img.crop((598, 82, 940, 423))
+    prediction = img.crop((1008, 82, 1350, 423))
 
-    return original, mask, prediction
+    return original, ground_truth, prediction
 
 
 def plot_progression_grid(
