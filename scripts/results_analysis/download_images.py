@@ -176,8 +176,13 @@ def download_job_images(
         if epoch_folder == "final" and stage_folder == "test":
             should_download = True
         elif strategy == "simplemixed":
-            # SimpleMixed: test stage, epochs 5 and 10
-            if stage_folder == "test" and epoch_folder in ["epoch_5", "epoch_10"]:
+            # SimpleMixed: test stage, epochs 5, 10, 15, and 20
+            if stage_folder == "test" and epoch_folder in [
+                "epoch_5",
+                "epoch_10",
+                "epoch_15",
+                "epoch_20",
+            ]:
                 should_download = True
         elif strategy == "finetune":
             # For finetune, use the target epochs we determined from metrics

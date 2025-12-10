@@ -118,8 +118,8 @@ def plot_progression_grid(
         ]
         epoch_numbers = [5, 10, 13, 17, None]  # None for final
     else:  # simplemixed
-        epoch_folders = ["epoch_5", "epoch_10", "final"]
-        epoch_numbers = [5, 10, None]
+        epoch_folders = ["epoch_5", "epoch_10", "epoch_15", "epoch_20", "final"]
+        epoch_numbers = [5, 10, 15, 20, None]
 
     # Check which epoch folders exist and dynamically update epoch labels
     available_folders = []
@@ -158,9 +158,18 @@ def plot_progression_grid(
 
     # Read Dice scores from metrics
     epoch_scores = {}
+    final_epoch_score = None
     if metrics_path.exists():
         valid_epoch_nums = [e for e in available_epochs if e is not None]
         epoch_scores = read_metrics_for_epochs(metrics_path, valid_epoch_nums)
+
+        # Get the final epoch score (last row in metrics)
+        try:
+            df = pd.read_csv(metrics_path)
+            if "val_dice_joints" in df.columns and not df.empty:
+                final_epoch_score = df["val_dice_joints"].iloc[-1]
+        except Exception as e:
+            print(f"Warning: Could not read final epoch score: {e}")
 
     # Get list of available samples from first epoch folder
     first_epoch_dir = image_dir / available_folders[0]
@@ -178,10 +187,13 @@ def plot_progression_grid(
 
     # Calculate figure size if not provided
     if figsize is None:
-        # Each cell should be square-ish for the cropped images
+        # Use consistent dimensions regardless of strategy
+        # Finetune has 7 columns (original + mask + 5 predictions)
+        # SimpleMixed has 7 columns (original + mask + 5 predictions)
         cell_height = 2.0
         cell_width = 2.0
-        figsize = (cell_width * num_cols + 0.5, cell_height * actual_num_samples + 1)
+        # Fixed width for 7 columns + extra space for sample labels on left
+        figsize = (cell_width * 7 + 2.0, cell_height * actual_num_samples + 1)
 
     # Create figure and axes
     fig, axes = plt.subplots(
@@ -190,6 +202,9 @@ def plot_progression_grid(
         figsize=figsize,
         squeeze=False,
     )
+
+    # Adjust subplot positioning to make room for sample labels on the left
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.95, bottom=0.05)
 
     # Plot images for each sample
     for row, sample_file in enumerate(sample_files):
@@ -267,33 +282,50 @@ def plot_progression_grid(
                 title = epoch_label
 
                 # Add Dice score if available
-                if epoch_num in epoch_scores:
+                if epoch_num is None and final_epoch_score is not None:
+                    # This is the final epoch
+                    title += f"\nDice: {final_epoch_score:.3f}"
+                elif epoch_num in epoch_scores:
                     dice = epoch_scores[epoch_num]
                     title += f"\nDice: {dice:.3f}"
 
                 ax.set_title(title, fontsize=10, fontweight="bold")
 
-        # Add row labels (sample number) on first column
-        axes[row, 0].set_ylabel(
-            f"Sample {row}",
-            fontsize=9,
-            rotation=0,
-            labelpad=30,
-            ha="right",
-            va="center",
-        )
-
-    # Add overall title with job information
+    # Add overall title with job information (remove date/time suffix)
     job_display_name = image_dir.name
+    # Remove the datetime suffix (format: -YYYYMMDD-HHMM)
+    job_name_without_datetime = "-".join(job_display_name.split("-")[:-2])
     fig.suptitle(
-        f"Training Progression: {job_display_name}",
+        f"Training Progression: {job_name_without_datetime}",
         fontsize=14,
         fontweight="bold",
         y=0.995,
     )
 
-    # Adjust layout
-    plt.tight_layout(rect=[0, 0, 1, 0.99])
+    # Adjust layout FIRST - leave more space on the left for sample labels
+    plt.tight_layout(rect=[0.08, 0, 1, 0.99])
+
+    # Add sample labels AFTER layout is finalized
+    # Note: axes[row, 0] gives the subplot at that row position
+    for row in range(actual_num_samples):
+        # Get the bbox of the subplot in figure coordinates
+        bbox = axes[row, 0].get_position()
+        # Calculate vertical center of this subplot
+        row_center_y = (bbox.y0 + bbox.y1) / 2
+
+        # Position labels to the left of the leftmost subplot
+        label_x = bbox.x0 - 0.02  # 2% to the left of subplot
+
+        fig.text(
+            label_x,
+            row_center_y,
+            f"Sample {row}",
+            fontsize=10,
+            fontweight="bold",
+            ha="right",  # Right-align so text extends leftward
+            va="center",
+            transform=fig.transFigure,
+        )
 
     # Save figure
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -366,6 +398,17 @@ def main() -> None:
             metrics_file = args.metrics_dir / f"{alt_name}_metrics.csv"
             if metrics_file.exists():
                 print(f"Found metrics file: {metrics_file.name}")
+            else:
+                # For simplemixed, try finding any metrics file matching the base name
+                # (timestamp in image folder might differ from metrics timestamp)
+                base_name = name_parts[
+                    0
+                ]  # e.g., "deeplabv3plus-simplemixed_generalisation_cardboard_box_30"
+                pattern = f"{base_name}-*_metrics.csv"
+                matching_files = list(args.metrics_dir.glob(pattern))
+                if matching_files:
+                    metrics_file = matching_files[0]
+                    print(f"Found metrics file: {metrics_file.name}")
 
     # Output path
     output_file = args.output_dir / f"{args.job_name}_progression.png"
