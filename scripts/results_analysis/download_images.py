@@ -115,6 +115,8 @@ def download_job_images(
 
     # Determine target epochs for finetune
     target_epochs = set()
+    stage2_first_epoch = None
+    stage2_fifth_epoch = None
     if strategy == "finetune" and epoch_to_stage:
         # Find epochs for stage 1: get epochs 5 and 10
         stage1_epochs = [ep for ep, st in epoch_to_stage.items() if st == 1]
@@ -130,11 +132,13 @@ def download_job_images(
         stage2_epochs.sort()
 
         if len(stage2_epochs) > 0:
-            target_epochs.add(stage2_epochs[0])  # First stage 2 epoch
-            print(f"  Stage 2 starts at epoch {stage2_epochs[0]}")
+            stage2_first_epoch = stage2_epochs[0]  # First stage 2 epoch
+            target_epochs.add(stage2_first_epoch)
+            print(f"  Stage 2 starts at epoch {stage2_first_epoch}")
         if len(stage2_epochs) >= 5:
-            target_epochs.add(stage2_epochs[4])  # 5th stage 2 epoch
-            print(f"  Stage 2 fifth epoch is {stage2_epochs[4]}")
+            stage2_fifth_epoch = stage2_epochs[4]  # 5th stage 2 epoch
+            target_epochs.add(stage2_fifth_epoch)
+            print(f"  Stage 2 fifth epoch is {stage2_fifth_epoch}")
 
     # Base path for this job
     job_blob_prefix = f"ExperimentRun/dcid.{job_name}/outputs/models/example_images/"
@@ -186,9 +190,25 @@ def download_job_images(
         if not should_download:
             continue
 
-        # Create output directory structure
+        # Create output directory structure with descriptive names for stage 2
         # Structure: {output_dir}/{display_name}/{epoch_folder}/{stage}/
-        output_subdir = output_dir / display_name / epoch_folder / stage_folder
+        epoch_num = parse_epoch_number(epoch_folder)
+        if (
+            strategy == "finetune"
+            and stage_folder == "stage2_val"
+            and epoch_num is not None
+        ):
+            # Use descriptive names for stage 2 epochs
+            if epoch_num == stage2_first_epoch:
+                renamed_epoch_folder = f"epoch_{epoch_num}_stage2_first_epoch"
+            elif epoch_num == stage2_fifth_epoch:
+                renamed_epoch_folder = f"epoch_{epoch_num}_stage2_fifth_epoch"
+            else:
+                renamed_epoch_folder = epoch_folder
+        else:
+            renamed_epoch_folder = epoch_folder
+
+        output_subdir = output_dir / display_name / renamed_epoch_folder / stage_folder
         output_subdir.mkdir(parents=True, exist_ok=True)
 
         output_path = output_subdir / filename
@@ -199,7 +219,7 @@ def download_job_images(
             with open(output_path, "wb") as f:
                 f.write(blob_client.download_blob().readall())
             downloaded += 1
-            print(f"  Downloaded: {epoch_folder}/{stage_folder}/{filename}")
+            print(f"  Downloaded: {renamed_epoch_folder}/{stage_folder}/{filename}")
         except Exception as e:
             print(f"  Error downloading {blob_name}: {e}")
 
