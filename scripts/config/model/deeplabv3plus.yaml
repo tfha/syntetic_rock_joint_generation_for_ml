@@ -3,7 +3,7 @@ num_epochs: 100  # Increased from 50 to give more time for joint learning
 batch_size: 8
 learning_rate: 0.001
 scheduler:
-  mode: min      # Changed to min for finetune/simplemixed experiments
+  mode: max      # Changed back to max
   patience: 5    # Increased from 3 to allow more exploration before LR reduction
   gamma: 0.5     # Reduce LR by 2x instead of 10x (was 0.1)
 params:
