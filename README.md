@@ -1006,6 +1006,10 @@ python scripts/submit_job_azure.py model=unet model.params.encoder_name=resnet50
 
 The Bayesian optimization approach efficiently explores the hyperparameter space, requiring far fewer trials than grid search to find optimal settings for your rock joint segmentation models.
 
+## Results Analysis
+
+After training models in Azure ML, use the results analysis tools to download metrics and images, create publication plots, and visualize training progression. For detailed usage instructions and examples, see [`scripts/results_analysis/README.md`](scripts/results_analysis/README.md).
+
 ### Inspect the experiment results in MLflow
 
 The experiments directory is stored in a shared location, so you can inspect the results of the experiments by running the following command:
