@@ -61,15 +61,38 @@ def read_metrics_for_epochs(
         return {}
 
 
+def crop_composite_image(
+    img: Image.Image,
+) -> tuple[Image.Image, Image.Image, Image.Image]:
+    """Crop a composite image into its three components.
+
+    Args:
+        img: Composite image with 3 columns (original, mask, prediction)
+
+    Returns:
+        Tuple of (original, mask, prediction) images
+    """
+    width, height = img.size
+    third_width = width // 3
+
+    original = img.crop((0, 0, third_width, height))
+    mask = img.crop((third_width, 0, 2 * third_width, height))
+    prediction = img.crop((2 * third_width, 0, width, height))
+
+    return original, mask, prediction
+
+
 def plot_progression_grid(
     image_dir: Path,
     metrics_path: Path,
     output_path: Path,
     strategy: str,
-    num_samples: int = 5,
+    num_samples: int = 10,
     figsize: tuple[float, float] | None = None,
 ) -> None:
     """Create a progression grid showing model predictions over training.
+
+    Each row shows: original image, ground truth mask, then predictions from different epochs.
 
     Args:
         image_dir: Directory containing epoch folders with images
@@ -93,14 +116,32 @@ def plot_progression_grid(
         epoch_folders = ["epoch_5", "epoch_10", "final"]
         epoch_numbers = [5, 10, None]
 
-    # Check which epoch folders exist
+    # Check which epoch folders exist and dynamically update epoch labels
     available_folders = []
-    available_epochs = []
+    available_epochs: list[int | None] = []
+    available_labels = []
+
     for folder, epoch_num in zip(epoch_folders, epoch_numbers, strict=False):
         folder_path = image_dir / folder
         if folder_path.exists():
-            available_folders.append(folder)
-            available_epochs.append(epoch_num)
+            # Check if it's a stage2 folder and extract actual epoch number
+            if "stage2_first_epoch" in folder:
+                actual_epoch = int(folder.split("_")[1])
+                available_folders.append(folder)
+                available_epochs.append(actual_epoch)
+                available_labels.append(f"Epoch {actual_epoch}\n(Stage 2 Start)")
+            elif "stage2_fifth_epoch" in folder:
+                actual_epoch = int(folder.split("_")[1])
+                available_folders.append(folder)
+                available_epochs.append(actual_epoch)
+                available_labels.append(f"Epoch {actual_epoch}\n(Stage 2 5th)")
+            else:
+                available_folders.append(folder)
+                available_epochs.append(epoch_num)
+                if epoch_num is None:
+                    available_labels.append("Final")
+                else:
+                    available_labels.append(f"Epoch {epoch_num}")
         else:
             print(f"Warning: Epoch folder not found: {folder_path}")
 
@@ -108,7 +149,7 @@ def plot_progression_grid(
         print(f"Error: No epoch folders found in {image_dir}")
         return
 
-    num_epochs = len(available_folders)
+    num_prediction_epochs = len(available_folders)
 
     # Read Dice scores from metrics
     epoch_scores = {}
@@ -125,46 +166,81 @@ def plot_progression_grid(
         return
 
     actual_num_samples = len(sample_files)
+    num_cols = 2 + num_prediction_epochs  # original + mask + predictions
     print(
-        f"Creating progression plot with {actual_num_samples} samples × {num_epochs} epochs"
+        f"Creating progression plot with {actual_num_samples} samples × {num_cols} columns"
     )
 
     # Calculate figure size if not provided
     if figsize is None:
-        # Each cell should be reasonably sized for the composite images
-        cell_height = 2.5
-        cell_width = 3.5
-        figsize = (cell_width * num_epochs + 1, cell_height * actual_num_samples + 1)
+        # Each cell should be square-ish for the cropped images
+        cell_height = 2.0
+        cell_width = 2.0
+        figsize = (cell_width * num_cols + 0.5, cell_height * actual_num_samples + 1)
 
     # Create figure and axes
     fig, axes = plt.subplots(
         actual_num_samples,
-        num_epochs,
+        num_cols,
         figsize=figsize,
         squeeze=False,
     )
 
-    # Plot images
+    # Plot images for each sample
     for row, sample_file in enumerate(sample_files):
         sample_name = sample_file.name
 
-        for col, (epoch_folder, epoch_num) in enumerate(
-            zip(available_folders, available_epochs, strict=False)
+        # Load the first epoch image to extract original and mask
+        first_image_path = image_dir / available_folders[0] / sample_name
+        if not first_image_path.exists():
+            print(f"Warning: Missing {first_image_path}")
+            continue
+
+        try:
+            first_img = Image.open(first_image_path)
+            original, mask, _ = crop_composite_image(first_img)
+
+            # Plot original image (column 0)
+            axes[row, 0].imshow(original)
+            axes[row, 0].set_aspect("equal")
+            axes[row, 0].axis("off")
+            if row == 0:
+                axes[row, 0].set_title("Original", fontsize=10, fontweight="bold")
+
+            # Plot mask (column 1)
+            axes[row, 1].imshow(mask)
+            axes[row, 1].set_aspect("equal")
+            axes[row, 1].axis("off")
+            if row == 0:
+                axes[row, 1].set_title("Ground Truth", fontsize=10, fontweight="bold")
+
+        except Exception as e:
+            print(f"Error loading {first_image_path}: {e}")
+            axes[row, 0].text(0.5, 0.5, "Error", ha="center", va="center")
+            axes[row, 0].axis("off")
+            axes[row, 1].text(0.5, 0.5, "Error", ha="center", va="center")
+            axes[row, 1].axis("off")
+
+        # Plot predictions from each epoch (columns 2+)
+        for col_offset, (epoch_folder, epoch_num, epoch_label) in enumerate(
+            zip(available_folders, available_epochs, available_labels, strict=False)
         ):
+            col = 2 + col_offset
             ax = axes[row, col]
 
-            # Load and display image
             image_path = image_dir / epoch_folder / sample_name
             if image_path.exists():
                 try:
                     img = Image.open(image_path)
-                    ax.imshow(img)
+                    _, _, prediction = crop_composite_image(img)
+                    ax.imshow(prediction)
+                    ax.set_aspect("equal")
                 except Exception as e:
                     print(f"Error loading {image_path}: {e}")
                     ax.text(
                         0.5,
                         0.5,
-                        "Image\nError",
+                        "Error",
                         ha="center",
                         va="center",
                         transform=ax.transAxes,
@@ -183,10 +259,7 @@ def plot_progression_grid(
 
             # Add column titles (epoch + score) on first row
             if row == 0:
-                if epoch_num is None:
-                    title = "Final"
-                else:
-                    title = f"Epoch {epoch_num}"
+                title = epoch_label
 
                 # Add Dice score if available
                 if epoch_num in epoch_scores:
@@ -195,14 +268,15 @@ def plot_progression_grid(
 
                 ax.set_title(title, fontsize=10, fontweight="bold")
 
-            # Add row labels (sample number) on first column
-            if col == 0:
-                ax.set_ylabel(
-                    f"Sample {row}",
-                    fontsize=9,
-                    rotation=90,
-                    labelpad=10,
-                )
+        # Add row labels (sample number) on first column
+        axes[row, 0].set_ylabel(
+            f"Sample {row}",
+            fontsize=9,
+            rotation=0,
+            labelpad=30,
+            ha="right",
+            va="center",
+        )
 
     # Add overall title with job information
     job_display_name = image_dir.name
