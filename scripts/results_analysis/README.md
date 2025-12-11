@@ -146,6 +146,19 @@ poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-d
 
 **Output:** `experiments/results/plots/epoch_progression_{metric}_{experiment}_{model}_page*.png`
 
+**Batch generation for multiple metrics:**
+
+Generate plots for all key metrics in one go:
+
+```bash
+# Generate dice_joints, dice, and loss plots
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric loss
+```
+
+Available metrics: `dice_joints`, `dice`, `iou_joints`, `iou`, `loss`, `precision_joints`, `recall_joints`
+
 ### 4. Create Training Progression Visualizations
 
 Generate visualizations showing how predictions improve during training:
