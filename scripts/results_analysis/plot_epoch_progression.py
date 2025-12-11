@@ -768,7 +768,7 @@ def main():
     ]
 
     # Define all proportions to plot
-    proportions = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0]
+    proportions = [0.1, 0.3, 0.5, 0.7, 0.9]
 
     if args.separate_pages:
         # Generate 4 separate A4 pages

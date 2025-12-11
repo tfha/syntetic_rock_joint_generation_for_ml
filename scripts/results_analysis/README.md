@@ -128,7 +128,7 @@ poetry run python scripts/results_analysis/plot_metrics_vs_proportion_real.py --
 Generate 4-page plots showing training progression over epochs for Box and Slope experiments:
 
 ```bash
-poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric val_dice_joints
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
 ```
 
 **Plot organization (4 pages):**
