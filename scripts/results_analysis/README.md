@@ -36,9 +36,7 @@ Download metrics (training/validation scores per epoch) from completed jobs:
 
 ```bash
 # Download metrics for all jobs in a text file
-poetry run python scripts/results_analysis/download_metrics.py \
-  --jobs-file experiments/results/job_names_mode=max.txt \
-  --output-folder-name "mode=max"
+poetry run python scripts/results_analysis/download_metrics.py --jobs-file experiments/results/job_names_mode=max.txt --output-folder-name "mode=max"
 ```
 
 **What gets downloaded:**
@@ -60,10 +58,7 @@ Download prediction images (composites of original, ground truth, prediction):
 
 ```bash
 # Download images for jobs in a text file
-poetry run python scripts/results_analysis/download_images.py \
-  --jobs-file scripts/results_analysis/test_image_jobs.txt \
-  --output-dir experiments/results/images \
-  --use-display-names
+poetry run python scripts/results_analysis/download_images.py --jobs-file scripts/results_analysis/test_image_jobs.txt --output-dir experiments/results/images --use-display-names
 ```
 
 **Strategy-specific epochs:**
@@ -101,9 +96,7 @@ experiments/results/images/
 Generate publication-quality comparison plots (5×2 grids):
 
 ```bash
-poetry run python scripts/results_analysis/plot_journal_figures.py \
-  --metrics-dir experiments/results/metrics/mode=max \
-  --output-dir experiments/results/plots
+poetry run python scripts/results_analysis/plot_journal_figures.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots
 ```
 
 **Generated plots compare:**
@@ -120,18 +113,10 @@ Generate training progression visualizations showing prediction improvement:
 
 ```bash
 # SimpleMixed experiment
-poetry run python scripts/results_analysis/plot_progression.py \
-  --image-dir experiments/results/images \
-  --job-name "deeplabv3plus-simplemixed_generalisation_cardboard_box_30-20251209-2337" \
-  --strategy simplemixed \
-  --num-samples 10
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-simplemixed_generalisation_cardboard_box_30-20251209-2337" --strategy simplemixed --num-samples 10
 
 # Finetune experiment
-poetry run python scripts/results_analysis/plot_progression.py \
-  --image-dir experiments/results/images \
-  --job-name "deeplabv3plus-finetune_generalisation_pattern_box_10-20251210-0957" \
-  --strategy finetune \
-  --num-samples 7
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-finetune_generalisation_pattern_box_10-20251210-0957" --strategy finetune --num-samples 7
 ```
 
 **Progression plot layout:**
