@@ -1140,6 +1140,12 @@ def create_splits_for_experiment(
             raise ValueError(
                 f"Not enough test data: need {n_test_real}, have {len(test_shuffled)}"
             )
+    elif fixed_test_set is not None:
+        # Using pre-allocated fixed test set (no validation needed, already split)
+        if n_test_real > len(fixed_test_set):
+            raise ValueError(
+                f"Not enough fixed test data: need {n_test_real}, have {len(fixed_test_set)}"
+            )
     else:
         # Using real_files for both train and test
         if (n_train_real + n_test_real) > len(real_shuffled):
@@ -1396,7 +1402,7 @@ def main(cfg: DictConfig) -> None:
 
     # Pre-select CARDBOARD BOX test set (same for all cardboard_box experiments)
     random.seed(pcfg.experiment.seed)
-    cardboard_test_shuffled = real_box_files.copy()
+    cardboard_test_shuffled = cardboard_files.copy()
     random.shuffle(cardboard_test_shuffled)
     cardboard_fixed_test = cardboard_test_shuffled[-cardboard_test_size:]  # type: ignore[operator]
     cardboard_train_pool = cardboard_test_shuffled[:-cardboard_test_size]  # type: ignore[operator]
@@ -1444,10 +1450,12 @@ def main(cfg: DictConfig) -> None:
     random.shuffle(gen_pattern_test_shuffled)
     gen_pattern_fixed_test = gen_pattern_test_shuffled[-gen_pattern_test_size:]  # type: ignore[operator]
 
-    # Cardboard pool for training (completely separate from pattern)
+    # Cardboard pool for training in generalization experiments (completely separate from pattern)
     cardboard_train_shuffled = cardboard_files.copy()
     random.shuffle(cardboard_train_shuffled)
-    cardboard_train_pool = cardboard_train_shuffled  # All available for training
+    cardboard_train_pool_for_gen = (
+        cardboard_train_shuffled  # All available for gen training
+    )
 
     # Gen Cardboard Box: train on pattern, test on cardboard
     random.seed(pcfg.experiment.seed)
@@ -1516,13 +1524,13 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(cardboard_train_pool)} real cardboard (train), {len(gen_pattern_fixed_test)} real pattern (test)"
+        f"{len(cardboard_train_pool_for_gen)} real cardboard (train), {len(gen_pattern_fixed_test)} real pattern (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_GEN_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=cardboard_train_pool,  # Train on cardboard ONLY
+            real_files=cardboard_train_pool_for_gen,  # Train on cardboard ONLY
             output_dir=output_base / "sm_gen_pattern_box",
             seed=pcfg.experiment.seed,
             fixed_test_set=gen_pattern_fixed_test,  # Test on pattern (pre-selected)
@@ -1686,13 +1694,13 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard (Stage 1), "
-        f"{len(cardboard_train_pool)} real cardboard (Stage 2), {len(gen_pattern_fixed_test)} real pattern (test)"
+        f"{len(cardboard_train_pool_for_gen)} real cardboard (Stage 2), {len(gen_pattern_fixed_test)} real pattern (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_GEN_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=cardboard_train_pool,  # Train on cardboard ONLY
+            real_files=cardboard_train_pool_for_gen,  # Train on cardboard ONLY
             output_dir=output_base / "ft_gen_pattern_box",
             seed=pcfg.experiment.seed,
             fixed_test_set=gen_pattern_fixed_test,  # Test on pattern (pre-selected)
