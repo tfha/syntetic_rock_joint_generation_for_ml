@@ -322,6 +322,8 @@ def validate_no_data_leakage(
     val_list: list[str],
     test_list: list[str],
     experiment_name: str = "current experiment",
+    train_synthetic_list: list[str] | None = None,
+    train_real_list: list[str] | None = None,
 ) -> None:
     """
     Validates that there is no data leakage between train, validation, and test sets.
@@ -331,19 +333,27 @@ def validate_no_data_leakage(
     - Training and test sets
     - Validation and test sets
 
+    For finetune experiments, additional checks are performed if stage-specific lists are provided:
+    - Synthetic training and test sets
+    - Real training and test sets
+
     If any overlap is detected, raises a ValueError with details about the leakage.
     This check runs before training starts to ensure data integrity.
 
     Parameters
     ----------
     train_list : list[str]
-        List of training file names
+        List of training file names (combined for FT experiments)
     val_list : list[str]
         List of validation file names
     test_list : list[str]
         List of test file names
     experiment_name : str, optional
         Name of the experiment for error reporting, by default "current experiment"
+    train_synthetic_list : list[str] | None, optional
+        List of synthetic training files for finetune experiments (stage 1), by default None
+    train_real_list : list[str] | None, optional
+        List of real training files for finetune experiments (stage 2), by default None
 
     Raises
     ------
@@ -356,42 +366,104 @@ def validate_no_data_leakage(
     >>> val_files = ["img3.png"]
     >>> test_files = ["img4.png"]
     >>> validate_no_data_leakage(train_files, val_files, test_files, "box_50")
+
+    >>> # Finetune experiment with stage-specific validation
+    >>> synthetic = ["synth1.png", "synth2.png"]
+    >>> real = ["real1.png", "real2.png"]
+    >>> combined = synthetic + real
+    >>> validate_no_data_leakage(
+    ...     combined,
+    ...     val_files,
+    ...     test_files,
+    ...     "FT_box_50",
+    ...     train_synthetic_list=synthetic,
+    ...     train_real_list=real,
+    ... )
     """
     train_set = set(train_list)
     val_set = set(val_list)
     test_set = set(test_list)
 
-    # Check train/val overlap
-    train_val_overlap = train_set & val_set
-    if train_val_overlap:
-        raise ValueError(
-            f"[CRITICAL] Data leakage detected in {experiment_name}! "
-            f"Found {len(train_val_overlap)} overlapping files between train and validation sets. "
-            f"Sample overlap: {list(train_val_overlap)[:5]}"
-        )
+    # For finetune experiments, check stage-specific overlaps FIRST
+    # (This catches stage-specific leakage before combined checks)
+    if train_synthetic_list is not None and train_real_list is not None:
+        synthetic_set = set(train_synthetic_list)
+        real_set = set(train_real_list)
 
-    # Check train/test overlap
-    train_test_overlap = train_set & test_set
-    if train_test_overlap:
-        raise ValueError(
-            f"[CRITICAL] Data leakage detected in {experiment_name}! "
-            f"Found {len(train_test_overlap)} overlapping files between train and test sets. "
-            f"Sample overlap: {list(train_test_overlap)[:5]}"
-        )
+        # Check synthetic stage (stage 1) vs test
+        synthetic_test_overlap = synthetic_set & test_set
+        if synthetic_test_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name} (FT Stage 1: Synthetic)! "
+                f"Found {len(synthetic_test_overlap)} overlapping files between synthetic train and test sets. "
+                f"Sample overlap: {list(synthetic_test_overlap)[:5]}"
+            )
 
-    # Check val/test overlap
-    val_test_overlap = val_set & test_set
-    if val_test_overlap:
-        raise ValueError(
-            f"[CRITICAL] Data leakage detected in {experiment_name}! "
-            f"Found {len(val_test_overlap)} overlapping files between validation and test sets. "
-            f"Sample overlap: {list(val_test_overlap)[:5]}"
-        )
+        # Check real stage (stage 2) vs test
+        real_test_overlap = real_set & test_set
+        if real_test_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name} (FT Stage 2: Real)! "
+                f"Found {len(real_test_overlap)} overlapping files between real train and test sets. "
+                f"Sample overlap: {list(real_test_overlap)[:5]}"
+            )
 
-    print(
-        f"[OK] Data integrity check passed for {experiment_name}: "
-        f"{len(train_list)} train, {len(val_list)} val, {len(test_list)} test files - no leakage detected"
-    )
+        # Check synthetic stage (stage 1) vs val
+        synthetic_val_overlap = synthetic_set & val_set
+        if synthetic_val_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name} (FT Stage 1: Synthetic)! "
+                f"Found {len(synthetic_val_overlap)} overlapping files between synthetic train and validation sets. "
+                f"Sample overlap: {list(synthetic_val_overlap)[:5]}"
+            )
+
+        # Check real stage (stage 2) vs val
+        real_val_overlap = real_set & val_set
+        if real_val_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name} (FT Stage 2: Real)! "
+                f"Found {len(real_val_overlap)} overlapping files between real train and validation sets. "
+                f"Sample overlap: {list(real_val_overlap)[:5]}"
+            )
+
+        print(
+            f"[OK] Data integrity check passed for {experiment_name} (FT): "
+            f"{len(train_synthetic_list)} synthetic train, {len(train_real_list)} real train, "
+            f"{len(val_list)} val, {len(test_list)} test files - no leakage detected"
+        )
+    else:
+        # Standard validation for non-FT experiments
+        # Check train/val overlap
+        train_val_overlap = train_set & val_set
+        if train_val_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name}! "
+                f"Found {len(train_val_overlap)} overlapping files between train and validation sets. "
+                f"Sample overlap: {list(train_val_overlap)[:5]}"
+            )
+
+        # Check train/test overlap
+        train_test_overlap = train_set & test_set
+        if train_test_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name}! "
+                f"Found {len(train_test_overlap)} overlapping files between train and test sets. "
+                f"Sample overlap: {list(train_test_overlap)[:5]}"
+            )
+
+        # Check val/test overlap
+        val_test_overlap = val_set & test_set
+        if val_test_overlap:
+            raise ValueError(
+                f"[CRITICAL] Data leakage detected in {experiment_name}! "
+                f"Found {len(val_test_overlap)} overlapping files between validation and test sets. "
+                f"Sample overlap: {list(val_test_overlap)[:5]}"
+            )
+
+        print(
+            f"[OK] Data integrity check passed for {experiment_name}: "
+            f"{len(train_list)} train, {len(val_list)} val, {len(test_list)} test files - no leakage detected"
+        )
 
 
 def validate_data_pre_transform(

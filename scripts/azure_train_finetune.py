@@ -66,6 +66,7 @@ from ml_segmentation.azure_core import (  # noqa: E402
 from ml_segmentation.data_loading import (  # noqa: E402
     SegmentationDataset,
     get_transforms,
+    validate_no_data_leakage,
 )
 from ml_segmentation.debug_functionality import better_traceback  # noqa: E402
 from ml_segmentation.define_model import choose_model  # noqa: E402
@@ -118,6 +119,22 @@ def load_finetune_splits(splits_path: Path) -> tuple[list, list, list, list]:
         f"Loaded FT splits: {len(train_synthetic)} synthetic, "
         f"{len(train_real)} real, {len(val_list)} val, {len(test_list)} test",
         style="info",
+    )
+
+    # VALIDATE NO DATA LEAKAGE (CRITICAL) - FT-specific validation
+    console.print(
+        "Validating data integrity (checking for train/val/test leakage)...",
+        style="info",
+    )
+    experiment_name = os.environ.get("AZUREML_RUN_DISPLAY_NAME", "azure_ft_experiment")
+    combined_train = train_synthetic + train_real
+    validate_no_data_leakage(
+        train_list=combined_train,
+        val_list=val_list,
+        test_list=test_list,
+        experiment_name=experiment_name,
+        train_synthetic_list=train_synthetic,
+        train_real_list=train_real,
     )
 
     return train_synthetic, train_real, val_list, test_list

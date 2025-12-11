@@ -317,12 +317,24 @@ def main(cfg: DictConfig) -> None:
         "Validating data integrity (checking for train/val/test leakage)...",
         style="info",
     )
-    validate_no_data_leakage(
-        train_list=train_list,
-        val_list=val_list,
-        test_list=test_list,
-        experiment_name=pcfg.experiment.experiment_strategy,
-    )
+    if is_finetune:
+        # For FT experiments, validate stage-specific splits to ensure no leakage
+        validate_no_data_leakage(
+            train_list=train_list,
+            val_list=val_list,
+            test_list=test_list,
+            experiment_name=pcfg.experiment.experiment_strategy,
+            train_synthetic_list=train_synthetic_list,
+            train_real_list=train_real_list,
+        )
+    else:
+        # For SM/standard experiments, validate combined splits only
+        validate_no_data_leakage(
+            train_list=train_list,
+            val_list=val_list,
+            test_list=test_list,
+            experiment_name=pcfg.experiment.experiment_strategy,
+        )
 
     # VALIDATE DATA - OPTIONAL
     ############################
