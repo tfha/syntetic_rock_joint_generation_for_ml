@@ -22,6 +22,7 @@ After training models in Azure ML, use these tools to:
 - **`plot_metrics_vs_proportion_real.py`** - Create plots showing metric vs synthetic/real data ratio
 - **`plot_epoch_progression.py`** - Create 4-page plots showing training curves over epochs
 - **`plot_progression.py`** - Generate training progression visualizations showing prediction improvement
+- **`plot_progression_batch.py`** - Batch generate progression plots for all downloaded jobs automatically
 
 ### Legacy/Experimental
 
@@ -192,23 +193,39 @@ poetry run python scripts/results_analysis/plot_progression.py --image-dir exper
 
 **Output:** `experiments/results/plots/progression/{job_name}_progression.png`
 
-**Batch generation for multiple jobs:**
+**Batch generation for all jobs:**
 
-To generate progression plots for multiple jobs, create a script or run commands in sequence:
+Automatically generate progression plots for all downloaded job folders:
 
 ```bash
-# Example: Generate progression plots for selected representative jobs
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "unet-simplemixed_box_10-20251211-1603" --strategy simplemixed --num-samples 10
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "unet-finetune_box_10-20251210-0956" --strategy finetune --num-samples 10
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-simplemixed_box_10-20251211-1631" --strategy simplemixed --num-samples 10
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-finetune_box_10-20251210-0956" --strategy finetune --num-samples 10
+poetry run python scripts/results_analysis/plot_progression_batch.py --image-dir experiments/results/images --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots/progression --num-samples 10
 ```
 
-**Tips:**
-- Focus on representative experiments (e.g., one from each model×strategy×proportion combination)
-- Use consistent `--num-samples` across comparisons for fair visual comparison
-- Job names must match the directory names in `experiments/results/images/`
-- Progression plots are most useful for key experiments with interesting learning patterns
+**How it works:**
+- Automatically detects all job folders in the image directory
+- Identifies training strategy (finetune/simplemixed) from folder names
+- Matches each job with its corresponding metrics CSV file
+- Handles timestamp differences between image folders and metrics files
+- Generates progression plots for all jobs with available images and metrics
+
+**Features:**
+- **Auto-detection**: Determines finetune vs simplemixed from folder names
+- **Smart matching**: Finds metrics files despite different naming conventions
+- **Error handling**: Skips jobs with missing data and reports summary
+- **Consistent output**: All plots use the same number of samples for fair comparison
+
+**Summary output example:**
+```
+Found 50 job folders
+Processing: unet-simplemixed_box_10-20251211-1603
+  Detected strategy: simplemixed
+  Using metrics: unet-simplemixed_box_10-20251211-1603_metrics.csv
+  ✓ Saved: unet-simplemixed_box_10-20251211-1603_progression.png
+...
+Summary:
+  Processed: 45 plots
+  Skipped: 5 jobs
+```
 
 ## Metrics Explained
 
