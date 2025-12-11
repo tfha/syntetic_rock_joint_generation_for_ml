@@ -327,8 +327,17 @@ def main(cfg: DictConfig) -> None:
             train_synthetic_list=train_synthetic_list,
             train_real_list=train_real_list,
         )
+    elif is_simplemixed:
+        # For SimpleMixed experiments, val=test by design (Wachter strategy)
+        validate_no_data_leakage(
+            train_list=train_list,
+            val_list=val_list,
+            test_list=test_list,
+            experiment_name=pcfg.experiment.experiment_strategy,
+            allow_val_test_overlap=True,
+        )
     else:
-        # For SM/standard experiments, validate combined splits only
+        # For standard experiments, validate combined splits only
         validate_no_data_leakage(
             train_list=train_list,
             val_list=val_list,

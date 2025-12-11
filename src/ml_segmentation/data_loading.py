@@ -324,6 +324,7 @@ def validate_no_data_leakage(
     experiment_name: str = "current experiment",
     train_synthetic_list: list[str] | None = None,
     train_real_list: list[str] | None = None,
+    allow_val_test_overlap: bool = False,
 ) -> None:
     """
     Validates that there is no data leakage between train, validation, and test sets.
@@ -331,7 +332,7 @@ def validate_no_data_leakage(
     This function checks for overlapping files between:
     - Training and validation sets
     - Training and test sets
-    - Validation and test sets
+    - Validation and test sets (unless allow_val_test_overlap=True for SimpleMixed strategy)
 
     For finetune experiments, additional checks are performed if stage-specific lists are provided:
     - Synthetic training and test sets
@@ -354,6 +355,8 @@ def validate_no_data_leakage(
         List of synthetic training files for finetune experiments (stage 1), by default None
     train_real_list : list[str] | None, optional
         List of real training files for finetune experiments (stage 2), by default None
+    allow_val_test_overlap : bool, optional
+        If True, skip val/test overlap check (for SimpleMixed strategy where val=test by design), by default False
 
     Raises
     ------
@@ -378,6 +381,15 @@ def validate_no_data_leakage(
     ...     "FT_box_50",
     ...     train_synthetic_list=synthetic,
     ...     train_real_list=real,
+    ... )
+
+    >>> # SimpleMixed experiment where val and test are intentionally the same
+    >>> validate_no_data_leakage(
+    ...     train_files,
+    ...     test_files,
+    ...     test_files,
+    ...     "simplemixed_box_50",
+    ...     allow_val_test_overlap=True,
     ... )
     """
     train_set = set(train_list)
@@ -451,19 +463,26 @@ def validate_no_data_leakage(
                 f"Sample overlap: {list(train_test_overlap)[:5]}"
             )
 
-        # Check val/test overlap
-        val_test_overlap = val_set & test_set
-        if val_test_overlap:
-            raise ValueError(
-                f"[CRITICAL] Data leakage detected in {experiment_name}! "
-                f"Found {len(val_test_overlap)} overlapping files between validation and test sets. "
-                f"Sample overlap: {list(val_test_overlap)[:5]}"
-            )
+        # Check val/test overlap (skip for SimpleMixed where val=test by design)
+        if not allow_val_test_overlap:
+            val_test_overlap = val_set & test_set
+            if val_test_overlap:
+                raise ValueError(
+                    f"[CRITICAL] Data leakage detected in {experiment_name}! "
+                    f"Found {len(val_test_overlap)} overlapping files between validation and test sets. "
+                    f"Sample overlap: {list(val_test_overlap)[:5]}"
+                )
 
-        print(
-            f"[OK] Data integrity check passed for {experiment_name}: "
-            f"{len(train_list)} train, {len(val_list)} val, {len(test_list)} test files - no leakage detected"
-        )
+        if allow_val_test_overlap:
+            print(
+                f"[OK] Data integrity check passed for {experiment_name} (SimpleMixed - val=test by design): "
+                f"{len(train_list)} train, {len(val_list)} val/test files - no leakage detected"
+            )
+        else:
+            print(
+                f"[OK] Data integrity check passed for {experiment_name}: "
+                f"{len(train_list)} train, {len(val_list)} val, {len(test_list)} test files - no leakage detected"
+            )
 
 
 def validate_data_pre_transform(

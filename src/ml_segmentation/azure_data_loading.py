@@ -204,11 +204,14 @@ def setup_azure_dataloader(
             experiment_name = os.environ.get(
                 "AZUREML_RUN_DISPLAY_NAME", "azure_experiment"
             )
+            # Check if SimpleMixed experiment (val=test by design)
+            is_simplemixed = "simplemixed" in experiment_name.lower()
             validate_no_data_leakage(
                 train_list=train_list,
                 val_list=val_list,
                 test_list=test_list,
                 experiment_name=experiment_name,
+                allow_val_test_overlap=is_simplemixed,
             )
 
             # Log to MLflow if in Azure ML environment
