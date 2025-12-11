@@ -107,48 +107,59 @@ def plot_progression_grid(
         num_samples: Number of test samples to show (rows)
         figsize: Figure size (width, height) in inches. If None, auto-calculated
     """
-    # Determine epoch folders based on strategy
+    # Discover available epoch folders dynamically
+    all_epoch_folders = [d for d in image_dir.iterdir() if d.is_dir()]
+
+    # Collect folders with their epoch numbers for sorting
+    folder_info: list[tuple[str, int | float, str]] = []
+
     if strategy == "finetune":
-        epoch_folders = [
-            "epoch_5",
-            "epoch_10",
-            "epoch_13_stage2_first_epoch",
-            "epoch_17_stage2_fifth_epoch",
-            "final",
-        ]
-        epoch_numbers = [5, 10, 13, 17, None]  # None for final
+        # For finetune: look for epoch_5, epoch_10, stage2 epochs, and final
+        for folder in all_epoch_folders:
+            folder_name = folder.name
+            if folder_name == "epoch_5":
+                folder_info.append((folder_name, 5, "Epoch 5"))
+            elif folder_name == "epoch_10":
+                folder_info.append((folder_name, 10, "Epoch 10"))
+            elif "stage2_first_epoch" in folder_name:
+                actual_epoch = int(folder_name.split("_")[1])
+                folder_info.append(
+                    (
+                        folder_name,
+                        actual_epoch,
+                        f"Epoch {actual_epoch}\n(Stage 2 Start)",
+                    )
+                )
+            elif "stage2_fifth_epoch" in folder_name:
+                actual_epoch = int(folder_name.split("_")[1])
+                folder_info.append(
+                    (folder_name, actual_epoch, f"Epoch {actual_epoch}\n(Stage 2 5th)")
+                )
+            elif folder_name == "final":
+                folder_info.append(
+                    (folder_name, float("inf"), "Final")
+                )  # Sort final to end
     else:  # simplemixed
-        epoch_folders = ["epoch_5", "epoch_10", "epoch_15", "epoch_20", "final"]
-        epoch_numbers = [5, 10, 15, 20, None]
+        # For simplemixed: look for epoch_5, epoch_10, epoch_15, epoch_20, and final
+        for folder in all_epoch_folders:
+            folder_name = folder.name
+            if folder_name in ["epoch_5", "epoch_10", "epoch_15", "epoch_20"]:
+                epoch_num = int(folder_name.split("_")[1])
+                folder_info.append((folder_name, epoch_num, f"Epoch {epoch_num}"))
+            elif folder_name == "final":
+                folder_info.append(
+                    (folder_name, float("inf"), "Final")
+                )  # Sort final to end
 
-    # Check which epoch folders exist and dynamically update epoch labels
-    available_folders = []
-    available_epochs: list[int | None] = []
-    available_labels = []
+    # Sort by epoch number
+    folder_info.sort(key=lambda x: x[1])
 
-    for folder, epoch_num in zip(epoch_folders, epoch_numbers, strict=False):
-        folder_path = image_dir / folder
-        if folder_path.exists():
-            # Check if it's a stage2 folder and extract actual epoch number
-            if "stage2_first_epoch" in folder:
-                actual_epoch = int(folder.split("_")[1])
-                available_folders.append(folder)
-                available_epochs.append(actual_epoch)
-                available_labels.append(f"Epoch {actual_epoch}\n(Stage 2 Start)")
-            elif "stage2_fifth_epoch" in folder:
-                actual_epoch = int(folder.split("_")[1])
-                available_folders.append(folder)
-                available_epochs.append(actual_epoch)
-                available_labels.append(f"Epoch {actual_epoch}\n(Stage 2 5th)")
-            else:
-                available_folders.append(folder)
-                available_epochs.append(epoch_num)
-                if epoch_num is None:
-                    available_labels.append("Final")
-                else:
-                    available_labels.append(f"Epoch {epoch_num}")
-        else:
-            print(f"Warning: Epoch folder not found: {folder_path}")
+    # Extract sorted lists
+    available_folders = [f[0] for f in folder_info]
+    available_epochs: list[int | None] = [
+        None if f[1] == float("inf") else int(f[1]) for f in folder_info
+    ]
+    available_labels = [f[2] for f in folder_info]
 
     if not available_folders:
         print(f"Error: No epoch folders found in {image_dir}")
@@ -242,11 +253,12 @@ def plot_progression_grid(
             axes[row, 1].axis("off")
 
         # Plot predictions from each epoch (columns 2+)
-        for col_offset, (epoch_folder, epoch_num, epoch_label) in enumerate(
-            zip(available_folders, available_epochs, available_labels, strict=False)
+        for col_offset, (epoch_folder, epoch_label) in enumerate(
+            zip(available_folders, available_labels, strict=False)
         ):
             col = 2 + col_offset
             ax = axes[row, col]
+            current_epoch_num: int | None = available_epochs[col_offset]
 
             image_path = image_dir / epoch_folder / sample_name
             if image_path.exists():
@@ -282,11 +294,13 @@ def plot_progression_grid(
                 title = epoch_label
 
                 # Add Dice score if available
-                if epoch_num is None and final_epoch_score is not None:
+                if current_epoch_num is None and final_epoch_score is not None:
                     # This is the final epoch
                     title += f"\nDice: {final_epoch_score:.3f}"
-                elif epoch_num in epoch_scores:
-                    dice = epoch_scores[epoch_num]
+                elif (
+                    current_epoch_num is not None and current_epoch_num in epoch_scores
+                ):
+                    dice = epoch_scores[current_epoch_num]
                     title += f"\nDice: {dice:.3f}"
 
                 ax.set_title(title, fontsize=10, fontweight="bold")
