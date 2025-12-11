@@ -131,6 +131,8 @@ Generate 4-page plots showing training progression over epochs for Box and Slope
 poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
 ```
 
+**Note:** Use metric names without `val_` or `train_` prefix (e.g., `dice_joints` not `val_dice_joints`). The script automatically plots both training (dashed) and validation (solid) curves.
+
 **Plot organization (4 pages):**
 - Page 1: Box experiments - UNet (finetune left, simplemixed right)
 - Page 2: Box experiments - DeepLabV3+ (finetune left, simplemixed right)
