@@ -317,6 +317,83 @@ def get_transforms(
     return {"image": image_transform, "label": label_transform}
 
 
+def validate_no_data_leakage(
+    train_list: list[str],
+    val_list: list[str],
+    test_list: list[str],
+    experiment_name: str = "current experiment",
+) -> None:
+    """
+    Validates that there is no data leakage between train, validation, and test sets.
+
+    This function checks for overlapping files between:
+    - Training and validation sets
+    - Training and test sets
+    - Validation and test sets
+
+    If any overlap is detected, raises a ValueError with details about the leakage.
+    This check runs before training starts to ensure data integrity.
+
+    Parameters
+    ----------
+    train_list : list[str]
+        List of training file names
+    val_list : list[str]
+        List of validation file names
+    test_list : list[str]
+        List of test file names
+    experiment_name : str, optional
+        Name of the experiment for error reporting, by default "current experiment"
+
+    Raises
+    ------
+    ValueError
+        If any data leakage is detected between the sets
+
+    Examples
+    --------
+    >>> train_files = ["img1.png", "img2.png"]
+    >>> val_files = ["img3.png"]
+    >>> test_files = ["img4.png"]
+    >>> validate_no_data_leakage(train_files, val_files, test_files, "box_50")
+    """
+    train_set = set(train_list)
+    val_set = set(val_list)
+    test_set = set(test_list)
+
+    # Check train/val overlap
+    train_val_overlap = train_set & val_set
+    if train_val_overlap:
+        raise ValueError(
+            f"[CRITICAL] Data leakage detected in {experiment_name}! "
+            f"Found {len(train_val_overlap)} overlapping files between train and validation sets. "
+            f"Sample overlap: {list(train_val_overlap)[:5]}"
+        )
+
+    # Check train/test overlap
+    train_test_overlap = train_set & test_set
+    if train_test_overlap:
+        raise ValueError(
+            f"[CRITICAL] Data leakage detected in {experiment_name}! "
+            f"Found {len(train_test_overlap)} overlapping files between train and test sets. "
+            f"Sample overlap: {list(train_test_overlap)[:5]}"
+        )
+
+    # Check val/test overlap
+    val_test_overlap = val_set & test_set
+    if val_test_overlap:
+        raise ValueError(
+            f"[CRITICAL] Data leakage detected in {experiment_name}! "
+            f"Found {len(val_test_overlap)} overlapping files between validation and test sets. "
+            f"Sample overlap: {list(val_test_overlap)[:5]}"
+        )
+
+    print(
+        f"[OK] Data integrity check passed for {experiment_name}: "
+        f"{len(train_list)} train, {len(val_list)} val, {len(test_list)} test files - no leakage detected"
+    )
+
+
 def validate_data_pre_transform(
     images_dir: Path, labels_dir: Path, file_list: list[str]
 ) -> None:

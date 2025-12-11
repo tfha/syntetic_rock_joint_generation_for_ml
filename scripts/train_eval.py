@@ -55,6 +55,7 @@ from ml_segmentation.data_loading import (
     split_data,
     validate_data_post_transform,
     validate_data_pre_transform,
+    validate_no_data_leakage,
 )
 from ml_segmentation.debug_functionality import (
     better_traceback,
@@ -309,6 +310,19 @@ def main(cfg: DictConfig) -> None:
     console.print(f"Number of training samples: {len(train_list)}")
     console.print(f"Number of validation samples: {len(val_list)}")
     console.print(f"Number of test samples: {len(test_list)}")
+
+    # VALIDATE NO DATA LEAKAGE (CRITICAL)
+    ########################################
+    console.print(
+        "Validating data integrity (checking for train/val/test leakage)...",
+        style="info",
+    )
+    validate_no_data_leakage(
+        train_list=train_list,
+        val_list=val_list,
+        test_list=test_list,
+        experiment_name=pcfg.experiment.experiment_strategy,
+    )
 
     # VALIDATE DATA - OPTIONAL
     ############################

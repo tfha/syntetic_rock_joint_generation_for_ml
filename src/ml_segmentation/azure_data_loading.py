@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from ml_segmentation.data_loading import (
     SegmentationDataset,
     get_transforms,
+    validate_no_data_leakage,
 )
 
 
@@ -193,6 +194,21 @@ def setup_azure_dataloader(
                 f"train={len(train_list)}, val={len(val_list)}, "
                 f"test={len(test_list)}",
                 style="info",
+            )
+
+            # VALIDATE NO DATA LEAKAGE (CRITICAL)
+            console.print(
+                "Validating data integrity (checking for train/val/test leakage)...",
+                style="info",
+            )
+            experiment_name = os.environ.get(
+                "AZUREML_RUN_DISPLAY_NAME", "azure_experiment"
+            )
+            validate_no_data_leakage(
+                train_list=train_list,
+                val_list=val_list,
+                test_list=test_list,
+                experiment_name=experiment_name,
             )
 
             # Log to MLflow if in Azure ML environment
