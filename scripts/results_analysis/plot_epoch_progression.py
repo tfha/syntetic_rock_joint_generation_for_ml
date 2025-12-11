@@ -225,7 +225,13 @@ def plot_model_strategy_experiment(
 
     # Add legend for proportions in all subplots if has data
     if has_data:
-        ax.legend(fontsize=6, loc="lower right", framealpha=0.8)
+        ax.legend(
+            fontsize=6,
+            loc="lower right",
+            framealpha=0.8,
+            title="% real data",
+            title_fontsize=6,
+        )
 
 
 def plot_experiment_grid(

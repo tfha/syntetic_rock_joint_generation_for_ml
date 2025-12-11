@@ -1,7 +1,7 @@
 """Generate publication-quality plots for journal article.
 
 Creates two plots showing best validation Dice score for joints across different
-proportions of synthetic data, comparing models and training strategies.
+proportions of real data, comparing models and training strategies.
 """
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ def plot_individual_experiment(
     ax.spines["right"].set_visible(False)
 
     if show_xlabel:
-        ax.set_xlabel("Proportion synthetic", fontsize=9)
+        ax.set_xlabel("Proportion real", fontsize=9)
     else:
         ax.set_xticklabels([])
 
