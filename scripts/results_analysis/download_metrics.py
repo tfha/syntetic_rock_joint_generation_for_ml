@@ -1,11 +1,7 @@
 """Download metrics CSV files from Azure ML jobs.
 
-This script uses Azure Storage Blob SDK to selectively download only *_metrics.csv files
-from completed Azure ML jobs. Performance optimizations include:
-- Direct blob access bypasses Azure ML SDK (7-8x faster)
-- Reuses blob client across jobs (eliminates per-job overhead)
-- Skips unnecessary job metadata fetches
-- Typical performance: 3-4 seconds per job vs 90+ seconds with Azure ML SDK
+This script downloads *_metrics.csv files from completed Azure ML jobs
+specified in a manifest or CSV file.
 
 Usage:
     # From batch jobs summary CSV
@@ -22,9 +18,6 @@ Usage:
 
     # Dry run to preview
     poetry run python scripts/results_analysis/download_metrics.py --csv experiments/batch_jobs_summary.csv --output-folder-name preview --dry-run
-
-    # Show detailed timing for debugging
-    poetry run python scripts/results_analysis/download_metrics.py --jobs-file job_names.txt --output-folder-name test --timing
 """
 
 from __future__ import annotations
@@ -33,16 +26,125 @@ import argparse
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 import pandas as pd
 from azure.ai.ml import MLClient
 from azure.identity import DefaultAzureCredential
-from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import track
+
+
+def get_job_info_from_azure(
+    ml_client: MLClient,
+    job_name: str,
+) -> tuple[str, str]:
+    """Get model and strategy information from Azure ML job.
+
+    Args:
+        ml_client: Azure ML client
+        job_name: Job name
+
+    Returns:
+        Tuple of (model, strategy)
+    """
+    try:
+        job = ml_client.jobs.get(job_name)
+
+        # Try to get from display name first (format: model_strategy)
+        if job.display_name and "_" in job.display_name:
+            parts = job.display_name.split("_", 1)
+            if len(parts) == 2:
+                return parts[0], parts[1]
+
+        # Try to get from tags
+        if job.tags:
+            model = job.tags.get("model", "unknown")
+            strategy = job.tags.get("experiment_strategy", "unknown")
+            if model != "unknown" or strategy != "unknown":
+                return model, strategy
+
+        # Try to get from properties
+        if job.properties:
+            model = job.properties.get("model", "unknown")
+            strategy = job.properties.get("experiment_strategy", "unknown")
+            return model, strategy
+
+        return "unknown", "unknown"
+
+    except Exception:
+        return "unknown", "unknown"
+
+
+def load_job_names_from_csv(
+    csv_path: Path,
+    model: str | None = None,
+    strategy: str | None = None,
+) -> list[tuple[str, str, str]]:
+    """Load job names from batch_jobs_summary.csv.
+
+    Args:
+        csv_path: Path to CSV file
+        model: Filter by model name
+        strategy: Filter by experiment strategy
+
+    Returns:
+        List of (job_name, model, strategy) tuples
+    """
+    df = pd.read_csv(csv_path)
+
+    # Filter out empty job names
+    df = df[df["job_name"].notna() & (df["job_name"] != "")]
+
+    # Apply filters
+    if model:
+        df = df[df["model"] == model]
+    if strategy:
+        df = df[df["experiment_strategy"] == strategy]
+
+    return list(
+        df[["job_name", "model", "experiment_strategy"]].itertuples(
+            index=False, name=None
+        )
+    )
+
+
+def load_job_names_from_manifest(
+    manifest_path: Path,
+    model: str | None = None,
+    strategy: str | None = None,
+) -> list[tuple[str, str, str]]:
+    """Load job names from job manifest JSON.
+
+    Args:
+        manifest_path: Path to manifest file
+        model: Filter by model name
+        strategy: Filter by experiment strategy
+
+    Returns:
+        List of (job_name, model, strategy) tuples
+    """
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    jobs = []
+    for job_record in manifest["jobs"]:
+        if job_record["status"] != "submitted" or not job_record.get("job_name"):
+            continue
+
+        job_model = job_record.get("model", "unknown")
+        job_strategy = job_record.get("experiment_strategy", "unknown")
+
+        # Apply filters
+        if model and job_model != model:
+            continue
+        if strategy and job_strategy != strategy:
+            continue
+
+        jobs.append((job_record["job_name"], job_model, job_strategy))
+
+    return jobs
 
 
 def download_metrics_from_job(
@@ -54,27 +156,18 @@ def download_metrics_from_job(
     output_dir: Path,
     pattern: str = "*_metrics.csv",
     dry_run: bool = False,
-    blob_service_client: BlobServiceClient | None = None,
-    show_timing: bool = False,
 ) -> bool:
-    """Download metrics CSV files from a job using fast selective download.
-
-    Uses Azure Storage Blob SDK to directly access blobs in the azureml container.
-    Optimized to avoid expensive API calls and reuse connections across jobs.
-
-    Performance: ~3-4 seconds per job (vs 90+ seconds with Azure ML SDK).
+    """Download metrics CSV files from a job.
 
     Args:
-        ml_client: Azure ML client (used only to get datastore info)
-        console: Rich console for output
+        ml_client: Azure ML client
+        console: Rich console
         job_name: Job name
         model: Model name
         strategy: Experiment strategy
-        output_dir: Output directory (flat structure, no subdirectories)
-        pattern: File pattern to match (default: *_metrics.csv)
-        dry_run: Dry run mode (preview without downloading)
-        blob_service_client: Reusable blob service client (improves performance)
-        show_timing: Show detailed timing breakdown for debugging
+        output_dir: Output directory
+        pattern: File pattern to match
+        dry_run: Dry run mode
 
     Returns:
         True if successful
@@ -84,95 +177,60 @@ def download_metrics_from_job(
         return True
 
     try:
-        # Create output directory (no subdirectories - all CSVs in one folder)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Create temporary download directory
+        temp_dir = output_dir / "_temp" / job_name
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use Azure Storage Blob SDK for fast selective downloads
-        try:
-            from azure.identity import DefaultAzureCredential
-            from azure.storage.blob import BlobServiceClient
+        # Download all artifacts
+        ml_client.jobs.download(
+            name=job_name,
+            download_path=str(temp_dir),
+            all=True,
+        )
 
-            t0 = time.time() if show_timing else None
+        # Find matching files recursively
+        # Handles both:
+        # - simplemixed: metrics/*.csv
+        # - finetune: *.csv in root
+        matching_files = list(temp_dir.rglob(pattern))
 
-            # Get datastore info (we can skip getting full job details)
-            datastore = ml_client.datastores.get_default()
-            account_name = datastore.account_name
-            container_name = "azureml"
+        if not matching_files:
+            console.print(f"  No metrics files found for {job_name}", style="yellow")
+            # Clean up
+            import shutil
 
-            t1: float
-            t2: float
-            if show_timing:
-                t1 = time.time()
-                console.print(f"  [TIME] Get datastore: {t1 - t0:.1f}s", style="dim")  # type: ignore[operator]
-
-            # Reuse blob client if provided, otherwise create new one
-            if blob_service_client is None:
-                account_url = f"https://{account_name}.blob.core.windows.net"
-                credential = DefaultAzureCredential()
-                blob_service_client = BlobServiceClient(
-                    account_url=account_url, credential=credential
-                )
-                if show_timing:
-                    t2 = time.time()
-                    console.print(
-                        f"  [TIME] Create blob client: {t2 - t1:.1f}s", style="dim"
-                    )
-            else:
-                if show_timing:
-                    t1_val = t1 if show_timing else time.time()
-                    t2 = t1_val
-                    console.print("  [TIME] Reuse blob client: 0.0s", style="dim")
-
-            container_client = blob_service_client.get_container_client(container_name)
-
-            # List blobs under ExperimentRun/dcid.{job_name}
-            base_prefix = f"ExperimentRun/dcid.{job_name}"
-
-            downloaded_files = []
-            seen_filenames = set()  # Track filenames to avoid duplicates
-
-            # Download only *_metrics.csv files
-            blob_count = 0
-            for blob in container_client.list_blobs(name_starts_with=base_prefix):
-                blob_count += 1
-                if blob.name.endswith("_metrics.csv"):
-                    filename = Path(blob.name).name
-
-                    # Skip if we've already downloaded a file with this name
-                    if filename in seen_filenames:
-                        continue
-
-                    seen_filenames.add(filename)
-                    dest_path = output_dir / filename
-
-                    blob_client = container_client.get_blob_client(blob.name)
-                    with open(dest_path, "wb") as f:
-                        f.write(blob_client.download_blob().readall())
-
-                    downloaded_files.append(dest_path)
-
-            if show_timing:
-                t3 = time.time()
-                console.print(
-                    f"  [TIME] List and download ({blob_count} blobs): {t3 - t2:.1f}s",
-                    style="dim",
-                )
-                console.print(f"  [TIME] Total: {t3 - t0:.1f}s", style="dim")  # type: ignore[operator]
-
-            if downloaded_files:
-                console.print(
-                    f"  [OK] {job_name}: {len(downloaded_files)} file(s)", style="green"
-                )
-                return True
-            else:
-                console.print(
-                    f"  [SKIP] {job_name}: No metrics files found", style="yellow"
-                )
-                return False
-
-        except Exception as e:
-            console.print(f"  [ERROR] Failed to download {job_name}: {e}", style="red")
+            shutil.rmtree(temp_dir)
             return False
+
+        # Create job-specific output directory
+        job_output_dir = output_dir / f"{model}_{strategy}" / job_name
+        job_output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy matching files, preserving subdirectory structure if needed
+        import shutil
+
+        for file_path in matching_files:
+            # Get relative path from temp_dir to preserve folder structure
+            relative_path = file_path.relative_to(temp_dir)
+
+            # Check if file is in a subdirectory (e.g., metrics/)
+            if len(relative_path.parts) > 1:
+                # Preserve the parent folder name in output
+                dest_path = job_output_dir / relative_path.parts[-2] / file_path.name
+            else:
+                # File is in root, save directly
+                dest_path = job_output_dir / file_path.name
+
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file_path, dest_path)
+
+        # Clean up
+        shutil.rmtree(temp_dir)
+
+        console.print(
+            f"  [OK] {job_name}: {len(matching_files)} file(s)", style="green"
+        )
+        return True
 
     except Exception as e:
         console.print(f"  [ERROR] {job_name}: {e}", style="red")
@@ -232,48 +290,24 @@ def main() -> None:
         action="store_true",
         help="Preview without downloading",
     )
-    parser.add_argument(
-        "--timing",
-        action="store_true",
-        help="Show detailed timing information for debugging",
-    )
     args = parser.parse_args()
 
     console = Console()
 
-    # Load job names - inline simple logic instead of helper functions
-    jobs: list[tuple[str, str, str]] = []
+    # Load job names
+    jobs = []
     if args.csv:
         if not args.csv.exists():
             console.print(f"Error: CSV not found: {args.csv}", style="red")
             sys.exit(1)
-        df = pd.read_csv(args.csv)
-        df = df[df["job_name"].notna() & (df["job_name"] != "")]
-        if args.model:
-            df = df[df["model"] == args.model]
-        if args.strategy:
-            df = df[df["experiment_strategy"] == args.strategy]
-        jobs = list(
-            df[["job_name", "model", "experiment_strategy"]].itertuples(
-                index=False, name=None
-            )
-        )
+        jobs = load_job_names_from_csv(args.csv, args.model, args.strategy)
         console.print(f"Loaded {len(jobs)} jobs from CSV", style="green")
 
     elif args.manifest:
         if not args.manifest.exists():
             console.print(f"Error: Manifest not found: {args.manifest}", style="red")
             sys.exit(1)
-        with open(args.manifest) as f:
-            manifest = json.load(f)
-        for job_record in manifest["jobs"]:
-            if job_record["status"] == "submitted" and job_record.get("job_name"):
-                job_model = job_record.get("model", "unknown")
-                job_strategy = job_record.get("experiment_strategy", "unknown")
-                if (not args.model or job_model == args.model) and (
-                    not args.strategy or job_strategy == args.strategy
-                ):
-                    jobs.append((job_record["job_name"], job_model, job_strategy))
+        jobs = load_job_names_from_manifest(args.manifest, args.model, args.strategy)
         console.print(f"Loaded {len(jobs)} jobs from manifest", style="green")
 
     elif args.jobs_file:
@@ -281,13 +315,12 @@ def main() -> None:
             console.print(f"Error: File not found: {args.jobs_file}", style="red")
             sys.exit(1)
         with open(args.jobs_file) as f:
-            job_names = [
-                line.strip()
-                for line in f
-                if line.strip() and not line.strip().startswith("#")
-            ]
+            job_names = [line.strip() for line in f if line.strip()]
+
+        # We'll get model and strategy from Azure ML later
         jobs = [(name, "unknown", "unknown") for name in job_names]
         console.print(f"Loaded {len(jobs)} job names from file", style="green")
+        console.print("Will retrieve model and strategy from Azure ML...", style="blue")
 
     else:
         console.print("Error: Specify --csv, --manifest, or --jobs-file", style="red")
@@ -336,25 +369,19 @@ def main() -> None:
             )
             console.print("[OK] Connected\n", style="green")
 
-            # Create BlobServiceClient once for reuse across all jobs
-            datastore = ml_client.datastores.get_default()
-            account_url = f"https://{datastore.account_name}.blob.core.windows.net"
-            blob_service_client = BlobServiceClient(
-                account_url=account_url, credential=credential
-            )
-
         except Exception as e:
             console.print(f"Error: {e}", style="red")
             sys.exit(1)
-    else:
-        blob_service_client = None
 
-    # Download metrics using fast selective download
+    # Download metrics
     success_count = 0
     for job_name, model, strategy in track(jobs, description="Downloading..."):
-        if ml_client is None:
-            console.print("Error: ML client not initialized", style="red")
-            continue
+        # If model/strategy is unknown, fetch from Azure ML
+        if model == "unknown" or strategy == "unknown":
+            if not args.dry_run:
+                model, strategy = get_job_info_from_azure(ml_client, job_name)
+            else:
+                model, strategy = "unknown", "unknown"
 
         success = download_metrics_from_job(
             ml_client=ml_client,
@@ -365,14 +392,13 @@ def main() -> None:
             output_dir=output_dir,
             pattern=args.pattern,
             dry_run=args.dry_run,
-            blob_service_client=blob_service_client,
-            show_timing=args.timing,
         )
         if success:
             success_count += 1
-    console.print(f"\n[OK] Downloaded metrics from {success_count}/{len(jobs)} jobs")
+
+    console.print(f"\n✓ Downloaded metrics from {success_count}/{len(jobs)} jobs")
     if not args.dry_run:
-        console.print(f"[FILE] {output_dir}")
+        console.print(f"📁 {output_dir}")
 
 
 if __name__ == "__main__":
