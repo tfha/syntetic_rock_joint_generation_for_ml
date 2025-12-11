@@ -1,7 +1,8 @@
 """Generate publication-quality plots for journal article.
 
 Creates two plots showing best validation Dice score for joints across different
-proportions of real data, comparing models and training strategies.
+proportions of synthetic data, comparing models and training strategies.
+Note: X-axis is reversed to show synthetic proportion increasing left to right.
 """
 
 from __future__ import annotations
@@ -191,6 +192,9 @@ def plot_individual_experiment(
             # Sort by proportion
             df_subset = df_subset.sort_values("proportion")
 
+            # Convert to synthetic proportion (1 - real proportion)
+            synthetic_proportion = 1.0 - df_subset["proportion"]
+
             # Get marker and fill style
             marker = EXPERIMENT_MARKERS.get(experiment, "o")
             fillstyle = STRATEGY_FILL[strategy]
@@ -198,7 +202,7 @@ def plot_individual_experiment(
 
             # Plot line
             ax.plot(
-                df_subset["proportion"],
+                synthetic_proportion,
                 df_subset["val_dice_joints"],
                 color=COLORS[model],
                 linestyle=linestyle,
@@ -208,7 +212,7 @@ def plot_individual_experiment(
 
             # Plot points on top
             ax.scatter(
-                df_subset["proportion"],
+                synthetic_proportion,
                 df_subset["val_dice_joints"],
                 color=COLORS[model],
                 marker=marker,
@@ -222,14 +226,14 @@ def plot_individual_experiment(
 
     # Styling
     ax.set_title(experiment, fontsize=10, pad=5)
-    ax.set_xlim(-0.05, 1.05)
+    ax.set_xlim(-0.05, 1.05)  # 0.0 to 1.0 for synthetic proportion
     ax.set_ylim(0, 0.8)
     ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     if show_xlabel:
-        ax.set_xlabel("Proportion real", fontsize=9)
+        ax.set_xlabel("Proportion of synthetic data", fontsize=9)
     else:
         ax.set_xticklabels([])
 

@@ -173,6 +173,9 @@ def plot_model_strategy_experiment(
         # Get color for this proportion
         color = proportion_colors.get(proportion, "#000000")
 
+        # Convert to synthetic proportion for label (1 - real proportion)
+        synthetic_pct = round((1.0 - proportion) * 100)
+
         # Plot training dice (dashed line)
         if "train_dice_joints" in df.columns:
             ax.plot(
@@ -193,7 +196,7 @@ def plot_model_strategy_experiment(
                 linewidth=1.5,
                 linestyle="-",
                 alpha=0.9,
-                label=f"{int(proportion * 100)}%",
+                label=f"{synthetic_pct}%",
             )
 
     if not has_data:
@@ -229,7 +232,7 @@ def plot_model_strategy_experiment(
             fontsize=6,
             loc="lower right",
             framealpha=0.8,
-            title="% real data",
+            title="% synthetic data",
             title_fontsize=6,
         )
 
