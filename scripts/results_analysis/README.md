@@ -57,9 +57,20 @@ unet-simplemixed_slope_30-20251209-1523
 Download prediction images (composites of original, ground truth, prediction):
 
 ```bash
-# Download images for jobs in a text file
+# Download images for jobs in a text file (default: 4 parallel workers)
 poetry run python scripts/results_analysis/download_images.py --jobs-file scripts/results_analysis/test_image_jobs.txt --output-dir experiments/results/images --use-display-names
+
+# Faster download with more parallel workers (recommended for good internet)
+poetry run python scripts/results_analysis/download_images.py --jobs-file scripts/results_analysis/test_image_jobs.txt --output-dir experiments/results/images --use-display-names --max-workers 8
 ```
+
+**Parallel Downloads:**
+- `--max-workers` controls concurrent downloads (default: 4)
+- Recommended values:
+  - **4 workers** (default): Safe for all connections
+  - **8 workers**: Good balance for fast internet (50+ Mbps)
+  - **12 workers**: Aggressive for very fast connections (100+ Mbps)
+- Network bandwidth is usually the bottleneck, not CPU
 
 **Strategy-specific epochs:**
 

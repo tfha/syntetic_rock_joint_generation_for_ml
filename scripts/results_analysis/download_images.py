@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import io
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -253,6 +254,12 @@ def main() -> None:
         action="store_true",
         help="Use job display names instead of job names for organizing downloads (slower, requires API calls)",
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=4,
+        help="Maximum number of parallel download workers (default: 4)",
+    )
 
     args = parser.parse_args()
 
@@ -300,13 +307,12 @@ def main() -> None:
 
     print(f"Connected to storage account: {datastore.account_name}")
     print(f"Output directory: {output_dir}")
+    print(f"Parallel workers: {args.max_workers}")
     print()
 
-    # Download images for each job
-    total_downloaded = 0
-    total_jobs = len(job_names)
-
-    for i, job_name in enumerate(job_names, 1):
+    def process_single_job(job_info: tuple[int, str]) -> tuple[str, int]:
+        """Process a single job download (used for parallel execution)."""
+        i, job_name = job_info
         # Get display name if requested
         if args.use_display_names:
             display_name = get_job_display_name(ml_client, job_name)
@@ -314,7 +320,6 @@ def main() -> None:
             display_name = job_name
 
         # Determine strategy from job name or display name
-        # SimpleMixed jobs have "simplemixed" in the name, finetune have "finetune"
         if "simplemixed" in display_name.lower():
             strategy = "simplemixed"
         elif "finetune" in display_name.lower():
@@ -331,13 +336,13 @@ def main() -> None:
                     print(
                         f"Warning: Cannot determine strategy for {job_name}, skipping..."
                     )
-                    continue
+                    return (job_name, 0)
             except Exception:
                 print(f"Warning: Cannot determine strategy for {job_name}, skipping...")
-                continue
+                return (job_name, 0)
 
         print(
-            f"[{i}/{total_jobs}] Processing {job_name} (strategy: {strategy}, as: {display_name})..."
+            f"[{i}/{len(job_names)}] Processing {job_name} (strategy: {strategy}, as: {display_name})..."
         )
 
         downloaded = download_job_images(
@@ -348,10 +353,31 @@ def main() -> None:
             strategy,
         )
 
-        total_downloaded += downloaded
-        print(f"  → Downloaded {downloaded} images")
+        print(f"  → [{i}/{len(job_names)}] {job_name}: Downloaded {downloaded} images")
+        return (job_name, downloaded)
 
-    print(f"\n✓ Complete! Downloaded {total_downloaded} images from {total_jobs} jobs")
+    # Download images for each job in parallel
+    total_downloaded = 0
+
+    job_list = list(enumerate(job_names, 1))
+
+    with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+        futures = {
+            executor.submit(process_single_job, job_info): job_info
+            for job_info in job_list
+        }
+
+        for future in as_completed(futures):
+            try:
+                job_name, downloaded = future.result()
+                total_downloaded += downloaded
+            except Exception as e:
+                job_info = futures[future]
+                print(f"Error processing job {job_info[1]}: {e}")
+
+    print(
+        f"\n✓ Complete! Downloaded {total_downloaded} images from {len(job_names)} jobs"
+    )
     print(f"  Output directory: {output_dir}")
 
 
