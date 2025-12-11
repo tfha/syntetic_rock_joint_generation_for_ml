@@ -192,6 +192,24 @@ poetry run python scripts/results_analysis/plot_progression.py --image-dir exper
 
 **Output:** `experiments/results/plots/progression/{job_name}_progression.png`
 
+**Batch generation for multiple jobs:**
+
+To generate progression plots for multiple jobs, create a script or run commands in sequence:
+
+```bash
+# Example: Generate progression plots for selected representative jobs
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "unet-simplemixed_box_10-20251211-1603" --strategy simplemixed --num-samples 10
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "unet-finetune_box_10-20251210-0956" --strategy finetune --num-samples 10
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-simplemixed_box_10-20251211-1631" --strategy simplemixed --num-samples 10
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-finetune_box_10-20251210-0956" --strategy finetune --num-samples 10
+```
+
+**Tips:**
+- Focus on representative experiments (e.g., one from each model×strategy×proportion combination)
+- Use consistent `--num-samples` across comparisons for fair visual comparison
+- Job names must match the directory names in `experiments/results/images/`
+- Progression plots are most useful for key experiments with interesting learning patterns
+
 ## Metrics Explained
 
 **Dice Score (`val_dice_joints`)**: The primary metric shown in plots.
