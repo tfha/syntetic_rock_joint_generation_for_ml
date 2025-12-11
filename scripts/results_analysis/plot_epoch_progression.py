@@ -143,23 +143,29 @@ def plot_model_strategy_experiment(
     model: str,
     strategy: str,
     proportions: list[float],
+    metric: str = "dice_joints",
     show_ylabel: bool = True,
     show_xlabel: bool = True,
     show_title: bool = False,
 ) -> None:
-    """Plot epoch progression for a specific model/strategy/experiment with all proportions."""
-    # Colors: Blue tones for 0-30%, Green tones for 50-100%
+    """Plot epoch progression for a specific model/strategy/experiment with all proportions.
+
+    Args:
+        metric: Name of metric to plot (e.g., 'dice_joints', 'dice', 'loss')
+    """
+    # Colors: Light to dark gradient - darker colors indicate more real data
     proportion_colors = {
-        0.0: "#E3F2FD",  # Very light blue (0%)
-        0.1: "#90CAF9",  # Light blue (10%)
-        0.3: "#42A5F5",  # Medium blue (30%)
-        0.5: "#C8E6C9",  # Light green (50%)
-        0.7: "#66BB6A",  # Medium green (70%)
-        0.9: "#388E3C",  # Medium-dark green (90%)
-        1.0: "#004D40",  # Very dark teal-green (100%)
+        0.0: "#F5F5F5",  # Very light gray (0% real = 100% synthetic)
+        0.1: "#E0E0E0",  # Light gray (10% real)
+        0.3: "#9E9E9E",  # Medium gray (30% real)
+        0.5: "#90CAF9",  # Light blue (50% real)
+        0.7: "#42A5F5",  # Medium blue (70% real)
+        0.9: "#1976D2",  # Dark blue (90% real)
+        1.0: "#0D47A1",  # Very dark blue (100% real)
     }
 
     has_data = False
+    all_values = []  # Collect all values for y-axis range
 
     # Plot each proportion
     for proportion in proportions:
@@ -173,31 +179,37 @@ def plot_model_strategy_experiment(
         # Get color for this proportion
         color = proportion_colors.get(proportion, "#000000")
 
-        # Convert to synthetic proportion for label (1 - real proportion)
-        synthetic_pct = round((1.0 - proportion) * 100)
+        # Convert to percentage for label (real data proportion)
+        real_pct = round(proportion * 100)
 
-        # Plot training dice (dashed line)
-        if "train_dice_joints" in df.columns:
+        # Plot training metric (dashed line)
+        train_col = f"train_{metric}"
+        if train_col in df.columns:
             ax.plot(
                 df["epoch"],
-                df["train_dice_joints"],
+                df[train_col],
                 color=color,
                 linewidth=1.5,
                 linestyle="--",
                 alpha=0.7,
+                zorder=3,
             )
+            all_values.extend(df[train_col].dropna().tolist())
 
-        # Plot validation dice (solid line) - this is the test/validation set
-        if "val_dice_joints" in df.columns:
+        # Plot validation metric (solid line) - this is the test/validation set
+        val_col = f"val_{metric}"
+        if val_col in df.columns:
             ax.plot(
                 df["epoch"],
-                df["val_dice_joints"],
+                df[val_col],
                 color=color,
                 linewidth=1.5,
                 linestyle="-",
                 alpha=0.9,
-                label=f"{synthetic_pct}%",
+                label=f"{real_pct}%",
+                zorder=3,
             )
+            all_values.extend(df[val_col].dropna().tolist())
 
     if not has_data:
         ax.text(0.5, 0.5, "No data", ha="center", va="center", transform=ax.transAxes)
@@ -209,10 +221,22 @@ def plot_model_strategy_experiment(
         ax.set_title(title, fontsize=9, pad=5)
 
     ax.set_xlim(0, 100)
-    ax.set_ylim(0, 0.8)
-    ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5)
+
+    # Set y-axis limits based on data range
+    if all_values:
+        y_min = min(all_values)
+        y_max = max(all_values)
+        y_range = y_max - y_min
+        # Add 10% padding above and below
+        padding = y_range * 0.1 if y_range > 0 else 0.1
+        ax.set_ylim(max(0, y_min - padding), y_max + padding)
+    else:
+        ax.set_ylim(0, 1.0)  # Default range if no values
+    ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5, zorder=1)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_zorder(2)
+    ax.spines["left"].set_zorder(2)
 
     if show_xlabel:
         ax.set_xlabel("Epoch", fontsize=8)
@@ -220,7 +244,8 @@ def plot_model_strategy_experiment(
         ax.set_xticklabels([])
 
     if show_ylabel:
-        ax.set_ylabel("Dice score (joints)", fontsize=8)
+        ylabel = metric.replace("_", " ").title()
+        ax.set_ylabel(ylabel, fontsize=8)
     else:
         ax.set_yticklabels([])
 
@@ -228,11 +253,13 @@ def plot_model_strategy_experiment(
 
     # Add legend for proportions in all subplots if has data
     if has_data:
+        # Use top right for loss metrics to avoid blocking curves
+        legend_loc = "upper right" if metric == "loss" else "lower right"
         ax.legend(
             fontsize=6,
-            loc="lower right",
+            loc=legend_loc,
             framealpha=0.8,
-            title="% synthetic data",
+            title="% real data",
             title_fontsize=6,
         )
 
@@ -243,16 +270,21 @@ def plot_experiment_grid(
     slope_experiments: list[str],
     proportions: list[float],
     output_path: Path,
+    metric: str = "dice_joints",
 ) -> None:
-    """Create a 5×8 grid of subplots for all model/strategy/experiment combinations."""
+    """Create a 5×8 grid of subplots for all model/strategy/experiment combinations.
+
+    Args:
+        metric: Name of metric to plot (e.g., 'dice_joints', 'dice', 'loss')
+    """
     fig, axes = plt.subplots(5, 8, figsize=(40, 15))
 
     # Define the combinations for each column
     # Columns: 4 for box experiments, 4 for slope experiments
-    # For each experiment type: UNet-Finetune, UNet-SimpleMixed, DeepLabV3+-Finetune, DeepLabV3+-SimpleMixed
+    # Order from left to right: UNet-Finetune, DeepLabV3+-Finetune, UNet-SimpleMixed, DeepLabV3+-SimpleMixed
 
-    models = ["unet", "unet", "deeplabv3plus", "deeplabv3plus"]
-    strategies = ["finetune", "simplemixed", "finetune", "simplemixed"]
+    models = ["unet", "deeplabv3plus", "unet", "deeplabv3plus"]
+    strategies = ["finetune", "finetune", "simplemixed", "simplemixed"]
 
     # Plot box experiments (left 4 columns)
     for col_idx in range(4):
@@ -268,6 +300,7 @@ def plot_experiment_grid(
                 models[col_idx],
                 strategies[col_idx],
                 proportions,
+                metric,
                 show_ylabel,
                 show_xlabel,
                 show_title,
@@ -301,6 +334,7 @@ def plot_experiment_grid(
                 models[col_idx],
                 strategies[col_idx],
                 proportions,
+                metric,
                 show_ylabel,
                 show_xlabel,
                 show_title,
@@ -340,6 +374,8 @@ def plot_experiment_grid(
     # Create custom legend at the bottom
     from matplotlib.lines import Line2D
 
+    # Format metric name for legend labels
+    metric_label = metric.replace("_", " ").title()
     legend_elements = [
         Line2D(
             [0],
@@ -348,7 +384,7 @@ def plot_experiment_grid(
             linewidth=1.5,
             linestyle="--",
             alpha=0.7,
-            label="Train_dice_joints",
+            label=f"Train {metric_label}",
         ),
         Line2D(
             [0],
@@ -357,7 +393,7 @@ def plot_experiment_grid(
             linewidth=1.5,
             linestyle="-",
             alpha=0.9,
-            label="Val_dice_joints",
+            label=f"Val {metric_label}",
         ),
     ]
 
@@ -371,6 +407,308 @@ def plot_experiment_grid(
     )
 
     plt.tight_layout(rect=[0.02, 0.02, 1, 0.97])
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved plot to {output_path}")
+
+
+def plot_combined_page(
+    metrics_dir: Path,
+    experiments: list[str],
+    experiment_type: str,
+    model: str,
+    proportions: list[float],
+    output_path: Path,
+    metric: str = "dice_joints",
+) -> None:
+    """Create a page with Finetune on left, SimpleMixed on right (same size as grid plot).
+
+    Args:
+        experiments: List of experiment names
+        experiment_type: "Box" or "Slope"
+        model: "unet" or "deeplabv3plus"
+    """
+    # Wider figure for better readability
+    fig, axes = plt.subplots(5, 2, figsize=(14, 15))
+
+    # Left column: Finetune strategy
+    for row_idx, experiment in enumerate(experiments):
+        show_xlabel = row_idx == 4
+        show_ylabel = True
+        show_title = False
+
+        plot_model_strategy_experiment(
+            axes[row_idx, 0],
+            metrics_dir,
+            experiment,
+            model,
+            "finetune",
+            proportions,
+            metric,
+            show_ylabel,
+            show_xlabel,
+            show_title,
+        )
+
+        # Add experiment name as row label (only on left column)
+        axes[row_idx, 0].text(
+            -0.18,
+            0.5,
+            experiment,
+            transform=axes[row_idx, 0].transAxes,
+            fontsize=9,
+            fontweight="bold",
+            va="center",
+            ha="right",
+            rotation=0,
+        )
+
+    # Right column: SimpleMixed strategy
+    for row_idx, experiment in enumerate(experiments):
+        show_xlabel = row_idx == 4
+        show_ylabel = False
+        show_title = False
+
+        plot_model_strategy_experiment(
+            axes[row_idx, 1],
+            metrics_dir,
+            experiment,
+            model,
+            "simplemixed",
+            proportions,
+            metric,
+            show_ylabel,
+            show_xlabel,
+            show_title,
+        )
+
+    # Add column titles
+    axes[0, 0].text(
+        0.5,
+        1.15,
+        "Finetune",
+        ha="center",
+        transform=axes[0, 0].transAxes,
+        fontsize=12,
+        fontweight="bold",
+    )
+    axes[0, 1].text(
+        0.5,
+        1.15,
+        "SimpleMixed",
+        ha="center",
+        transform=axes[0, 1].transAxes,
+        fontsize=12,
+        fontweight="bold",
+    )
+
+    # Add page title at top (centered)
+    model_name = "U-Net" if model == "unet" else "DeepLabV3+"
+    fig.suptitle(
+        f"{experiment_type} Experiments - {model_name}",
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
+        x=0.5,
+    )
+
+    # Create custom legend at the bottom (centered)
+    from matplotlib.lines import Line2D
+
+    metric_label = metric.replace("_", " ").title()
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="gray",
+            linewidth=1.5,
+            linestyle="--",
+            alpha=0.7,
+            label=f"Train {metric_label}",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="gray",
+            linewidth=1.5,
+            linestyle="-",
+            alpha=0.9,
+            label=f"Val {metric_label}",
+        ),
+    ]
+
+    fig.legend(
+        handles=legend_elements,
+        loc="lower center",
+        ncol=2,
+        frameon=True,
+        fontsize=10,
+        bbox_to_anchor=(0.5, 0.01),
+    )
+
+    plt.tight_layout(rect=[0.02, 0.03, 1, 0.96])
+    plt.subplots_adjust(wspace=0.1, left=0.08)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"Saved plot to {output_path}")
+
+
+def plot_two_column_page(
+    metrics_dir: Path,
+    experiments: list[str],
+    experiment_type: str,
+    model: str,
+    strategy: str,
+    proportions: list[float],
+    output_path: Path,
+    metric: str = "dice_joints",
+) -> None:
+    """Create a single A4-sized page with 2 columns for one model/strategy combination.
+
+    Args:
+        experiment_type: "Box Experiments" or "Slope Experiments"
+        model: "unet" or "deeplabv3plus"
+        strategy: "finetune" or "simplemixed"
+    """
+    # A4 size: 8.27 x 11.69 inches
+    fig, axes = plt.subplots(5, 2, figsize=(8.27, 11.69))
+
+    # Split experiments into two groups for the two columns
+    # Left column: first half, Right column: second half
+    experiments_col1: list[str | None] = list(
+        experiments[:3]
+        if len(experiments) == 5
+        else experiments[: len(experiments) // 2]
+    )
+    experiments_col2: list[str | None] = list(
+        experiments[3:]
+        if len(experiments) == 5
+        else experiments[len(experiments) // 2 :]
+    )
+
+    # Pad to ensure we have 5 rows
+    while len(experiments_col1) < 5:
+        experiments_col1.append(None)
+    while len(experiments_col2) < 5:
+        experiments_col2.append(None)
+
+    # Plot left column
+    for row_idx in range(5):
+        experiment = experiments_col1[row_idx]
+        if experiment:
+            show_xlabel = row_idx == 4
+            show_ylabel = True
+            show_title = False
+
+            plot_model_strategy_experiment(
+                axes[row_idx, 0],
+                metrics_dir,
+                experiment,
+                model,
+                strategy,
+                proportions,
+                metric,
+                show_ylabel,
+                show_xlabel,
+                show_title,
+            )
+
+            # Add experiment name as row label
+            axes[row_idx, 0].text(
+                -0.35,
+                0.5,
+                experiment,
+                transform=axes[row_idx, 0].transAxes,
+                fontsize=10,
+                fontweight="bold",
+                va="center",
+                ha="right",
+                rotation=0,
+            )
+        else:
+            axes[row_idx, 0].axis("off")
+
+    # Plot right column
+    for row_idx in range(5):
+        experiment = experiments_col2[row_idx]
+        if experiment:
+            show_xlabel = row_idx == 4
+            show_ylabel = False
+            show_title = False
+
+            plot_model_strategy_experiment(
+                axes[row_idx, 1],
+                metrics_dir,
+                experiment,
+                model,
+                strategy,
+                proportions,
+                metric,
+                show_ylabel,
+                show_xlabel,
+                show_title,
+            )
+
+            # Add experiment name as row label
+            axes[row_idx, 1].text(
+                -0.15,
+                0.5,
+                experiment,
+                transform=axes[row_idx, 1].transAxes,
+                fontsize=10,
+                fontweight="bold",
+                va="center",
+                ha="right",
+                rotation=0,
+            )
+        else:
+            axes[row_idx, 1].axis("off")
+
+    # Add page title at top
+    model_name = "U-Net" if model == "unet" else "DeepLabV3+"
+    strategy_name = strategy.capitalize()
+    fig.suptitle(
+        f"{experiment_type} - {model_name} ({strategy_name})",
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
+    )
+
+    # Create custom legend at the bottom
+    from matplotlib.lines import Line2D
+
+    metric_label = metric.replace("_", " ").title()
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="gray",
+            linewidth=1.5,
+            linestyle="--",
+            alpha=0.7,
+            label=f"Train {metric_label}",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="gray",
+            linewidth=1.5,
+            linestyle="-",
+            alpha=0.9,
+            label=f"Val {metric_label}",
+        ),
+    ]
+
+    fig.legend(
+        handles=legend_elements,
+        loc="lower center",
+        ncol=2,
+        frameon=True,
+        fontsize=10,
+        bbox_to_anchor=(0.5, 0.01),
+    )
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.96])
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"Saved plot to {output_path}")
@@ -391,6 +729,17 @@ def main():
         type=Path,
         default=Path("experiments/results/plots"),
         help="Output directory for plots",
+    )
+    parser.add_argument(
+        "--metric",
+        type=str,
+        default="dice_joints",
+        help="Metric to plot (e.g., 'dice_joints', 'dice', 'loss')",
+    )
+    parser.add_argument(
+        "--separate-pages",
+        action="store_true",
+        help="Generate separate A4 pages (4 pages total) instead of single grid",
     )
 
     args = parser.parse_args()
@@ -421,16 +770,79 @@ def main():
     # Define all proportions to plot
     proportions = [0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0]
 
-    print("\nGenerating 5×8 grid epoch progression plot...")
-    plot_experiment_grid(
-        args.metrics_dir,
-        box_experiments,
-        slope_experiments,
-        proportions,
-        args.output_dir / "figure_epoch_progression_grid.png",
-    )
+    if args.separate_pages:
+        # Generate 4 separate A4 pages
+        print(f"\nGenerating 4 separate A4 pages for metric: {args.metric}...")
 
-    print("\nDone! Plot saved to:", args.output_dir)
+        # Page 1: Box - UNet Finetune (left) | UNet SimpleMixed (right)
+        output_file = f"figure_epoch_progression_{args.metric}_page1_box_unet.png"
+        plot_combined_page(
+            args.metrics_dir,
+            box_experiments,
+            "Box",
+            "unet",
+            proportions,
+            args.output_dir / output_file,
+            args.metric,
+        )
+
+        # Page 2: Box - DeepLabV3+ Finetune (left) | DeepLabV3+ SimpleMixed (right)
+        output_file = (
+            f"figure_epoch_progression_{args.metric}_page2_box_deeplabv3plus.png"
+        )
+        plot_combined_page(
+            args.metrics_dir,
+            box_experiments,
+            "Box",
+            "deeplabv3plus",
+            proportions,
+            args.output_dir / output_file,
+            args.metric,
+        )
+
+        # Page 3: Slope - UNet Finetune (left) | UNet SimpleMixed (right)
+        output_file = f"figure_epoch_progression_{args.metric}_page3_slope_unet.png"
+        plot_combined_page(
+            args.metrics_dir,
+            slope_experiments,
+            "Slope",
+            "unet",
+            proportions,
+            args.output_dir / output_file,
+            args.metric,
+        )
+
+        # Page 4: Slope - DeepLabV3+ Finetune (left) | DeepLabV3+ SimpleMixed (right)
+        output_file = (
+            f"figure_epoch_progression_{args.metric}_page4_slope_deeplabv3plus.png"
+        )
+        plot_combined_page(
+            args.metrics_dir,
+            slope_experiments,
+            "Slope",
+            "deeplabv3plus",
+            proportions,
+            args.output_dir / output_file,
+            args.metric,
+        )
+
+        print(f"\nDone! 4 pages saved to: {args.output_dir}")
+    else:
+        # Generate single 5×8 grid
+        print(
+            f"\nGenerating 5×8 grid epoch progression plot for metric: {args.metric}..."
+        )
+        output_file = f"figure_epoch_progression_{args.metric}_grid.png"
+        plot_experiment_grid(
+            args.metrics_dir,
+            box_experiments,
+            slope_experiments,
+            proportions,
+            args.output_dir / output_file,
+            args.metric,
+        )
+
+        print(f"\nDone! Plot saved to: {args.output_dir / output_file}")
 
 
 if __name__ == "__main__":

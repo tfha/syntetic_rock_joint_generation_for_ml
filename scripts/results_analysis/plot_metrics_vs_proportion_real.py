@@ -192,8 +192,8 @@ def plot_individual_experiment(
             # Sort by proportion
             df_subset = df_subset.sort_values("proportion")
 
-            # Convert to synthetic proportion (1 - real proportion)
-            synthetic_proportion = 1.0 - df_subset["proportion"]
+            # Use real data proportion directly
+            real_proportion = df_subset["proportion"]
 
             # Get marker and fill style
             marker = EXPERIMENT_MARKERS.get(experiment, "o")
@@ -202,7 +202,7 @@ def plot_individual_experiment(
 
             # Plot line
             ax.plot(
-                synthetic_proportion,
+                real_proportion,
                 df_subset["val_dice_joints"],
                 color=COLORS[model],
                 linestyle=linestyle,
@@ -212,7 +212,7 @@ def plot_individual_experiment(
 
             # Plot points on top
             ax.scatter(
-                synthetic_proportion,
+                real_proportion,
                 df_subset["val_dice_joints"],
                 color=COLORS[model],
                 marker=marker,
@@ -226,14 +226,14 @@ def plot_individual_experiment(
 
     # Styling
     ax.set_title(experiment, fontsize=10, pad=5)
-    ax.set_xlim(-0.05, 1.05)  # 0.0 to 1.0 for synthetic proportion
+    ax.set_xlim(-0.05, 1.05)  # 0.0 to 1.0 for real data proportion
     ax.set_ylim(0, 0.8)
     ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     if show_xlabel:
-        ax.set_xlabel("Proportion of synthetic data", fontsize=9)
+        ax.set_xlabel("Proportion of real data", fontsize=9)
     else:
         ax.set_xticklabels([])
 
