@@ -19,7 +19,8 @@ After training models in Azure ML, use these tools to:
 
 ### Visualization
 
-- **`plot_journal_figures.py`** - Create publication plots comparing experiments (5×2 grids)
+- **`plot_metrics_vs_proportion_real.py`** - Create plots showing metric vs synthetic/real data ratio
+- **`plot_epoch_progression.py`** - Create 4-page plots showing training curves over epochs
 - **`plot_progression.py`** - Generate training progression visualizations showing prediction improvement
 
 ### Legacy/Experimental
@@ -104,38 +105,65 @@ experiments/results/images/
 
 ### 3. Create Publication Plots
 
-Generate publication-quality comparison plots (5×2 grids):
+#### Metrics vs Proportion of Real Data
+
+Generate publication-quality plots showing how validation Dice score varies with synthetic/real data ratio:
 
 ```bash
-poetry run python scripts/results_analysis/plot_journal_figures.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots
+poetry run python scripts/results_analysis/plot_metrics_vs_proportion_real.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric val_dice_joints
 ```
 
-**Generated plots compare:**
-- Training strategies (simplemixed vs finetune)
-- Synthetic/real data ratios (0%, 10%, 30%, 50%, 70%, 90%, 100%)
-- Model architectures (UNet vs DeepLabV3+)
-- Test datasets (box, pattern_box, cardboard_box, slope, larvik, rv4)
+**Plot features:**
+- Compares training strategies (simplemixed vs finetune)
+- Shows effect of synthetic/real data ratios (0%, 10%, 30%, 50%, 70%, 90%, 100%)
+- Compares model architectures (UNet vs DeepLabV3+)
+- Separate plots for different test dataset groups (box-based, slope/rock)
+- Colorblind-friendly with hollow/filled markers for strategies
+- X-axis reversed to show increasing synthetic data left-to-right
 
-**Output:** `experiments/results/plots/validation_dice_joints_{comparison_type}.png`
+**Output:** `experiments/results/plots/{metric}_vs_proportion_*.png`
 
-### 4. Create Progression Plots
+#### Epoch Progression Plots
 
-Generate training progression visualizations showing prediction improvement:
+Generate 4-page plots showing training progression over epochs for Box and Slope experiments:
 
 ```bash
-# SimpleMixed experiment
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-simplemixed_generalisation_cardboard_box_30-20251209-2337" --strategy simplemixed --num-samples 10
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric val_dice_joints
+```
 
-# Finetune experiment
-poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-finetune_generalisation_pattern_box_10-20251210-0957" --strategy finetune --num-samples 7
+**Plot organization (4 pages):**
+- Page 1: Box experiments - UNet (finetune left, simplemixed right)
+- Page 2: Box experiments - DeepLabV3+ (finetune left, simplemixed right)
+- Page 3: Slope experiments - UNet (finetune left, simplemixed right)
+- Page 4: Slope experiments - DeepLabV3+ (finetune left, simplemixed right)
+
+**Plot features:**
+- 5 rows of subplots per page (different data proportions)
+- Training curves show progression from epoch 0 to 100
+- Compares train_dice_joints (dashed) and test_dice_joints (solid)
+- Colorblind-friendly colors
+- Optimized layout for publication (14×15 inch pages)
+
+**Output:** `experiments/results/plots/epoch_progression_{metric}_{experiment}_{model}_page*.png`
+
+### 4. Create Training Progression Visualizations
+
+Generate visualizations showing how predictions improve during training:
+
+```bash
+# SimpleMixed experiment (5 epochs: 5, 10, 15, 20, final)
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-simplemixed_generalisation_cardboard_box_30-20251211-1639" --strategy simplemixed --num-samples 10
+
+# Finetune experiment (5 epochs: 5, 10, stage2_start, stage2_mid, final)
+poetry run python scripts/results_analysis/plot_progression.py --image-dir experiments/results/images --job-name "deeplabv3plus-finetune_generalisation_pattern_box_10-20251210-0956" --strategy finetune --num-samples 7
 ```
 
 **Progression plot layout:**
-- **Rows**: Test samples (10 by default)
-- **Columns**:
+- **Rows**: Test samples (configurable with `--num-samples`, default 10)
+- **Columns** (7 total):
   1. Original image
   2. Ground truth mask
-  3-7. Predictions at different epochs
+  3-7. Predictions at 5 key training epochs
 - **Headers**: Epoch labels with validation Dice scores (`val_dice_joints`)
 - **Left margin**: Sample numbers (aligned with rows)
 
@@ -145,6 +173,7 @@ poetry run python scripts/results_analysis/plot_progression.py --image-dir exper
 - Automatic metrics file matching (handles different timestamps)
 - Consistent 7-column layout for both strategies
 - Clean titles without date/time stamps
+- Strategy-specific epoch selection (early, mid, late training)
 
 **Output:** `experiments/results/plots/progression/{job_name}_progression.png`
 
@@ -164,7 +193,7 @@ This metric evaluates how accurately the model segments rock joints (fractures) 
 1. **Train models** in Azure ML (simplemixed and finetune strategies)
 2. **Download metrics** using `download_metrics.py` to get epoch-wise performance data
 3. **Download images** using `download_images.py` for visual inspection
-4. **Create comparisons** using `plot_journal_figures.py` for publication plots
+4. **Create comparison plots** using `plot_metrics_vs_proportion_real.py` and `plot_epoch_progression.py`
 5. **Visualize progression** using `plot_progression.py` to show training improvement
 6. **Analyze results** to determine best models and strategies
 
