@@ -1081,6 +1081,7 @@ def create_splits_for_experiment(
     output_dir: Path,
     seed: int = 42,
     test_files: list[str] | None = None,
+    fixed_test_set: list[str] | None = None,
 ) -> None:
     """Create train/test splits for a single experiment.
 
@@ -1091,6 +1092,7 @@ def create_splits_for_experiment(
         output_dir: Output directory for splits
         seed: Random seed for reproducibility
         test_files: Optional separate test files (e.g., for generalization experiments)
+        fixed_test_set: Pre-selected test set to ensure consistency across experiments
     """
     import random
 
@@ -1102,8 +1104,11 @@ def create_splits_for_experiment(
     random.shuffle(synthetic_shuffled)
     random.shuffle(real_shuffled)
 
-    # Use separate test files if provided (for generalization experiments)
-    if test_files is not None:
+    # Use fixed test set if provided (ensures same test set across all experiments)
+    if fixed_test_set is not None:
+        test_shuffled = fixed_test_set
+    elif test_files is not None:
+        # Use separate test files if provided (for generalization experiments)
         test_shuffled = test_files.copy()
         random.shuffle(test_shuffled)
     else:
@@ -1149,8 +1154,10 @@ def create_splits_for_experiment(
     # Split real data for training (from real_files)
     train_real = real_shuffled[:n_train_real]
 
-    # Split test data (from test_files if provided, otherwise from remaining real_files)
-    if test_files is not None:
+    # Split test data (use fixed test set if provided, otherwise use test_files or real_files)
+    if fixed_test_set is not None:
+        test_real = fixed_test_set[:n_test_real]
+    elif test_files is not None:
         test_real = test_shuffled[:n_test_real]
     else:
         # Test comes after training data in real_shuffled
@@ -1296,6 +1303,16 @@ def main(cfg: DictConfig) -> None:
         test_prefixes=[],
     )
 
+    # Get cardboard-only files (exclude pattern files) for generalisation experiments
+    # real_box_files includes both cardboard and pattern, so filter them
+    cardboard_prefixes = ["Box-drone-cardboard", "Box-camera-cardboard"]
+    cardboard_files, _ = get_data_files(
+        images_dir=Path(pcfg.dataset.path_images),
+        labels_dir=Path(pcfg.dataset.path_processed_mask_labels),
+        train_prefixes=cardboard_prefixes,
+        test_prefixes=[],
+    )
+
     # Get FracMan synthetic files for Larvik/Rv4 experiments
     fracman_prefixes = ["FracMan"]
     fracman_files, _ = get_data_files(
@@ -1323,32 +1340,174 @@ def main(cfg: DictConfig) -> None:
         test_prefixes=[],
     )
 
+    # === PRE-SELECT TEST SETS (Fixed across all experiments of same type) ===
+    # This ensures consistent test sets across all experiments of the same type
+    # and prevents data leakage by separating train and test pools BEFORE experiments
+    import random
+
+    # Determine test set sizes from experiment definitions (max test_real per type)
+    box_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_BOX + FINETUNE_EXPERIMENTS_BOX
+    )
+    slope_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_SLOPE + FINETUNE_EXPERIMENTS_SLOPE
+    )
+    pattern_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_PATTERN_BOX
+        + FINETUNE_EXPERIMENTS_PATTERN_BOX
+    )
+    cardboard_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_CARDBOARD_BOX
+        + FINETUNE_EXPERIMENTS_CARDBOARD_BOX
+    )
+    larvik_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_LARVIK + FINETUNE_EXPERIMENTS_LARVIK
+    )
+    rv4_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_RV4 + FINETUNE_EXPERIMENTS_RV4
+    )
+
+    # Pre-select BOX test set (same for all box experiments)
+    random.seed(pcfg.experiment.seed)
+    box_test_shuffled = real_box_files.copy()
+    random.shuffle(box_test_shuffled)
+    box_fixed_test = box_test_shuffled[-box_test_size:]  # type: ignore[operator]
+    box_train_pool = box_test_shuffled[:-box_test_size]  # type: ignore[operator]
+
+    # Pre-select SLOPE test set (same for all slope experiments)
+    random.seed(pcfg.experiment.seed)
+    slope_test_shuffled = real_slope_files.copy()
+    random.shuffle(slope_test_shuffled)
+    slope_fixed_test = slope_test_shuffled[-slope_test_size:]  # type: ignore[operator]
+    slope_train_pool = slope_test_shuffled[:-slope_test_size]  # type: ignore[operator]
+
+    # Pre-select PATTERN test set (same for all pattern_box experiments)
+    random.seed(pcfg.experiment.seed)
+    pattern_test_shuffled = pattern_files.copy()
+    random.shuffle(pattern_test_shuffled)
+    pattern_fixed_test = pattern_test_shuffled[-pattern_test_size:]  # type: ignore[operator]
+    pattern_train_pool = pattern_test_shuffled[:-pattern_test_size]  # type: ignore[operator]
+
+    # Pre-select CARDBOARD BOX test set (same for all cardboard_box experiments)
+    random.seed(pcfg.experiment.seed)
+    cardboard_test_shuffled = real_box_files.copy()
+    random.shuffle(cardboard_test_shuffled)
+    cardboard_fixed_test = cardboard_test_shuffled[-cardboard_test_size:]  # type: ignore[operator]
+    cardboard_train_pool = cardboard_test_shuffled[:-cardboard_test_size]  # type: ignore[operator]
+
+    # Pre-select LARVIK test set (same for all larvik experiments)
+    random.seed(pcfg.experiment.seed)
+    larvik_test_shuffled = larvik_files.copy()
+    random.shuffle(larvik_test_shuffled)
+    larvik_fixed_test = larvik_test_shuffled[-larvik_test_size:]  # type: ignore[operator]
+    larvik_train_pool = larvik_test_shuffled[:-larvik_test_size]  # type: ignore[operator]
+
+    # Pre-select RV4 test set (same for all rv4 experiments)
+    random.seed(pcfg.experiment.seed)
+    rv4_test_shuffled = rv4_files.copy()
+    random.shuffle(rv4_test_shuffled)
+    rv4_fixed_test = rv4_test_shuffled[-rv4_test_size:]  # type: ignore[operator]
+    rv4_train_pool = rv4_test_shuffled[:-rv4_test_size]  # type: ignore[operator]
+
+    # === PRE-SELECT TEST SETS FOR GENERALIZATION EXPERIMENTS ===
+    # These ensure train and test domains are properly separated
+
+    # Compute test set sizes for generalization experiments
+    gen_pattern_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_GEN_PATTERN_BOX
+        + FINETUNE_EXPERIMENTS_GEN_PATTERN_BOX
+    )
+    gen_cardboard_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_GEN_CARDBOARD_BOX
+        + FINETUNE_EXPERIMENTS_GEN_CARDBOARD_BOX
+    )
+    gen_larvik_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_GEN_LARVIK + FINETUNE_EXPERIMENTS_GEN_LARVIK
+    )
+    gen_rv4_test_size = max(  # type: ignore[type-var]
+        exp["test_real"]
+        for exp in SIMPLEMIXED_EXPERIMENTS_GEN_RV4 + FINETUNE_EXPERIMENTS_GEN_RV4
+    )
+
+    # Gen Pattern Box: train on cardboard, test on pattern
+    random.seed(pcfg.experiment.seed)
+    gen_pattern_test_shuffled = pattern_files.copy()
+    random.shuffle(gen_pattern_test_shuffled)
+    gen_pattern_fixed_test = gen_pattern_test_shuffled[-gen_pattern_test_size:]  # type: ignore[operator]
+
+    # Cardboard pool for training (completely separate from pattern)
+    cardboard_train_shuffled = cardboard_files.copy()
+    random.shuffle(cardboard_train_shuffled)
+    cardboard_train_pool = cardboard_train_shuffled  # All available for training
+
+    # Gen Cardboard Box: train on pattern, test on cardboard
+    random.seed(pcfg.experiment.seed)
+    gen_cardboard_test_shuffled = cardboard_files.copy()
+    random.shuffle(gen_cardboard_test_shuffled)
+    gen_cardboard_fixed_test = gen_cardboard_test_shuffled[-gen_cardboard_test_size:]  # type: ignore[operator]
+
+    # Pattern pool for training (completely separate from cardboard test)
+    pattern_train_shuffled = pattern_files.copy()
+    random.shuffle(pattern_train_shuffled)
+    pattern_train_pool_for_gen = pattern_train_shuffled  # All available for training
+
+    # Gen Larvik: train on RV4, test on Larvik
+    random.seed(pcfg.experiment.seed)
+    gen_larvik_test_shuffled = larvik_files.copy()
+    random.shuffle(gen_larvik_test_shuffled)
+    gen_larvik_fixed_test = gen_larvik_test_shuffled[-gen_larvik_test_size:]  # type: ignore[operator]
+
+    # RV4 pool for training (separate from Larvik test)
+    rv4_train_pool_for_gen = rv4_files.copy()
+    random.shuffle(rv4_train_pool_for_gen)
+
+    # Gen RV4: train on Larvik, test on RV4
+    random.seed(pcfg.experiment.seed)
+    gen_rv4_test_shuffled = rv4_files.copy()
+    random.shuffle(gen_rv4_test_shuffled)
+    gen_rv4_fixed_test = gen_rv4_test_shuffled[-gen_rv4_test_size:]  # type: ignore[operator]
+
+    # Larvik pool for training (separate from RV4 test)
+    larvik_train_pool_for_gen = larvik_files.copy()
+    random.shuffle(larvik_train_pool_for_gen)
+
     # === SIMPLE MIXED (SM) EXPERIMENTS ===
     console.print("[bold yellow]Simple Mixed (SM) Strategy - BOX[/bold yellow]")
     console.print(
-        f"Available: {len(synthetic_box_files)} synth, {len(real_box_files)} real"
+        f"Available: {len(synthetic_box_files)} synth, {len(box_train_pool)} real (train), {len(box_fixed_test)} real (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,
+            real_files=box_train_pool,
             output_dir=output_base / "sm_box",
             seed=pcfg.experiment.seed,
+            fixed_test_set=box_fixed_test,
         )
     console.print()
 
     console.print("[bold yellow]Simple Mixed (SM) Strategy - SLOPE[/bold yellow]")
     console.print(
-        f"Available: {len(synthetic_slope_files)} synth, {len(real_slope_files)} real"
+        f"Available: {len(synthetic_slope_files)} synth, {len(slope_train_pool)} real (train), {len(slope_fixed_test)} real (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_SLOPE:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_slope_files,
-            real_files=real_slope_files,
+            real_files=slope_train_pool,
             output_dir=output_base / "sm_slope",
             seed=pcfg.experiment.seed,
+            fixed_test_set=slope_fixed_test,
         )
 
     console.print()
@@ -1357,32 +1516,32 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(real_box_files)} real cardbox, {len(pattern_files)} real pattern"
+        f"{len(cardboard_train_pool)} real cardboard (train), {len(gen_pattern_fixed_test)} real pattern (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_GEN_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,
+            real_files=cardboard_train_pool,  # Train on cardboard ONLY
             output_dir=output_base / "sm_gen_pattern_box",
             seed=pcfg.experiment.seed,
-            test_files=pattern_files,  # Test on pattern, not cardbox
+            fixed_test_set=gen_pattern_fixed_test,  # Test on pattern (pre-selected)
         )
     console.print()
 
     console.print("[bold yellow]Simple Mixed (SM) Strategy - PATTERN BOX[/bold yellow]")
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(pattern_files)} real pattern"
+        f"{len(pattern_train_pool)} real pattern (train), {len(pattern_fixed_test)} real pattern (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=pattern_files,  # Stage 2 uses pattern
+            real_files=pattern_train_pool,  # Use training pool only
             output_dir=output_base / "sm_pattern_box",
             seed=pcfg.experiment.seed,
-            test_files=pattern_files,  # Test also uses pattern (separate split)
+            fixed_test_set=pattern_fixed_test,  # Use pre-selected fixed test set
         )
     console.print()
 
@@ -1391,16 +1550,16 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(pattern_files)} real pattern (Stage 2), {len(real_box_files)} real cardbox (Test)"
+        f"{len(pattern_train_pool_for_gen)} real pattern (train), {len(gen_cardboard_fixed_test)} real cardboard (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_GEN_CARDBOARD_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=pattern_files,  # Stage 2 uses pattern
+            real_files=pattern_train_pool_for_gen,  # Train on pattern ONLY
             output_dir=output_base / "sm_gen_cardboard_box",
             seed=pcfg.experiment.seed,
-            test_files=real_box_files,  # Test uses cardbox
+            fixed_test_set=gen_cardboard_fixed_test,  # Test on cardboard (pre-selected)
         )
     console.print()
 
@@ -1409,16 +1568,16 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(real_box_files)} real cardbox (both train and test from same source)"
+        f"{len(cardboard_train_pool)} real cardbox (train), {len(cardboard_fixed_test)} real cardbox (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_CARDBOARD_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,  # Stage 2 uses cardbox
+            real_files=cardboard_train_pool,  # Use training pool only
             output_dir=output_base / "sm_cardboard_box",
             seed=pcfg.experiment.seed,
-            test_files=real_box_files,  # Test also uses cardbox (separate split from train)
+            fixed_test_set=cardboard_fixed_test,  # Use pre-selected fixed test set
         )
     console.print()
 
@@ -1427,32 +1586,32 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(rv4_files)} real Rv4 (Stage 2), {len(larvik_files)} real Larvik (Test)"
+        f"{len(rv4_train_pool_for_gen)} real rv4 (train), {len(gen_larvik_fixed_test)} real larvik (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_GEN_LARVIK:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=rv4_files,  # Stage 2 uses Rv4
+            real_files=rv4_train_pool_for_gen,  # Train on RV4 ONLY
             output_dir=output_base / "sm_gen_larvik",
             seed=pcfg.experiment.seed,
-            test_files=larvik_files,  # Test uses Larvik
+            fixed_test_set=gen_larvik_fixed_test,  # Test on Larvik (pre-selected)
         )
     console.print()
 
     console.print("[bold yellow]Simple Mixed (SM) Strategy - LARVIK[/bold yellow]")
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(larvik_files)} real Larvik (both train and test from same source)"
+        f"{len(larvik_train_pool)} real Larvik (train), {len(larvik_fixed_test)} real Larvik (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_LARVIK:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=larvik_files,  # Stage 2 uses Larvik
+            real_files=larvik_train_pool,  # Use training pool only
             output_dir=output_base / "sm_larvik",
             seed=pcfg.experiment.seed,
-            test_files=larvik_files,  # Test also uses Larvik (separate split from train)
+            fixed_test_set=larvik_fixed_test,  # Use pre-selected fixed test set
         )
     console.print()
 
@@ -1461,197 +1620,198 @@ def main(cfg: DictConfig) -> None:
     )
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(larvik_files)} real Larvik (Stage 2), {len(rv4_files)} real Rv4 (Test)"
+        f"{len(larvik_train_pool_for_gen)} real larvik (train), {len(gen_rv4_fixed_test)} real rv4 (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_GEN_RV4:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=larvik_files,  # Stage 2 uses Larvik
+            real_files=larvik_train_pool_for_gen,  # Train on Larvik ONLY
             output_dir=output_base / "sm_gen_rv4",
             seed=pcfg.experiment.seed,
-            test_files=rv4_files,  # Test uses Rv4
+            fixed_test_set=gen_rv4_fixed_test,  # Test on RV4 (pre-selected)
         )
     console.print()
 
     console.print("[bold yellow]Simple Mixed (SM) Strategy - RV4[/bold yellow]")
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(rv4_files)} real Rv4 (both train and test from same source)"
+        f"{len(rv4_train_pool)} real Rv4 (train), {len(rv4_fixed_test)} real Rv4 (test)"
     )
     for exp in SIMPLEMIXED_EXPERIMENTS_RV4:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=rv4_files,  # Stage 2 uses Rv4
+            real_files=rv4_train_pool,  # Use training pool only
             output_dir=output_base / "sm_rv4",
             seed=pcfg.experiment.seed,
-            test_files=rv4_files,  # Test also uses Rv4 (separate split from train)
+            fixed_test_set=rv4_fixed_test,  # Use pre-selected fixed test set
         )
     console.print()
 
     # === FINE-TUNED (FT) EXPERIMENTS ===
+    # FT experiments use the same test sets as SM experiments
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - BOX[/bold yellow]")
     console.print(
-        f"Available: {len(synthetic_box_files)} synth, {len(real_box_files)} real"
+        f"Available: {len(synthetic_box_files)} synth, {len(box_train_pool)} real (train), {len(box_fixed_test)} real (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,
+            real_files=box_train_pool,
             output_dir=output_base / "ft_box",
             seed=pcfg.experiment.seed,
+            fixed_test_set=box_fixed_test,
         )
     console.print()
 
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - SLOPE[/bold yellow]")
     console.print(
-        f"Available: {len(synthetic_slope_files)} synth, {len(real_slope_files)} real"
+        f"Available: {len(synthetic_slope_files)} synth, {len(slope_train_pool)} real (train), {len(slope_fixed_test)} real (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_SLOPE:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_slope_files,
-            real_files=real_slope_files,
+            real_files=slope_train_pool,
             output_dir=output_base / "ft_slope",
             seed=pcfg.experiment.seed,
+            fixed_test_set=slope_fixed_test,
         )
 
     console.print()
     console.print(
-        "[bold yellow]Fine-Tuned (FT) Strategy - GENERALISATION PATTERN BOX[/bold yellow]"
+        "[bold yellow]Finetune (FT) Strategy - GENERALISATION PATTERN BOX[/bold yellow]"
     )
     console.print(
-        f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(real_box_files)} real cardbox, {len(pattern_files)} real pattern"
+        f"Available: {len(synthetic_box_files)} synth cardboard (Stage 1), "
+        f"{len(cardboard_train_pool)} real cardboard (Stage 2), {len(gen_pattern_fixed_test)} real pattern (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_GEN_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,
+            real_files=cardboard_train_pool,  # Train on cardboard ONLY
             output_dir=output_base / "ft_gen_pattern_box",
             seed=pcfg.experiment.seed,
-            test_files=pattern_files,  # Test on pattern, not cardbox
+            fixed_test_set=gen_pattern_fixed_test,  # Test on pattern (pre-selected)
         )
-
     console.print()
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - PATTERN BOX[/bold yellow]")
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(pattern_files)} real pattern"
+        f"{len(pattern_train_pool)} real pattern (train), {len(pattern_fixed_test)} real pattern (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_PATTERN_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=pattern_files,  # Stage 2 uses pattern
+            real_files=pattern_train_pool,  # Use training pool only
             output_dir=output_base / "ft_pattern_box",
             seed=pcfg.experiment.seed,
-            test_files=pattern_files,  # Test also uses pattern (separate split)
+            fixed_test_set=pattern_fixed_test,  # Use pre-selected fixed test set
         )
 
     console.print()
     console.print(
-        "[bold yellow]Fine-Tuned (FT) Strategy - GENERALISATION CARDBOARD BOX[/bold yellow]"
+        "[bold yellow]Finetune (FT) Strategy - GENERALISATION CARDBOARD BOX[/bold yellow]"
     )
     console.print(
-        f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(pattern_files)} real pattern (Stage 2), {len(real_box_files)} real cardbox (Test)"
+        f"Available: {len(synthetic_box_files)} synth cardboard (Stage 1), "
+        f"{len(pattern_train_pool_for_gen)} real pattern (Stage 2), {len(gen_cardboard_fixed_test)} real cardboard (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_GEN_CARDBOARD_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=pattern_files,  # Stage 2 uses pattern
+            real_files=pattern_train_pool_for_gen,  # Train on pattern ONLY
             output_dir=output_base / "ft_gen_cardboard_box",
             seed=pcfg.experiment.seed,
-            test_files=real_box_files,  # Test uses cardbox
+            fixed_test_set=gen_cardboard_fixed_test,  # Test on cardboard (pre-selected)
         )
 
     console.print()
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - CARDBOARD BOX[/bold yellow]")
     console.print(
         f"Available: {len(synthetic_box_files)} synth cardboard, "
-        f"{len(real_box_files)} real cardbox (both train and test from same source)"
+        f"{len(cardboard_train_pool)} real cardbox (train), {len(cardboard_fixed_test)} real cardbox (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_CARDBOARD_BOX:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=synthetic_box_files,
-            real_files=real_box_files,  # Stage 2 uses cardbox
+            real_files=cardboard_train_pool,  # Use training pool only
             output_dir=output_base / "ft_cardboard_box",
             seed=pcfg.experiment.seed,
-            test_files=real_box_files,  # Test also uses cardbox (separate split from train)
+            fixed_test_set=cardboard_fixed_test,  # Use pre-selected fixed test set
         )
 
     console.print()
     console.print(
-        "[bold yellow]Fine-Tuned (FT) Strategy - GENERALISATION LARVIK[/bold yellow]"
+        "[bold yellow]Finetune (FT) Strategy - GENERALISATION LARVIK[/bold yellow]"
     )
     console.print(
-        f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(rv4_files)} real Rv4 (Stage 2), {len(larvik_files)} real Larvik (Test)"
+        f"Available: {len(fracman_files)} synth FracMan (Stage 1), "
+        f"{len(rv4_train_pool_for_gen)} real rv4 (Stage 2), {len(gen_larvik_fixed_test)} real larvik (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_GEN_LARVIK:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=rv4_files,  # Stage 2 uses Rv4
+            real_files=rv4_train_pool_for_gen,  # Train on RV4 ONLY
             output_dir=output_base / "ft_gen_larvik",
             seed=pcfg.experiment.seed,
-            test_files=larvik_files,  # Test uses Larvik
+            fixed_test_set=gen_larvik_fixed_test,  # Test on Larvik (pre-selected)
         )
-
     console.print()
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - LARVIK[/bold yellow]")
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(larvik_files)} real Larvik (both train and test from same source)"
+        f"{len(larvik_train_pool)} real Larvik (train), {len(larvik_fixed_test)} real Larvik (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_LARVIK:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=larvik_files,  # Stage 2 uses Larvik
+            real_files=larvik_train_pool,  # Use training pool only
             output_dir=output_base / "ft_larvik",
             seed=pcfg.experiment.seed,
-            test_files=larvik_files,  # Test also uses Larvik (separate split from train)
+            fixed_test_set=larvik_fixed_test,  # Use pre-selected fixed test set
         )
 
     console.print()
     console.print(
-        "[bold yellow]Fine-Tuned (FT) Strategy - GENERALISATION RV4[/bold yellow]"
+        "[bold yellow]Finetune (FT) Strategy - GENERALISATION RV4[/bold yellow]"
     )
     console.print(
-        f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(larvik_files)} real Larvik (Stage 2), {len(rv4_files)} real Rv4 (Test)"
+        f"Available: {len(fracman_files)} synth FracMan (Stage 1), "
+        f"{len(larvik_train_pool_for_gen)} real larvik (Stage 2), {len(gen_rv4_fixed_test)} real rv4 (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_GEN_RV4:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=larvik_files,  # Stage 2 uses Larvik
+            real_files=larvik_train_pool_for_gen,  # Train on Larvik ONLY
             output_dir=output_base / "ft_gen_rv4",
             seed=pcfg.experiment.seed,
-            test_files=rv4_files,  # Test uses Rv4
+            fixed_test_set=gen_rv4_fixed_test,  # Test on RV4 (pre-selected)
         )
 
     console.print()
     console.print("[bold yellow]Fine-Tuned (FT) Strategy - RV4[/bold yellow]")
     console.print(
         f"Available: {len(fracman_files)} synth FracMan, "
-        f"{len(rv4_files)} real Rv4 (both train and test from same source)"
+        f"{len(rv4_train_pool)} real Rv4 (train), {len(rv4_fixed_test)} real Rv4 (test)"
     )
     for exp in FINETUNE_EXPERIMENTS_RV4:
         create_splits_for_experiment(
             experiment=exp,
             synthetic_files=fracman_files,
-            real_files=rv4_files,  # Stage 2 uses Rv4
+            real_files=rv4_train_pool,  # Use training pool only
             output_dir=output_base / "ft_rv4",
             seed=pcfg.experiment.seed,
-            test_files=rv4_files,  # Test also uses Rv4 (separate split from train)
+            fixed_test_set=rv4_fixed_test,  # Use pre-selected fixed test set
         )
 
     console.print()

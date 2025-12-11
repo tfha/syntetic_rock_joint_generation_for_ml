@@ -1,0 +1,441 @@
+"""Plot training progression showing model predictions at different checkpoints.
+
+This script creates publication-quality figures showing how model predictions
+improve during training. Each figure shows multiple test samples (rows) across
+different training epochs (columns), with Dice scores annotated.
+"""
+
+import argparse
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from PIL import Image
+
+
+def read_metrics_for_epochs(
+    metrics_path: Path, epoch_numbers: list[int]
+) -> dict[int, float]:
+    """Read Dice scores for specific epochs from metrics CSV.
+
+    Args:
+        metrics_path: Path to the metrics CSV file
+        epoch_numbers: List of epoch numbers to extract scores for
+
+    Returns:
+        Dictionary mapping epoch number to Dice score
+    """
+    if not metrics_path.exists():
+        print(f"Warning: Metrics file not found: {metrics_path}")
+        return {}
+
+    try:
+        df = pd.read_csv(metrics_path)
+        # Check for required columns
+        if "epoch" not in df.columns:
+            print(f"Warning: epoch column not found in {metrics_path}")
+            return {}
+
+        # Try to find the appropriate Dice score column
+        dice_col = None
+        for col_name in ["val_dice_joints", "best_val_dice_joint", "val_dice"]:
+            if col_name in df.columns:
+                dice_col = col_name
+                break
+
+        if dice_col is None:
+            print(f"Warning: No Dice score column found in {metrics_path}")
+            return {}
+
+        epoch_scores = {}
+        for epoch_num in epoch_numbers:
+            epoch_data = df[df["epoch"] == epoch_num]
+            if not epoch_data.empty:
+                # Get the validation Dice score for this epoch
+                score = epoch_data[dice_col].iloc[0]
+                epoch_scores[epoch_num] = score
+
+        return epoch_scores
+    except Exception as e:
+        print(f"Error reading metrics from {metrics_path}: {e}")
+        return {}
+
+
+def crop_composite_image(
+    img: Image.Image,
+) -> tuple[Image.Image, Image.Image, Image.Image]:
+    """Crop a composite image into its three components.
+
+    The composite images have layout: original | ground_truth | prediction
+    with white padding between components.
+
+    Args:
+        img: Composite image with 3 columns (original, ground_truth, prediction)
+
+    Returns:
+        Tuple of (original, ground_truth, prediction) in display order
+    """
+    # Exact crop coordinates based on actual content boundaries:
+    # Original: (188, 82) to (530, 423)
+    # Ground Truth: (598, 82) to (940, 423)
+    # Prediction: (1008, 82) to (1350, 423)
+
+    original = img.crop((188, 82, 530, 423))
+    ground_truth = img.crop((598, 82, 940, 423))
+    prediction = img.crop((1008, 82, 1350, 423))
+
+    return original, ground_truth, prediction
+
+
+def plot_progression_grid(
+    image_dir: Path,
+    metrics_path: Path,
+    output_path: Path,
+    strategy: str,
+    num_samples: int = 10,
+    figsize: tuple[float, float] | None = None,
+) -> None:
+    """Create a progression grid showing model predictions over training.
+
+    Each row shows: original image, ground truth mask, then predictions from different epochs.
+
+    Args:
+        image_dir: Directory containing epoch folders with images
+        metrics_path: Path to metrics CSV file
+        output_path: Where to save the output figure
+        strategy: Training strategy ('simplemixed' or 'finetune')
+        num_samples: Number of test samples to show (rows)
+        figsize: Figure size (width, height) in inches. If None, auto-calculated
+    """
+    # Discover available epoch folders dynamically
+    all_epoch_folders = [d for d in image_dir.iterdir() if d.is_dir()]
+
+    # Collect folders with their epoch numbers for sorting
+    folder_info: list[tuple[str, int | float, str]] = []
+
+    if strategy == "finetune":
+        # For finetune: look for epoch_5, epoch_10, stage2 epochs, and final
+        for folder in all_epoch_folders:
+            folder_name = folder.name
+            if folder_name == "epoch_5":
+                folder_info.append((folder_name, 5, "Epoch 5"))
+            elif folder_name == "epoch_10":
+                folder_info.append((folder_name, 10, "Epoch 10"))
+            elif "stage2_first_epoch" in folder_name:
+                actual_epoch = int(folder_name.split("_")[1])
+                folder_info.append(
+                    (
+                        folder_name,
+                        actual_epoch,
+                        f"Epoch {actual_epoch}\n(Stage 2 Start)",
+                    )
+                )
+            elif "stage2_fifth_epoch" in folder_name:
+                actual_epoch = int(folder_name.split("_")[1])
+                folder_info.append(
+                    (folder_name, actual_epoch, f"Epoch {actual_epoch}\n(Stage 2 5th)")
+                )
+            elif folder_name == "final":
+                folder_info.append(
+                    (folder_name, float("inf"), "Final")
+                )  # Sort final to end
+    else:  # simplemixed
+        # For simplemixed: look for epoch_5, epoch_10, epoch_15, epoch_20, and final
+        for folder in all_epoch_folders:
+            folder_name = folder.name
+            if folder_name in ["epoch_5", "epoch_10", "epoch_15", "epoch_20"]:
+                epoch_num = int(folder_name.split("_")[1])
+                folder_info.append((folder_name, epoch_num, f"Epoch {epoch_num}"))
+            elif folder_name == "final":
+                folder_info.append(
+                    (folder_name, float("inf"), "Final")
+                )  # Sort final to end
+
+    # Sort by epoch number
+    folder_info.sort(key=lambda x: x[1])
+
+    # Extract sorted lists
+    available_folders = [f[0] for f in folder_info]
+    available_epochs: list[int | None] = [
+        None if f[1] == float("inf") else int(f[1]) for f in folder_info
+    ]
+    available_labels = [f[2] for f in folder_info]
+
+    if not available_folders:
+        print(f"Error: No epoch folders found in {image_dir}")
+        return
+
+    num_prediction_epochs = len(available_folders)
+
+    # Read Dice scores from metrics
+    epoch_scores = {}
+    final_epoch_score = None
+    if metrics_path.exists():
+        valid_epoch_nums = [e for e in available_epochs if e is not None]
+        epoch_scores = read_metrics_for_epochs(metrics_path, valid_epoch_nums)
+
+        # Get the final epoch score (last row in metrics)
+        try:
+            df = pd.read_csv(metrics_path)
+            if "val_dice_joints" in df.columns and not df.empty:
+                final_epoch_score = df["val_dice_joints"].iloc[-1]
+        except Exception as e:
+            print(f"Warning: Could not read final epoch score: {e}")
+
+    # Get list of available samples from first epoch folder
+    first_epoch_dir = image_dir / available_folders[0]
+    sample_files = sorted(first_epoch_dir.glob("sample_*.png"))[:num_samples]
+
+    if not sample_files:
+        print(f"Error: No sample images found in {first_epoch_dir}")
+        return
+
+    actual_num_samples = len(sample_files)
+    num_cols = 2 + num_prediction_epochs  # original + mask + predictions
+    print(
+        f"Creating progression plot with {actual_num_samples} samples × {num_cols} columns"
+    )
+
+    # Calculate figure size if not provided
+    if figsize is None:
+        # Use consistent dimensions regardless of strategy
+        # Finetune has 7 columns (original + mask + 5 predictions)
+        # SimpleMixed has 7 columns (original + mask + 5 predictions)
+        cell_height = 2.0
+        cell_width = 2.0
+        # Fixed width for 7 columns + extra space for sample labels on left
+        figsize = (cell_width * 7 + 2.0, cell_height * actual_num_samples + 1)
+
+    # Create figure and axes
+    fig, axes = plt.subplots(
+        actual_num_samples,
+        num_cols,
+        figsize=figsize,
+        squeeze=False,
+    )
+
+    # Adjust subplot positioning to make room for sample labels on the left
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.95, bottom=0.05)
+
+    # Plot images for each sample
+    for row, sample_file in enumerate(sample_files):
+        sample_name = sample_file.name
+
+        # Load the first epoch image to extract original and mask
+        first_image_path = image_dir / available_folders[0] / sample_name
+        if not first_image_path.exists():
+            print(f"Warning: Missing {first_image_path}")
+            continue
+
+        try:
+            first_img = Image.open(first_image_path)
+            original, mask, _ = crop_composite_image(first_img)
+
+            # Plot original image (column 0)
+            axes[row, 0].imshow(original)
+            axes[row, 0].set_aspect("equal")
+            axes[row, 0].axis("off")
+            if row == 0:
+                axes[row, 0].set_title("Original", fontsize=10, fontweight="bold")
+
+            # Plot mask (column 1)
+            axes[row, 1].imshow(mask)
+            axes[row, 1].set_aspect("equal")
+            axes[row, 1].axis("off")
+            if row == 0:
+                axes[row, 1].set_title("Ground Truth", fontsize=10, fontweight="bold")
+
+        except Exception as e:
+            print(f"Error loading {first_image_path}: {e}")
+            axes[row, 0].text(0.5, 0.5, "Error", ha="center", va="center")
+            axes[row, 0].axis("off")
+            axes[row, 1].text(0.5, 0.5, "Error", ha="center", va="center")
+            axes[row, 1].axis("off")
+
+        # Plot predictions from each epoch (columns 2+)
+        for col_offset, (epoch_folder, epoch_label) in enumerate(
+            zip(available_folders, available_labels, strict=False)
+        ):
+            col = 2 + col_offset
+            ax = axes[row, col]
+            current_epoch_num: int | None = available_epochs[col_offset]
+
+            image_path = image_dir / epoch_folder / sample_name
+            if image_path.exists():
+                try:
+                    img = Image.open(image_path)
+                    _, _, prediction = crop_composite_image(img)
+                    ax.imshow(prediction)
+                    ax.set_aspect("equal")
+                except Exception as e:
+                    print(f"Error loading {image_path}: {e}")
+                    ax.text(
+                        0.5,
+                        0.5,
+                        "Error",
+                        ha="center",
+                        va="center",
+                        transform=ax.transAxes,
+                    )
+            else:
+                ax.text(
+                    0.5,
+                    0.5,
+                    "Missing",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                )
+
+            ax.axis("off")
+
+            # Add column titles (epoch + score) on first row
+            if row == 0:
+                title = epoch_label
+
+                # Add Dice score if available
+                if current_epoch_num is None and final_epoch_score is not None:
+                    # This is the final epoch
+                    title += f"\nDice: {final_epoch_score:.3f}"
+                elif (
+                    current_epoch_num is not None and current_epoch_num in epoch_scores
+                ):
+                    dice = epoch_scores[current_epoch_num]
+                    title += f"\nDice: {dice:.3f}"
+
+                ax.set_title(title, fontsize=10, fontweight="bold")
+
+    # Add overall title with job information (remove date/time suffix)
+    job_display_name = image_dir.name
+    # Remove the datetime suffix (format: -YYYYMMDD-HHMM)
+    job_name_without_datetime = "-".join(job_display_name.split("-")[:-2])
+    fig.suptitle(
+        f"Training Progression: {job_name_without_datetime}",
+        fontsize=14,
+        fontweight="bold",
+        y=0.995,
+    )
+
+    # Adjust layout FIRST - leave more space on the left for sample labels
+    plt.tight_layout(rect=[0.08, 0, 1, 0.99])
+
+    # Add sample labels AFTER layout is finalized
+    # Note: axes[row, 0] gives the subplot at that row position
+    for row in range(actual_num_samples):
+        # Get the bbox of the subplot in figure coordinates
+        bbox = axes[row, 0].get_position()
+        # Calculate vertical center of this subplot
+        row_center_y = (bbox.y0 + bbox.y1) / 2
+
+        # Position labels to the left of the leftmost subplot
+        label_x = bbox.x0 - 0.02  # 2% to the left of subplot
+
+        fig.text(
+            label_x,
+            row_center_y,
+            f"Sample {row}",
+            fontsize=10,
+            fontweight="bold",
+            ha="right",  # Right-align so text extends leftward
+            va="center",
+            transform=fig.transFigure,
+        )
+
+    # Save figure
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    print(f"Saved progression plot to {output_path}")
+    plt.close()
+
+
+def main() -> None:
+    """Generate progression plots from downloaded images."""
+    parser = argparse.ArgumentParser(
+        description="Create training progression plots from downloaded images"
+    )
+    parser.add_argument(
+        "--image-dir",
+        type=Path,
+        required=True,
+        help="Directory containing job folders with epoch images",
+    )
+    parser.add_argument(
+        "--job-name",
+        type=str,
+        required=True,
+        help="Job display name (folder name under image-dir)",
+    )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        required=True,
+        choices=["simplemixed", "finetune"],
+        help="Training strategy",
+    )
+    parser.add_argument(
+        "--metrics-dir",
+        type=Path,
+        default=Path("experiments/results/metrics/mode=max"),
+        help="Directory containing metrics CSV files",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("experiments/results/plots/progression"),
+        help="Output directory for progression plots",
+    )
+    parser.add_argument(
+        "--num-samples",
+        type=int,
+        default=5,
+        help="Number of test samples to include in the plot",
+    )
+
+    args = parser.parse_args()
+
+    # Construct paths
+    job_image_dir = args.image_dir / args.job_name
+    if not job_image_dir.exists():
+        print(f"Error: Job image directory not found: {job_image_dir}")
+        return
+
+    # Find corresponding metrics file
+    # Try with full display name first, then try without timestamp
+    metrics_file = args.metrics_dir / f"{args.job_name}_metrics.csv"
+    if not metrics_file.exists():
+        # Try alternate naming (without timestamp for finetune jobs)
+        # e.g., "deeplabv3plus-finetune_generalisation_pattern_box_10-20251210-0957"
+        # becomes "deeplabv3plus_finetune_generalisation_pattern_box_10"
+        name_parts = args.job_name.rsplit("-", 2)  # Split off last 2 parts (date-time)
+        if len(name_parts) == 3:
+            alt_name = name_parts[0].replace("-", "_")
+            metrics_file = args.metrics_dir / f"{alt_name}_metrics.csv"
+            if metrics_file.exists():
+                print(f"Found metrics file: {metrics_file.name}")
+            else:
+                # For simplemixed, try finding any metrics file matching the base name
+                # (timestamp in image folder might differ from metrics timestamp)
+                base_name = name_parts[
+                    0
+                ]  # e.g., "deeplabv3plus-simplemixed_generalisation_cardboard_box_30"
+                pattern = f"{base_name}-*_metrics.csv"
+                matching_files = list(args.metrics_dir.glob(pattern))
+                if matching_files:
+                    metrics_file = matching_files[0]
+                    print(f"Found metrics file: {metrics_file.name}")
+
+    # Output path
+    output_file = args.output_dir / f"{args.job_name}_progression.png"
+
+    # Create progression plot
+    plot_progression_grid(
+        image_dir=job_image_dir,
+        metrics_path=metrics_file,
+        output_path=output_file,
+        strategy=args.strategy,
+        num_samples=args.num_samples,
+    )
+
+
+if __name__ == "__main__":
+    main()
