@@ -269,12 +269,11 @@ streamlit run scripts/results_analysis/qualitative_evaluation_app.py --server.po
 **App features:**
 - Navigate through images one-by-one with Prev/Next buttons
 - Progress tracker showing which images have been rated
-- Rate final epoch on 5 criteria using 1-5 scale:
+- Rate final epoch on 4 criteria using 1-5 scale:
   - **Geological recognisability**: How realistic do the predicted joints look?
   - **Joint persistence**: Are continuous joints properly connected?
   - **Boundary localisation & thickness**: Are joint boundaries precise?
   - **False positives / noise**: How much spurious segmentation exists?
-  - **Engineering usability**: Would this be useful for engineering analysis?
 - Optional field to note best epoch(s) that outperform final in general
 - Add optional text notes
 - Ratings saved automatically to CSV file
@@ -295,7 +294,6 @@ streamlit run scripts/results_analysis/qualitative_evaluation_app.py --server.po
 - `joint_persistence`: Score 1-5
 - `boundary_localisation`: Score 1-5
 - `false_positives`: Score 1-5
-- `engineering_usability`: Score 1-5
 - `better_epoch`: Optional - best epoch(s) that outperform final in general
 - `notes`: Optional text comments
 
@@ -303,7 +301,7 @@ streamlit run scripts/results_analysis/qualitative_evaluation_app.py --server.po
 1. Download images using `download_images.py`
 2. Select a job folder in the app (contains epoch subfolders)
 3. Navigate through sample images with Prev/Next or click from sidebar list
-4. Rate final epoch on 5 criteria (1-5 scale)
+4. Rate final epoch on 4 criteria (1-5 scale)
 5. Optionally note best epoch(s) that outperform final in general
 6. Add any notes
 7. Click Save to record ratings
