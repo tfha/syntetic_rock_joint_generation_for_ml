@@ -125,38 +125,52 @@ poetry run python scripts/results_analysis/plot_metrics_vs_proportion_real.py --
 
 #### Epoch Progression Plots
 
-Generate 4-page plots showing training progression over epochs for Box and Slope experiments:
+Generate training progression plots over epochs for Box and Slope experiments.
+
+**Option 1: Single grid plot (5×8 layout, all experiments on one figure):**
 
 ```bash
 poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
 ```
 
+**Output:** `experiments/results/plots/figure_epoch_progression_{metric}_grid.png`
+
+**Option 2: Separate pages (4-page format for publication):**
+
+```bash
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints --separate-pages
+```
+
+**Output:** 4 separate files:
+- `epoch_progression_{metric}_box_unet_page*.png`
+- `epoch_progression_{metric}_box_deeplabv3plus_page*.png`
+- `epoch_progression_{metric}_slope_unet_page*.png`
+- `epoch_progression_{metric}_slope_deeplabv3plus_page*.png`
+
 **Note:** Use metric names without `val_` or `train_` prefix (e.g., `dice_joints` not `val_dice_joints`). The script automatically plots both training (dashed) and validation (solid) curves.
 
-**Plot organization (4 pages):**
+**Plot organization (4 separate pages when using --separate-pages):**
 - Page 1: Box experiments - UNet (finetune left, simplemixed right)
 - Page 2: Box experiments - DeepLabV3+ (finetune left, simplemixed right)
 - Page 3: Slope experiments - UNet (finetune left, simplemixed right)
 - Page 4: Slope experiments - DeepLabV3+ (finetune left, simplemixed right)
 
 **Plot features:**
-- 5 rows of subplots per page (different data proportions)
+- 5 rows of subplots per page (different data proportions: 10%, 30%, 50%, 70%, 90%)
 - Training curves show progression from epoch 0 to 100
-- Compares train_dice_joints (dashed) and test_dice_joints (solid)
+- Compares train_dice_joints (dashed) and val_dice_joints (solid)
 - Colorblind-friendly colors
 - Optimized layout for publication (14×15 inch pages)
-
-**Output:** `experiments/results/plots/epoch_progression_{metric}_{experiment}_{model}_page*.png`
 
 **Batch generation for multiple metrics:**
 
 Generate plots for all key metrics in one go:
 
 ```bash
-# Generate dice_joints, dice, and loss plots
-poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
-poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice
-poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric loss
+# Generate 4-page format for dice_joints, dice, and loss
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints --separate-pages
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice --separate-pages
+poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric loss --separate-pages
 ```
 
 Available metrics: `dice_joints`, `dice`, `iou_joints`, `iou`, `loss`, `precision_joints`, `recall_joints`
