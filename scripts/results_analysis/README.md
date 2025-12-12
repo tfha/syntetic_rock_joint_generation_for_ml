@@ -110,7 +110,7 @@ experiments/results/images/
 Generate publication-quality plots showing how validation Dice score varies with synthetic/real data ratio:
 
 ```bash
-poetry run python scripts/results_analysis/plot_metrics_vs_proportion_real.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric val_dice_joints
+poetry run python scripts/results_analysis/plot_metrics_vs_proportion_real.py --metrics-dir experiments/results/metrics/mode=max --output-dir experiments/results/plots --metric dice_joints
 ```
 
 **Plot features:**
