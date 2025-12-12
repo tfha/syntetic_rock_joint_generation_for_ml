@@ -49,9 +49,8 @@ poetry run python scripts/results_analysis/download_metrics.py --jobs-file exper
 
 **Input format:** Text file with one job name per line:
 ```
-deeplabv3plus-simplemixed_box_10-20251209-1543
-deeplabv3plus-finetune_box_10-20251210-0956
-unet-simplemixed_slope_30-20251209-1523
+helpful_rice_czsjvjzqz8
+dreamy_needle_qr9t9jd920
 ```
 
 ### 2. Download Example Images
