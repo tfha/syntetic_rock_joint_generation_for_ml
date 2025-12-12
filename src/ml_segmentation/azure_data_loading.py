@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from ml_segmentation.data_loading import (
     SegmentationDataset,
     get_transforms,
+    validate_no_data_leakage,
 )
 
 
@@ -93,6 +94,7 @@ def setup_azure_dataloader(
     pin_memory: bool | None = None,
     persistent_workers: bool | None = None,
     generator: torch.Generator | None = None,
+    experiment_strategy: str | None = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Sets up data loaders for Azure ML training environment.
@@ -111,6 +113,7 @@ def setup_azure_dataloader(
         pin_memory: Whether to use pinned memory (None for auto-detect)
         persistent_workers: Whether to use persistent workers (None for auto-detect)
         generator: Random generator for reproducible shuffling
+        experiment_strategy: Experiment strategy name (e.g., 'simplemixed_box_50')
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
@@ -193,6 +196,28 @@ def setup_azure_dataloader(
                 f"train={len(train_list)}, val={len(val_list)}, "
                 f"test={len(test_list)}",
                 style="info",
+            )
+
+            # VALIDATE NO DATA LEAKAGE (CRITICAL)
+            console.print(
+                "Validating data integrity (checking for train/val/test leakage)...",
+                style="info",
+            )
+            experiment_name = os.environ.get(
+                "AZUREML_RUN_DISPLAY_NAME", "azure_experiment"
+            )
+            # Check if SimpleMixed experiment (val=test by design)
+            # Use experiment_strategy if provided, otherwise fall back to experiment_name
+            strategy_check = (
+                experiment_strategy if experiment_strategy else experiment_name
+            )
+            is_simplemixed = "simplemixed" in strategy_check.lower()
+            validate_no_data_leakage(
+                train_list=train_list,
+                val_list=val_list,
+                test_list=test_list,
+                experiment_name=experiment_name,
+                allow_val_test_overlap=is_simplemixed,
             )
 
             # Log to MLflow if in Azure ML environment

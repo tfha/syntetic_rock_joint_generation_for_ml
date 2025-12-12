@@ -372,6 +372,7 @@ def main(cfg: DictConfig) -> None:
         pin_memory=None,  # auto: True on CUDA, False on CPU
         persistent_workers=None,  # auto: True if num_workers > 0
         generator=generator,
+        experiment_strategy=pcfg.experiment.experiment_strategy,
     )
 
     # 6. Initialize model architecture

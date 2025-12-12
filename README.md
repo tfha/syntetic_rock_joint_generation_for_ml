@@ -144,9 +144,19 @@ Fine-Tuned (FT) - pretrain on synthetic, finetune on real (requires FT implement
    ```bash
    poetry run python scripts/create_finetune_splits.py
    ```
-   This creates splits in `data/model_ready/wachter_splits/{sm_box,sm_slope,ft_box,ft_slope}/`
+   This creates splits in `data/model_ready/wachter_splits/` for all 140 experiments (20 experiment types × 7 proportions).
 
-2. **Register splits in Azure ML**:
+2. **Verify data integrity** (no train/test leakage):
+   ```bash
+   poetry run python scripts/verify_no_leakage.py
+   ```
+   This script checks all 140 experiments for data leakage between training and test sets:
+   - **SM experiments**: Verifies `train.json` ∩ `test.json` = ∅
+   - **FT experiments**: Verifies `train_synthetic.json` ∩ `test.json` = ∅ AND `train_real.json` ∩ `test.json` = ∅
+   - Confirms test set consistency within each experiment type
+   - Reports summary statistics for all experiment configurations
+
+3. **Register splits in Azure ML**:
    ```bash
    poetry run python scripts/azure_manage_assets_and_resources.py azure_data_assets.command=register-finetune-splits
    ```
