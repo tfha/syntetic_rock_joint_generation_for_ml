@@ -24,6 +24,10 @@ After training models in Azure ML, use these tools to:
 - **`plot_progression.py`** - Generate training progression visualizations showing prediction improvement
 - **`plot_progression_batch.py`** - Batch generate progression plots for all downloaded jobs automatically
 
+### Qualitative Evaluation
+
+- **`qualitative_evaluation_app.py`** - Streamlit app for rating epoch progression images interactively
+
 ### Legacy/Experimental
 
 - `aggregate_results.py` - Aggregate metrics from multiple experiments
@@ -251,6 +255,62 @@ Summary:
 
 This metric evaluates how accurately the model segments rock joints (fractures) at each training epoch.
 
+### 5. Qualitative Evaluation (Interactive)
+
+Launch the Streamlit app to rate epoch progression images interactively:
+
+```bash
+streamlit run scripts/results_analysis/qualitative_evaluation_app.py
+
+# If port 8501 is blocked or in use, specify an alternative port:
+streamlit run scripts/results_analysis/qualitative_evaluation_app.py --server.port 8502
+```
+
+**App features:**
+- Navigate through images one-by-one with Prev/Next buttons
+- Progress tracker showing which images have been rated
+- Rate final epoch on 5 criteria using 1-5 scale:
+  - **Geological recognisability**: How realistic do the predicted joints look?
+  - **Joint persistence**: Are continuous joints properly connected?
+  - **Boundary localisation & thickness**: Are joint boundaries precise?
+  - **False positives / noise**: How much spurious segmentation exists?
+  - **Engineering usability**: Would this be useful for engineering analysis?
+- Optional field to note best epoch(s) that outperform final in general
+- Add optional text notes
+- Ratings saved automatically to CSV file
+- Supports multiple raters with unique IDs
+- Clickable sidebar list showing rated (✓) vs unrated (○) images
+
+**Configuration (sidebar):**
+- **Image folder**: Path to folder containing images (e.g., `experiments/results/images/job_name/`)
+- **Rater ID**: Identifier for the person rating (e.g., `rater_1`, `geologist_A`)
+- **Output CSV**: Path to save ratings (default: `qualitative_ratings.csv`)
+
+**Output format:** CSV with columns:
+- `timestamp`: When rating was saved
+- `rater`: Who provided the rating
+- `image`: Image filename
+- `stage`: Training stage (always "final")
+- `geological_recognisability`: Score 1-5
+- `joint_persistence`: Score 1-5
+- `boundary_localisation`: Score 1-5
+- `false_positives`: Score 1-5
+- `engineering_usability`: Score 1-5
+- `better_epoch`: Optional - best epoch(s) that outperform final in general
+- `notes`: Optional text comments
+
+**Workflow:**
+1. Download images using `download_images.py`
+2. Select a job folder in the app (contains epoch subfolders)
+3. Navigate through sample images with Prev/Next or click from sidebar list
+4. Rate final epoch on 5 criteria (1-5 scale)
+5. Optionally note best epoch(s) that outperform final in general
+6. Add any notes
+7. Click Save to record ratings
+8. Progress automatically tracked in sidebar
+
+**Use case:** Complement quantitative metrics (Dice, IoU) with expert assessment of prediction quality for publication and model selection.
+
 ## Workflow Summary
 
 1. **Train models** in Azure ML (simplemixed and finetune strategies)
@@ -258,7 +318,8 @@ This metric evaluates how accurately the model segments rock joints (fractures) 
 3. **Download images** using `download_images.py` for visual inspection
 4. **Create comparison plots** using `plot_metrics_vs_proportion_real.py` and `plot_epoch_progression.py`
 5. **Visualize progression** using `plot_progression.py` to show training improvement
-6. **Analyze results** to determine best models and strategies
+6. **Qualitative evaluation** using `qualitative_evaluation_app.py` for expert ratings
+7. **Analyze results** to determine best models and strategies
 
 ## Configuration Files
 

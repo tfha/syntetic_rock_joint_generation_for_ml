@@ -71,6 +71,7 @@ toml = "^0.10.2"
 absl-py = "1.4.0"
 sympy = "^1.14.0"
 azure-storage-blob = "^12.27.1"
+streamlit = "^1.52.1"
 
 [tool.poetry.group.dev.dependencies]
 tensorboard = "^2.18.0"
