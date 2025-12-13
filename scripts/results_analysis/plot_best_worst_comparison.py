@@ -432,7 +432,15 @@ def create_comparison_grid(
                     else:
                         score_text = score_fmt.format(score)
                 else:
-                    score_text = score_fmt.format(score)
+                    # For quality columns, also add dice joints score
+                    dice_match = metrics_df[metrics_df["full_name"] == exp_name]
+                    if not dice_match.empty:
+                        dice_score = dice_match["best_val_dice_joints"].iloc[0]
+                        score_text = (
+                            f"{score_fmt.format(score)}\nDice Joints: {dice_score:.3f}"
+                        )
+                    else:
+                        score_text = score_fmt.format(score)
 
                 # Add experiment name and score below image
                 axes[row, col].text(
