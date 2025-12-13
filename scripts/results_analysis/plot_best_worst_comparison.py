@@ -422,8 +422,19 @@ def create_comparison_grid(
                 else:
                     short_name = exp_name
 
+                # For best_dice column, also add mean quality score
+                if exp_key == "best_dice":
+                    # Look up mean quality score for this experiment
+                    quality_match = ratings_df[ratings_df["full_name"] == exp_name]
+                    if not quality_match.empty:
+                        quality_score = quality_match["mean_quality_score"].iloc[0]
+                        score_text = f"Mean quality score: {quality_score:.1f}\n{score_fmt.format(score)}"
+                    else:
+                        score_text = score_fmt.format(score)
+                else:
+                    score_text = score_fmt.format(score)
+
                 # Add experiment name and score below image
-                score_text = score_fmt.format(score)
                 axes[row, col].text(
                     0.5,
                     -0.04,
