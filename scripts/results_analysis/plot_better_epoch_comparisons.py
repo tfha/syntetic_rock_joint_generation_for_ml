@@ -113,7 +113,11 @@ def crop_section(img: Image.Image, section: str) -> Image.Image:
 
 
 def load_epoch_images(
-    exp_dir: Path, sample_num: int, better_epochs: list[int], strategy: str
+    exp_dir: Path,
+    sample_num: int,
+    better_epochs: list[int],
+    strategy: str,
+    metrics_df: pd.DataFrame | None = None,
 ) -> list[tuple[str, Image.Image, bool]]:
     """Load prediction images for all available epochs for a specific sample.
 
@@ -122,6 +126,7 @@ def load_epoch_images(
 
     For finetune: marks stage2 epochs as better.
     For simplemixed: uses better_epochs list from CSV.
+    If metrics_df provided, adds val_dice_joints to epoch labels.
     """
     image_list = []
 
@@ -158,7 +163,18 @@ def load_epoch_images(
             epoch_label = epoch_dir.name
 
             if epoch_label == "final":
-                epoch_label = "Final"
+                # Add dice score for Final epoch
+                dice_str = ""
+                if metrics_df is not None and "val_dice_joints" in metrics_df.columns:
+                    if strategy == "finetune":
+                        # For finetune: use best (max) val_dice_joints
+                        dice_score = metrics_df["val_dice_joints"].max()
+                        dice_str = f"\nDice: {dice_score:.3f}"
+                    else:
+                        # For simplemixed: use last epoch's val_dice_joints
+                        dice_score = metrics_df["val_dice_joints"].iloc[-1]
+                        dice_str = f"\nDice: {dice_score:.3f}"
+                epoch_label = f"Final{dice_str}"
             elif epoch_label.startswith("epoch_"):
                 # Parse full directory name for stage info
                 dir_name = epoch_dir.name
@@ -183,13 +199,25 @@ def load_epoch_images(
                         # simplemixed: use actual epoch numbers from CSV
                         is_better = epoch_num in better_epochs
 
+                    # Get dice score for this epoch if metrics available
+                    dice_str = ""
+                    if (
+                        metrics_df is not None
+                        and "val_dice_joints" in metrics_df.columns
+                        and "epoch" in metrics_df.columns
+                    ):
+                        epoch_data = metrics_df[metrics_df["epoch"] == epoch_num]
+                        if not epoch_data.empty:
+                            dice_score = epoch_data["val_dice_joints"].iloc[0]
+                            dice_str = f"\nDice: {dice_score:.3f}"
+
                     # Check for stage 2 information
                     if "stage2_first_epoch" in dir_name:
-                        epoch_label = f"Epoch {epoch_num}\n(Stage 2 Start)"
+                        epoch_label = f"Epoch {epoch_num}\n(Stage 2 Start){dice_str}"
                     elif "stage2_fifth_epoch" in dir_name:
-                        epoch_label = f"Epoch {epoch_num}\n(Stage 2 5th)"
+                        epoch_label = f"Epoch {epoch_num}\n(Stage 2 5th){dice_str}"
                     else:
-                        epoch_label = f"Epoch {epoch_num}"
+                        epoch_label = f"Epoch {epoch_num}{dice_str}"
 
             image_list.append((epoch_label, prediction, is_better))
 
@@ -377,17 +405,6 @@ def create_comparison_figure(
         if exp_dir is None:
             continue
 
-        # Extract strategy from full_name
-        strategy = (
-            full_name.split("-")[1].split("_")[0] if "-" in full_name else "unknown"
-        )
-
-        # Load all epoch images
-        image_list = load_epoch_images(exp_dir, sample_num, better_epochs, strategy)
-        if not image_list:
-            print(f"Warning: No images found for {full_name}")
-            continue
-
         # Extract model, strategy, experiment, proportion from full_name
         # Format: model-strategy_experiment_proportion
         # Example: unet-finetune_box_10 or unet-finetune_generalisation_box_10
@@ -413,6 +430,24 @@ def create_comparison_figure(
                 experiment_label = full_name
         else:
             experiment_label = full_name
+
+        # Load metrics for this experiment to get dice scores
+        metrics_df = load_experiment_metrics(
+            metrics_dir, model, strategy_parsed, experiment, proportion
+        )
+
+        # Extract strategy from full_name for load_epoch_images
+        strategy = (
+            full_name.split("-")[1].split("_")[0] if "-" in full_name else "unknown"
+        )
+
+        # Load all epoch images with metrics
+        image_list = load_epoch_images(
+            exp_dir, sample_num, better_epochs, strategy, metrics_df
+        )
+        if not image_list:
+            print(f"Warning: No images found for {full_name}")
+            continue
 
         row_data_list.append(
             {
