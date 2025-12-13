@@ -227,7 +227,7 @@ def plot_individual_experiment(
     # Styling
     ax.set_title(experiment, fontsize=10, pad=5)
     ax.set_xlim(-0.05, 1.05)  # 0.0 to 1.0 for real data proportion
-    ax.set_ylim(0, 0.8)
+    ax.set_ylim(0, 0.85)
     ax.grid(True, alpha=0.3, linestyle="--", linewidth=0.5)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
