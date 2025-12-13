@@ -391,7 +391,7 @@ def create_comparison_grid(
 
         # Columns 2-5: Predictions
         pred_cols = [
-            ("best_dice", 2, "Dice joints: {:.2f}"),
+            ("best_dice", 2, "Dice joints: {:.3f}"),
             ("best_quality", 3, "Mean quality score: {:.1f}"),
             ("avg_quality", 4, "Mean quality score: {:.1f}"),
             ("worst_quality", 5, "Mean quality score: {:.1f}"),
