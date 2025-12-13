@@ -37,18 +37,18 @@ COLORS = {
     "deeplabv3plus": "#DE8F05",  # Orange
 }
 
-# Markers for different experiment strategies
+# Markers for all experiments (using circles to match legend)
 EXPERIMENT_MARKERS = {
     "Box": "o",  # Circle
-    "Pattern Box": "s",  # Square
-    "Cardboard Box": "^",  # Triangle up
-    "Generalisation Pattern Box": "X",  # Cross (X)
-    "Generalisation Cardboard Box": "P",  # Plus (+)
+    "Pattern Box": "o",  # Circle
+    "Cardboard Box": "o",  # Circle
+    "Generalisation Pattern Box": "o",  # Circle
+    "Generalisation Cardboard Box": "o",  # Circle
     "Slope": "o",  # Circle
-    "Larvik": "s",  # Square
-    "Rv 4": "^",  # Triangle up
-    "Generalisation Larvik": "X",  # Cross (X)
-    "Generalisation Rv 4": "P",  # Plus (+)
+    "Larvik": "o",  # Circle
+    "Rv 4": "o",  # Circle
+    "Generalisation Larvik": "o",  # Circle
+    "Generalisation Rv 4": "o",  # Circle
 }
 
 # Marker face colors for strategy (filled vs hollow)
@@ -313,7 +313,7 @@ def plot_experiment_grid(
         bbox_to_anchor=(0.5, -0.01),
     )
 
-    plt.tight_layout(rect=[0, 0.02, 1, 0.98])
+    plt.tight_layout(rect=(0, 0.02, 1, 0.98))
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     print(f"Saved plot: {output_path}")
     plt.close()
