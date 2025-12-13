@@ -113,12 +113,15 @@ def crop_section(img: Image.Image, section: str) -> Image.Image:
 
 
 def load_epoch_images(
-    exp_dir: Path, sample_num: int, better_epochs: list[int]
+    exp_dir: Path, sample_num: int, better_epochs: list[int], strategy: str
 ) -> list[tuple[str, Image.Image, bool]]:
     """Load prediction images for all available epochs for a specific sample.
 
     Returns list of (epoch_label, image, is_better) tuples.
     Also includes original and ground truth from one epoch.
+
+    For finetune: marks stage2 epochs as better.
+    For simplemixed: uses better_epochs list from CSV.
     """
     image_list = []
 
@@ -164,7 +167,21 @@ def load_epoch_images(
                 match = re.search(r"epoch_(\d+)", dir_name)
                 if match:
                     epoch_num = int(match.group(1))
-                    is_better = epoch_num in better_epochs
+
+                    # For finetune: CSV uses epoch_13 = stage2_first, epoch_17 = stage2_fifth
+                    # For simplemixed: use actual epoch numbers
+                    if strategy == "finetune":
+                        # Map CSV epoch codes to stage directories
+                        if "stage2_first_epoch" in dir_name:
+                            is_better = 13 in better_epochs
+                        elif "stage2_fifth_epoch" in dir_name:
+                            is_better = 17 in better_epochs
+                        else:
+                            # Regular epoch directories (e.g., epoch_5, epoch_10)
+                            is_better = epoch_num in better_epochs
+                    else:
+                        # simplemixed: use actual epoch numbers from CSV
+                        is_better = epoch_num in better_epochs
 
                     # Check for stage 2 information
                     if "stage2_first_epoch" in dir_name:
@@ -253,20 +270,33 @@ def create_comparison_figure(
         if exp_dir is None:
             continue
 
+        # Extract strategy from full_name
+        strategy = (
+            full_name.split("-")[1].split("_")[0] if "-" in full_name else "unknown"
+        )
+
         # Load all epoch images
-        image_list = load_epoch_images(exp_dir, sample_num, better_epochs)
+        image_list = load_epoch_images(exp_dir, sample_num, better_epochs, strategy)
         if not image_list:
             print(f"Warning: No images found for {full_name}")
             continue
 
         # Extract model, strategy, experiment, proportion from full_name
         # Format: model-strategy_experiment_proportion
-        label_parts = full_name.replace("-", "_").split("_")
-        if len(label_parts) >= 3:
-            model = label_parts[0]
-            strategy = label_parts[1]
-            proportion = label_parts[-1]
-            experiment_label = f"{model}_{strategy}_{proportion}"
+        # Example: unet-finetune_box_10 or unet-finetune_generalisation_box_10
+        parts = full_name.split("-")
+        if len(parts) == 2:
+            model = parts[0]
+            rest = parts[1]  # strategy_experiment_proportion
+            rest_parts = rest.split("_")
+            if len(rest_parts) >= 2:
+                strategy = rest_parts[0]
+                proportion = rest_parts[-1]
+                # Everything between strategy and proportion is the experiment name
+                experiment = "_".join(rest_parts[1:-1])
+                experiment_label = f"{model}_{strategy}_{experiment}_{proportion}"
+            else:
+                experiment_label = full_name
         else:
             experiment_label = full_name
 
