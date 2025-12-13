@@ -212,6 +212,76 @@ def add_red_border(img: Image.Image, border_width: int = 8) -> Image.Image:
     return bordered_img
 
 
+def get_actual_better_epochs(
+    exp_dir: Path, better_epochs: list[int], strategy: str
+) -> list[int]:
+    """Get actual epoch numbers for plotting markers.
+
+    For finetune: epoch_13 in CSV maps to stage2_first_epoch directory,
+                  epoch_17 in CSV maps to stage2_fifth_epoch directory.
+    For simplemixed: use epoch numbers directly.
+    """
+    if strategy != "finetune":
+        return better_epochs
+
+    actual_epochs = []
+
+    # Map CSV epoch codes to actual epoch numbers from directories
+    for epoch_dir in exp_dir.iterdir():
+        if not epoch_dir.is_dir():
+            continue
+
+        dir_name = epoch_dir.name
+        if "stage2_first_epoch" in dir_name and 13 in better_epochs:
+            # Extract actual epoch number
+            match = re.search(r"epoch_(\d+)", dir_name)
+            if match:
+                actual_epochs.append(int(match.group(1)))
+        elif "stage2_fifth_epoch" in dir_name and 17 in better_epochs:
+            match = re.search(r"epoch_(\d+)", dir_name)
+            if match:
+                actual_epochs.append(int(match.group(1)))
+        elif dir_name.startswith("epoch_") and "stage2" not in dir_name:
+            # Regular epoch directory (e.g., epoch_5, epoch_10)
+            match = re.search(r"epoch_(\d+)", dir_name)
+            if match:
+                epoch_num = int(match.group(1))
+                if epoch_num in better_epochs:
+                    actual_epochs.append(epoch_num)
+
+    return actual_epochs
+
+
+def load_experiment_metrics(
+    metrics_dir: Path, model: str, strategy: str, experiment: str, proportion: str
+) -> pd.DataFrame | None:
+    """Load epoch metrics CSV for a specific experiment."""
+    # Metrics are in mode=max subdirectory
+    metrics_dir = metrics_dir / "mode=max"
+
+    # Try different naming patterns:
+    # 1. Finetune: model_strategy_experiment_proportion_metrics.csv (no timestamp, underscores)
+    # 2. Simplemixed: model-strategy_experiment_proportion-timestamp_metrics.csv
+
+    patterns = [
+        f"{model}_{strategy}_{experiment}_{proportion}_metrics.csv",  # finetune
+        f"{model}-{strategy}_{experiment}_{proportion}-*_metrics.csv",  # simplemixed
+    ]
+
+    for pattern in patterns:
+        matching_files = list(metrics_dir.glob(pattern))
+        if matching_files:
+            try:
+                df = pd.read_csv(matching_files[0])
+                if "epoch" in df.columns:
+                    return df
+            except Exception as e:
+                print(f"Error loading {matching_files[0].name}: {e}")
+                continue
+
+    return None
+
+
 def parse_better_epochs(better_epoch_str: str) -> list[int]:
     """Parse better_epoch string to extract epoch numbers.
 
@@ -232,6 +302,7 @@ def parse_better_epochs(better_epoch_str: str) -> list[int]:
 def create_comparison_figure(
     experiments_df: pd.DataFrame,
     image_dir: Path,
+    metrics_dir: Path,
     output_path: Path,
 ) -> None:
     """Create 22×N comparison figure showing better epoch predictions."""
@@ -285,16 +356,23 @@ def create_comparison_figure(
         # Format: model-strategy_experiment_proportion
         # Example: unet-finetune_box_10 or unet-finetune_generalisation_box_10
         parts = full_name.split("-")
+        model = ""
+        strategy_parsed = ""
+        experiment = ""
+        proportion = ""
+
         if len(parts) == 2:
             model = parts[0]
             rest = parts[1]  # strategy_experiment_proportion
             rest_parts = rest.split("_")
             if len(rest_parts) >= 2:
-                strategy = rest_parts[0]
+                strategy_parsed = rest_parts[0]
                 proportion = rest_parts[-1]
                 # Everything between strategy and proportion is the experiment name
                 experiment = "_".join(rest_parts[1:-1])
-                experiment_label = f"{model}_{strategy}_{experiment}_{proportion}"
+                experiment_label = (
+                    f"{model}_{strategy_parsed}_{experiment}_{proportion}"
+                )
             else:
                 experiment_label = full_name
         else:
@@ -306,6 +384,11 @@ def create_comparison_figure(
                 "dataset": experiment_norm,
                 "label": experiment_label,
                 "images": image_list,
+                "model": model,
+                "strategy": strategy_parsed,
+                "experiment_name": experiment,
+                "proportion": proportion,
+                "better_epochs": better_epochs,
             }
         )
 
@@ -313,18 +396,19 @@ def create_comparison_figure(
         print("No images loaded!")
         return
 
-    # Determine column count from first experiment
-    max_cols = max(len(rd["images"]) for rd in row_data_list)
+    # Determine column count from first experiment + 2 for metrics plots
+    max_img_cols = max(len(rd["images"]) for rd in row_data_list)
     n_rows = len(row_data_list)
+    total_cols = max_img_cols + 2  # Add 2 columns for dice_joints and loss
 
-    print(f"Creating {n_rows}×{max_cols} comparison grid...")
+    print(f"Creating {n_rows}×{total_cols} comparison grid...")
 
-    # Create figure
-    fig_width = max_cols * 2.0
+    # Create figure with extra width for metric plots
+    fig_width = max_img_cols * 2.0 + 2 * 3.0  # Wider for metrics
     fig_height = n_rows * 2.0
 
     fig, axes = plt.subplots(
-        n_rows, max_cols, figsize=(fig_width, fig_height), squeeze=False
+        n_rows, total_cols, figsize=(fig_width, fig_height), squeeze=False
     )
 
     # Populate grid
@@ -347,7 +431,8 @@ def create_comparison_figure(
 
         sorted_images = sorted(images, key=sort_key)
 
-        for col_idx in range(max_cols):
+        # Plot images in first columns
+        for col_idx in range(max_img_cols):
             ax = axes[row_idx, col_idx]
 
             if col_idx < len(sorted_images):
@@ -361,6 +446,93 @@ def create_comparison_figure(
                 ax.set_title(label, fontsize=9)
 
             ax.axis("off")
+
+        # Load metrics and plot in last two columns
+        metrics_df = load_experiment_metrics(
+            metrics_dir,
+            row_data["model"],
+            row_data["strategy"],
+            row_data["experiment_name"],
+            row_data["proportion"],
+        )
+
+        # Get actual epoch numbers for markers
+        exp_dir = find_experiment_directory(image_dir, row_data["experiment"])
+        actual_better_epochs = []
+        if exp_dir is not None:
+            actual_better_epochs = get_actual_better_epochs(
+                exp_dir, row_data["better_epochs"], row_data["strategy"]
+            )
+
+        if metrics_df is not None:
+            # Plot dice_joints in second-to-last column
+            ax_dice = axes[row_idx, max_img_cols]
+            if "val_dice_joints" in metrics_df.columns:
+                ax_dice.plot(
+                    metrics_df["epoch"],
+                    metrics_df["val_dice_joints"],
+                    "b-",
+                    linewidth=1.5,
+                )
+
+                # Add markers at better epochs
+                for better_epoch in actual_better_epochs:
+                    epoch_data = metrics_df[metrics_df["epoch"] == better_epoch]
+                    if not epoch_data.empty:
+                        ax_dice.scatter(
+                            epoch_data["epoch"],
+                            epoch_data["val_dice_joints"],
+                            color="red",
+                            s=80,
+                            zorder=5,
+                            marker="o",
+                            edgecolors="black",
+                            linewidths=1.5,
+                        )
+
+                ax_dice.set_xlabel("Epoch", fontsize=8)
+                ax_dice.set_ylabel("Val Dice Joints", fontsize=8)
+                ax_dice.tick_params(labelsize=7)
+                ax_dice.grid(True, alpha=0.3)
+            else:
+                ax_dice.text(0.5, 0.5, "No data", ha="center", va="center", fontsize=8)
+                ax_dice.axis("off")
+
+            # Plot loss in last column
+            ax_loss = axes[row_idx, max_img_cols + 1]
+            if "val_loss" in metrics_df.columns:
+                ax_loss.plot(
+                    metrics_df["epoch"], metrics_df["val_loss"], "r-", linewidth=1.5
+                )
+
+                # Add markers at better epochs
+                for better_epoch in actual_better_epochs:
+                    epoch_data = metrics_df[metrics_df["epoch"] == better_epoch]
+                    if not epoch_data.empty:
+                        ax_loss.scatter(
+                            epoch_data["epoch"],
+                            epoch_data["val_loss"],
+                            color="red",
+                            s=80,
+                            zorder=5,
+                            marker="o",
+                            edgecolors="black",
+                            linewidths=1.5,
+                        )
+
+                ax_loss.set_xlabel("Epoch", fontsize=8)
+                ax_loss.set_ylabel("Val Loss", fontsize=8)
+                ax_loss.tick_params(labelsize=7)
+                ax_loss.grid(True, alpha=0.3)
+            else:
+                ax_loss.text(0.5, 0.5, "No data", ha="center", va="center", fontsize=8)
+                ax_loss.axis("off")
+        else:
+            # No metrics available
+            for col_offset in [0, 1]:
+                ax = axes[row_idx, max_img_cols + col_offset]
+                ax.text(0.5, 0.5, "No metrics", ha="center", va="center", fontsize=8)
+                ax.axis("off")
 
         # Add experiment label (model_strategy_proportion) to left
         axes[row_idx, 0].text(
@@ -386,6 +558,7 @@ def main() -> None:
     """Generate better epoch comparison plot."""
     csv_path = Path("experiments/results/qualitative_ratings.csv")
     image_dir = Path("experiments/results/images")
+    metrics_dir = Path("experiments/results/metrics")
     output_dir = Path("experiments/results/plots")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -396,6 +569,7 @@ def main() -> None:
     create_comparison_figure(
         experiments_df,
         image_dir,
+        metrics_dir,
         output_dir / "figure_better_epoch_comparisons.png",
     )
 
