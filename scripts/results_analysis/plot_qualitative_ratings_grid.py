@@ -118,6 +118,10 @@ def load_qualitative_ratings(csv_path: Path) -> pd.DataFrame:
         metadata = parse_image_filename(row["image"])
         if metadata:
             metadata["mean_quality_score"] = row["mean_quality_score"]
+            # Include better_epoch information
+            metadata["has_better_epoch"] = (
+                pd.notna(row.get("better_epoch")) and row.get("better_epoch") != ""
+            )
             metadata_list.append(metadata)
 
     if not metadata_list:
@@ -191,6 +195,21 @@ def plot_individual_experiment(
                 alpha=0.8,
                 zorder=3,
             )
+
+            # Mark points with better epochs: + for finetune, x for simplemixed
+            df_better = df_subset[df_subset["has_better_epoch"]]
+            if not df_better.empty:
+                marker_better = "+" if strategy == "finetune" else "x"
+                ax.scatter(
+                    df_better["proportion"],
+                    df_better["mean_quality_score"],
+                    marker=marker_better,
+                    s=200,
+                    color="black",
+                    linewidths=2,
+                    alpha=0.9,
+                    zorder=4,
+                )
 
     # Styling
     ax.set_title(experiment, fontsize=10, pad=5)
@@ -302,12 +321,34 @@ def plot_experiment_grid(
             label="DeepLabV3+ (SimpleMixed)",
             markeredgewidth=1.5,
         ),
+        Line2D(
+            [0],
+            [0],
+            marker="+",
+            color="w",
+            markerfacecolor="black",
+            markeredgecolor="black",
+            markersize=10,
+            label='Better epoch than "best" (Finetune)',
+            markeredgewidth=2,
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="x",
+            color="w",
+            markerfacecolor="black",
+            markeredgecolor="black",
+            markersize=10,
+            label="Better epoch than final (SimpleMixed)",
+            markeredgewidth=2,
+        ),
     ]
 
     fig.legend(
         handles=legend_elements,
         loc="lower center",
-        ncol=4,
+        ncol=3,
         frameon=True,
         fontsize=9,
         bbox_to_anchor=(0.5, -0.01),
