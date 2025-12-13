@@ -136,6 +136,18 @@ def load_epoch_metrics(
     return None
 
 
+def get_proportions_for_strategy(strategy: str) -> list[float]:
+    """Get appropriate proportions based on strategy.
+
+    Finetune uses 10-90% (0.1-0.9).
+    SimpleMixed includes 0% and 100% (0.0-1.0) in addition.
+    """
+    base_proportions = [0.1, 0.3, 0.5, 0.7, 0.9]
+    if strategy == "simplemixed":
+        return [0.0] + base_proportions + [1.0]
+    return base_proportions
+
+
 def plot_model_strategy_experiment(
     ax,
     metrics_dir: Path,
@@ -293,13 +305,16 @@ def plot_experiment_grid(
             show_ylabel = col_idx == 0  # Only leftmost column
             show_title = row_idx == 0  # Only top row
 
+            # Use strategy-specific proportions
+            strategy_proportions = get_proportions_for_strategy(strategies[col_idx])
+
             plot_model_strategy_experiment(
                 axes[row_idx, col_idx],
                 metrics_dir,
                 experiment,
                 models[col_idx],
                 strategies[col_idx],
-                proportions,
+                strategy_proportions,
                 metric,
                 show_ylabel,
                 show_xlabel,
@@ -327,13 +342,16 @@ def plot_experiment_grid(
             show_ylabel = False  # No ylabel for right columns
             show_title = row_idx == 0  # Only top row
 
+            # Use strategy-specific proportions
+            strategy_proportions = get_proportions_for_strategy(strategies[col_idx])
+
             plot_model_strategy_experiment(
                 axes[row_idx, col_idx + 4],
                 metrics_dir,
                 experiment,
                 models[col_idx],
                 strategies[col_idx],
-                proportions,
+                strategy_proportions,
                 metric,
                 show_ylabel,
                 show_xlabel,
@@ -432,6 +450,7 @@ def plot_combined_page(
     fig, axes = plt.subplots(5, 2, figsize=(14, 15))
 
     # Left column: Finetune strategy
+    finetune_proportions = get_proportions_for_strategy("finetune")
     for row_idx, experiment in enumerate(experiments):
         show_xlabel = row_idx == 4
         show_ylabel = True
@@ -443,7 +462,7 @@ def plot_combined_page(
             experiment,
             model,
             "finetune",
-            proportions,
+            finetune_proportions,
             metric,
             show_ylabel,
             show_xlabel,
@@ -464,6 +483,7 @@ def plot_combined_page(
         )
 
     # Right column: SimpleMixed strategy
+    simplemixed_proportions = get_proportions_for_strategy("simplemixed")
     for row_idx, experiment in enumerate(experiments):
         show_xlabel = row_idx == 4
         show_ylabel = False
@@ -475,7 +495,7 @@ def plot_combined_page(
             experiment,
             model,
             "simplemixed",
-            proportions,
+            simplemixed_proportions,
             metric,
             show_ylabel,
             show_xlabel,
