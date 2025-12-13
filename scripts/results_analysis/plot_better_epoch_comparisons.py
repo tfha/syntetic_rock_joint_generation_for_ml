@@ -282,6 +282,42 @@ def load_experiment_metrics(
     return None
 
 
+def load_all_proportions_metrics(
+    metrics_dir: Path, model: str, strategy: str, experiment: str
+) -> dict[str, pd.DataFrame]:
+    """Load metrics for all proportions of a given experiment.
+
+    Returns dict mapping proportion string to DataFrame.
+    """
+    metrics_dir = metrics_dir / "mode=max"
+    all_metrics = {}
+
+    # Define all possible proportions
+    if strategy == "finetune":
+        proportions = ["10", "30", "50", "70", "90"]
+    else:  # simplemixed
+        proportions = ["0", "10", "30", "50", "70", "90", "100"]
+
+    for prop in proportions:
+        patterns = [
+            f"{model}_{strategy}_{experiment}_{prop}_metrics.csv",  # finetune
+            f"{model}-{strategy}_{experiment}_{prop}-*_metrics.csv",  # simplemixed
+        ]
+
+        for pattern in patterns:
+            matching_files = list(metrics_dir.glob(pattern))
+            if matching_files:
+                try:
+                    df = pd.read_csv(matching_files[0])
+                    if "epoch" in df.columns:
+                        all_metrics[prop] = df
+                        break
+                except Exception:
+                    continue
+
+    return all_metrics
+
+
 def parse_better_epochs(better_epoch_str: str) -> list[int]:
     """Parse better_epoch string to extract epoch numbers.
 
@@ -447,13 +483,20 @@ def create_comparison_figure(
 
             ax.axis("off")
 
-        # Load metrics and plot in last two columns
+        # Load metrics for current proportion and all other proportions
         metrics_df = load_experiment_metrics(
             metrics_dir,
             row_data["model"],
             row_data["strategy"],
             row_data["experiment_name"],
             row_data["proportion"],
+        )
+
+        all_proportions_metrics = load_all_proportions_metrics(
+            metrics_dir,
+            row_data["model"],
+            row_data["strategy"],
+            row_data["experiment_name"],
         )
 
         # Get actual epoch numbers for markers
@@ -468,11 +511,28 @@ def create_comparison_figure(
             # Plot dice_joints in second-to-last column
             ax_dice = axes[row_idx, max_img_cols]
             if "val_dice_joints" in metrics_df.columns:
+                # Plot all other proportions in grey (background)
+                for prop, prop_df in all_proportions_metrics.items():
+                    if (
+                        prop != row_data["proportion"]
+                        and "val_dice_joints" in prop_df.columns
+                    ):
+                        ax_dice.plot(
+                            prop_df["epoch"],
+                            prop_df["val_dice_joints"],
+                            color="lightgrey",
+                            linewidth=1.0,
+                            alpha=0.5,
+                            zorder=1,
+                        )
+
+                # Plot current proportion in blue (foreground)
                 ax_dice.plot(
                     metrics_df["epoch"],
                     metrics_df["val_dice_joints"],
                     "b-",
-                    linewidth=1.5,
+                    linewidth=2.0,
+                    zorder=3,
                 )
 
                 # Add markers at better epochs
@@ -501,8 +561,25 @@ def create_comparison_figure(
             # Plot loss in last column
             ax_loss = axes[row_idx, max_img_cols + 1]
             if "val_loss" in metrics_df.columns:
+                # Plot all other proportions in grey (background)
+                for prop, prop_df in all_proportions_metrics.items():
+                    if prop != row_data["proportion"] and "val_loss" in prop_df.columns:
+                        ax_loss.plot(
+                            prop_df["epoch"],
+                            prop_df["val_loss"],
+                            color="lightgrey",
+                            linewidth=1.0,
+                            alpha=0.5,
+                            zorder=1,
+                        )
+
+                # Plot current proportion (foreground)
                 ax_loss.plot(
-                    metrics_df["epoch"], metrics_df["val_loss"], "r-", linewidth=1.5
+                    metrics_df["epoch"],
+                    metrics_df["val_loss"],
+                    "r-",
+                    linewidth=2.0,
+                    zorder=3,
                 )
 
                 # Add markers at better epochs
