@@ -1,5 +1,5 @@
 """
-Two-stage Fine-Tuned (FT) training for Wachter et al. (2026) experiments.
+Two-stage Fine-Tuned (FT) training for Wachter et al. (2025) experiments.
 
 This script implements the FT training strategy:
 1. Stage 1 (Pretrain): Train on 100% synthetic data until real validation accuracy plateaus

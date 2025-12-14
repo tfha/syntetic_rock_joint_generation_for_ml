@@ -3,7 +3,7 @@
 # Lines starting with # are comments and will be ignored
 # Empty lines are also ignored
 
-# Wachter et al. (2026) - All Experiments (excluding invalid finetune_0 and finetune_100)
+# Wachter et al. (2025) - All Experiments (excluding invalid finetune_0 and finetune_100)
 # Invalid experiments with num_sample=0 are commented out (all finetune_*_0 and finetune_*_100)
 # Format: model experiment_strategy
 

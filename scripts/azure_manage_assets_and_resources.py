@@ -57,7 +57,7 @@ def get_command_description(command: AzureDataAssetsCommand) -> str:
             "generate, upload, and register splits in one operation"
         ),
         AzureDataAssetsCommand.REGISTER_FINETUNE_SPLITS: (
-            "Register all Wachter et al. (2026) finetune experiment splits "
+            "Register all Wachter et al. (2025) finetune experiment splits "
             "(140 experiments: 70 SM + 70 FT)"
         ),
         AzureDataAssetsCommand.LIST_ASSETS: "List data assets in Azure ML",

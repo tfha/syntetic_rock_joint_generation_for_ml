@@ -97,9 +97,9 @@ EXTRA:
 
 For all models, experiment with transfer learning using pretrained models as a backbone model. At least for DeepLabV3+ and Unet, different pretrained models are available.
 
-### Wachter et al. (2026) Hybrid Training Experiments
+### Wachter et al. (2025) Hybrid Training Experiments
 
-Following the methodology from [Wachter et al. (2026)](https://arxiv.org/abs/2506.24093), we evaluate two mixed training strategies for combining synthetic and real data:
+Following the methodology from [Wachter et al. (2025)](https://arxiv.org/abs/2506.24093), we evaluate two mixed training strategies for combining synthetic and real data:
 
 - **SM (Simple Mixed)**: Train on synthetic and real data simultaneously, sampled randomly from both datasets
 - **FT (Fine-Tuned)**: Two-stage training - (1) pretrain on 100% synthetic data until real validation accuracy plateaus, (2) finetune on real data for remaining epochs

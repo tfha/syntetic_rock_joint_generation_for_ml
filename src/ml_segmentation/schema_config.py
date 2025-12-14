@@ -117,7 +117,7 @@ class ExperimentStrategy(str, Enum):
     DATASET_SIZE_TEST = "dataset_size_test"
     SEMI_SUPERVISED_LEARNING = "semi_supervised_learning"
     ONE_SHOT_SEGMENTATION = "one_shot_segmentation"
-    # Wachter et al. (2026) Simple Mixed (SM) Experiments
+    # Wachter et al. (2025) Simple Mixed (SM) Experiments
     SIMPLEMIXED_BOX_0 = "simplemixed_box_0"
     SIMPLEMIXED_BOX_10 = "simplemixed_box_10"
     SIMPLEMIXED_BOX_30 = "simplemixed_box_30"
@@ -132,7 +132,7 @@ class ExperimentStrategy(str, Enum):
     SIMPLEMIXED_SLOPE_70 = "simplemixed_slope_70"
     SIMPLEMIXED_SLOPE_90 = "simplemixed_slope_90"
     SIMPLEMIXED_SLOPE_100 = "simplemixed_slope_100"
-    # Wachter et al. (2026) Fine-Tuned (FT) Experiments
+    # Wachter et al. (2025) Fine-Tuned (FT) Experiments
     FINETUNE_BOX_0 = "finetune_box_0"
     FINETUNE_BOX_10 = "finetune_box_10"
     FINETUNE_BOX_30 = "finetune_box_30"
@@ -701,7 +701,7 @@ class AzureDataAssetsCommand(str, Enum):
     REGISTER_SPLITS = "register-splits"
     # Process all split strategies in one operation: generate, upload, register
     PROCESS_ALL_SPLITS = "process-all-splits"
-    # Register all Wachter et al. (2026) finetune experiment splits
+    # Register all Wachter et al. (2025) finetune experiment splits
     REGISTER_FINETUNE_SPLITS = "register-finetune-splits"
     BUILD_ENVIRONMENT = "build-environment"
 

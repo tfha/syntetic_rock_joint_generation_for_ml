@@ -22,7 +22,7 @@ from ml_segmentation.data_loading import get_data_files, get_datasets_prefixes
 console = Console()
 
 
-# Wachter et al. (2026) Experimental design from Table 1
+# Wachter et al. (2025) Experimental design from Table 1
 # Simple Mixed (SM) strategy - train on shuffled synthetic+real
 SIMPLEMIXED_EXPERIMENTS_BOX = [
     {
@@ -1231,7 +1231,7 @@ def create_splits_for_experiment(
 def main(cfg: DictConfig) -> None:
     """Generate all Simple Mixed and Fine-Tuned experiment splits."""
     console.print(
-        "[bold green]Creating Wachter et al. (2026) Experiment Splits[/bold green]"
+        "[bold green]Creating Wachter et al. (2025) Experiment Splits[/bold green]"
     )
     console.print("Generating both SM and FT strategy splits\n")
 

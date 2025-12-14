@@ -75,7 +75,7 @@ experiment:
   # GradCAM explainability visualization
   generate_gradcam: false  # Enable GradCAM heatmaps for model explainability (use local script after training)
   gradcam_samples: 20      # Number of validation samples to visualize with GradCAM
-  # Finetuning strategy (Wachter et al. 2026)
+  # Finetuning strategy (Wachter et al. 2025)
   # None: standard training (verification/main experiments)
   # 'SM' (simple mixed): train on synth+real simultaneously
   # 'FT' (fine-tuned): pretrain on synth, then finetune on real
@@ -188,7 +188,7 @@ experiment:
       train_datasets:
         - "real_world_rock_slope"
       test_datasets: []
-    # Wachter et al. (2026) Simple Mixed (SM) Experiments - BOX
+    # Wachter et al. (2025) Simple Mixed (SM) Experiments - BOX
     simplemixed_box_0:
       train_datasets: []  # Loaded from custom splits
       test_datasets: []   # Loaded from custom splits
@@ -224,7 +224,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_box/simplemixed_box_100"
-    # Wachter et al. (2026) Simple Mixed (SM) Experiments - SLOPE
+    # Wachter et al. (2025) Simple Mixed (SM) Experiments - SLOPE
     simplemixed_slope_0:
       train_datasets: []
       test_datasets: []
@@ -260,7 +260,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_slope/simplemixed_slope_100"
-    # Wachter et al. (2026) Fine-Tuned (FT) Experiments - BOX
+    # Wachter et al. (2025) Fine-Tuned (FT) Experiments - BOX
     finetune_box_0:
       train_datasets: []  # Loaded from custom splits
       test_datasets: []   # Loaded from custom splits
@@ -296,7 +296,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_box/finetune_box_100"
-    # Wachter et al. (2026) Fine-Tuned (FT) Experiments - SLOPE
+    # Wachter et al. (2025) Fine-Tuned (FT) Experiments - SLOPE
     finetune_slope_0:
       train_datasets: []
       test_datasets: []
@@ -332,7 +332,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_slope/finetune_slope_100"
-    # Wachter et al. (2026) Generalisation Pattern - BOX (Finetune)
+    # Wachter et al. (2025) Generalisation Pattern - BOX (Finetune)
     finetune_generalisation_pattern_box_0:
       train_datasets: []
       test_datasets: []
@@ -368,7 +368,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_gen_pattern_box/finetune_generalisation_pattern_box_100"
-    # Wachter et al. (2026) Generalisation Pattern - BOX (SimpleMixed)
+    # Wachter et al. (2025) Generalisation Pattern - BOX (SimpleMixed)
     simplemixed_generalisation_pattern_box_0:
       train_datasets: []
       test_datasets: []
@@ -404,7 +404,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_gen_pattern_box/simplemixed_generalisation_pattern_box_100"
-    # Wachter et al. (2026) Pattern - BOX (Finetune)
+    # Wachter et al. (2025) Pattern - BOX (Finetune)
     finetune_pattern_box_0:
       train_datasets: []
       test_datasets: []
@@ -440,7 +440,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_pattern_box/finetune_pattern_box_100"
-    # Wachter et al. (2026) Pattern - BOX (SimpleMixed)
+    # Wachter et al. (2025) Pattern - BOX (SimpleMixed)
     simplemixed_pattern_box_0:
       train_datasets: []
       test_datasets: []
@@ -476,7 +476,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_pattern_box/simplemixed_pattern_box_100"
-    # Wachter et al. (2026) Generalisation Cardboard - BOX (Finetune)
+    # Wachter et al. (2025) Generalisation Cardboard - BOX (Finetune)
     finetune_generalisation_cardboard_box_0:
       train_datasets: []
       test_datasets: []
@@ -512,7 +512,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_gen_cardboard_box/finetune_generalisation_cardboard_box_100"
-    # Wachter et al. (2026) Generalisation Cardboard - BOX (SimpleMixed)
+    # Wachter et al. (2025) Generalisation Cardboard - BOX (SimpleMixed)
     simplemixed_generalisation_cardboard_box_0:
       train_datasets: []
       test_datasets: []
@@ -548,7 +548,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_gen_cardboard_box/simplemixed_generalisation_cardboard_box_100"
-    # Wachter et al. (2026) Cardboard - BOX (Finetune)
+    # Wachter et al. (2025) Cardboard - BOX (Finetune)
     finetune_cardboard_box_0:
       train_datasets: []
       test_datasets: []
@@ -584,7 +584,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_cardboard_box/finetune_cardboard_box_100"
-    # Wachter et al. (2026) Cardboard - BOX (SimpleMixed)
+    # Wachter et al. (2025) Cardboard - BOX (SimpleMixed)
     simplemixed_cardboard_box_0:
       train_datasets: []
       test_datasets: []
@@ -620,7 +620,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_cardboard_box/simplemixed_cardboard_box_100"
-    # Wachter et al. (2026) Generalisation LARVIK (Finetune)
+    # Wachter et al. (2025) Generalisation LARVIK (Finetune)
     finetune_generalisation_larvik_0:
       train_datasets: []
       test_datasets: []
@@ -656,7 +656,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_gen_larvik/finetune_generalisation_larvik_100"
-    # Wachter et al. (2026) Generalisation LARVIK (SimpleMixed)
+    # Wachter et al. (2025) Generalisation LARVIK (SimpleMixed)
     simplemixed_generalisation_larvik_0:
       train_datasets: []
       test_datasets: []
@@ -692,7 +692,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_gen_larvik/simplemixed_generalisation_larvik_100"
-    # Wachter et al. (2026) LARVIK (Finetune)
+    # Wachter et al. (2025) LARVIK (Finetune)
     finetune_larvik_0:
       train_datasets: []
       test_datasets: []
@@ -728,7 +728,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_larvik/finetune_larvik_100"
-    # Wachter et al. (2026) LARVIK (SimpleMixed)
+    # Wachter et al. (2025) LARVIK (SimpleMixed)
     simplemixed_larvik_0:
       train_datasets: []
       test_datasets: []
@@ -764,7 +764,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_larvik/simplemixed_larvik_100"
-    # Wachter et al. (2026) Generalisation RV4 (Finetune)
+    # Wachter et al. (2025) Generalisation RV4 (Finetune)
     finetune_generalisation_rv4_0:
       train_datasets: []
       test_datasets: []
@@ -800,7 +800,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_gen_rv4/finetune_generalisation_rv4_100"
-    # Wachter et al. (2026) Generalisation RV4 (SimpleMixed)
+    # Wachter et al. (2025) Generalisation RV4 (SimpleMixed)
     simplemixed_generalisation_rv4_0:
       train_datasets: []
       test_datasets: []
@@ -836,7 +836,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/sm_gen_rv4/simplemixed_generalisation_rv4_100"
-    # Wachter et al. (2026) RV4 (Finetune)
+    # Wachter et al. (2025) RV4 (Finetune)
     finetune_rv4_0:
       train_datasets: []
       test_datasets: []
@@ -872,7 +872,7 @@ experiment:
       test_datasets: []
       use_custom_splits: true
       custom_splits_dir: "data/model_ready/wachter_splits/ft_rv4/finetune_rv4_100"
-    # Wachter et al. (2026) RV4 (SimpleMixed)
+    # Wachter et al. (2025) RV4 (SimpleMixed)
     simplemixed_rv4_0:
       train_datasets: []
       test_datasets: []
