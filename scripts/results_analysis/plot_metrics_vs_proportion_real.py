@@ -270,7 +270,7 @@ def plot_experiment_grid(
     axes[0, 0].text(
         0.5,
         1.15,
-        "Box Experiments",
+        "Box-domain experiments",
         ha="center",
         transform=axes[0, 0].transAxes,
         fontsize=11,
@@ -279,7 +279,7 @@ def plot_experiment_grid(
     axes[0, 1].text(
         0.5,
         1.15,
-        "Slope Experiments",
+        "Slope-domain experiments",
         ha="center",
         transform=axes[0, 1].transAxes,
         fontsize=11,
