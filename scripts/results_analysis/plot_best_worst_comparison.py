@@ -283,14 +283,18 @@ def load_experiment_image(
 
 
 def create_comparison_grid(
-    test_datasets: list[str],
+    test_datasets: list[str | tuple[str, int]],
     metrics_df: pd.DataFrame,
     ratings_df: pd.DataFrame,
     image_dir: Path,
     output_path: Path,
     figure_title: str = "Comparison Grid",
 ) -> None:
-    """Create grid comparing best/worst predictions."""
+    """Create grid comparing best/worst predictions.
+
+    Args:
+        test_datasets: List of dataset names (str) or tuples of (dataset_name, sample_num)
+    """
     num_rows = len(test_datasets)
     num_cols = 6
 
@@ -317,8 +321,8 @@ def create_comparison_grid(
         "Worst quality",
     ]
 
-    # Define specific sample numbers for each test dataset
-    sample_mapping = {
+    # Define default sample numbers for each test dataset
+    default_sample_mapping = {
         "Box": 1,
         "Pattern Box": 0,
         "Cardboard Box": 0,
@@ -332,9 +336,13 @@ def create_comparison_grid(
     }
 
     # Process each test dataset
-    for row, test_dataset in enumerate(test_datasets):
-        # Get the specific sample number for this dataset
-        sample_num = sample_mapping.get(test_dataset, 0)
+    for row, dataset_entry in enumerate(test_datasets):
+        # Handle both str and tuple formats
+        if isinstance(dataset_entry, tuple):
+            test_dataset, sample_num = dataset_entry
+        else:
+            test_dataset = dataset_entry
+            sample_num = default_sample_mapping.get(test_dataset, 0)
 
         # Find best experiments for this dataset
         best_experiments = find_best_experiments(test_dataset, metrics_df, ratings_df)
@@ -447,7 +455,7 @@ def create_comparison_grid(
                     0.5,
                     -0.04,
                     f"{short_name}\n{score_text}",
-                    fontsize=7,
+                    fontsize=10,
                     ha="center",
                     va="top",
                     transform=axes[row, col].transAxes,
@@ -466,9 +474,13 @@ def create_comparison_grid(
     plt.tight_layout(rect=(0.08, 0, 1, 0.99))
 
     # Add sample labels AFTER layout is finalized
-    for row, test_dataset in enumerate(test_datasets):
-        # Get sample number for this row
-        sample_num = sample_mapping.get(test_dataset, 0)
+    for row, dataset_entry in enumerate(test_datasets):
+        # Handle both str and tuple formats
+        if isinstance(dataset_entry, tuple):
+            test_dataset, sample_num = dataset_entry
+        else:
+            test_dataset = dataset_entry
+            sample_num = default_sample_mapping.get(test_dataset, 0)
 
         # Get the bbox of the subplot in figure coordinates
         bbox = axes[row, 0].get_position()
@@ -509,7 +521,9 @@ def main() -> None:
     print(f"Loaded {len(ratings_df)} rating entries")
 
     # Define test datasets in specified order
-    box_datasets = [
+    # Format: either "DatasetName" (uses default sample) or ("DatasetName", sample_num)
+    box_datasets: list[str | tuple[str, int]] = [
+        ("Box", 8),  # Top row showing Box sample 8
         "Box",
         "Cardboard Box",
         "Generalisation Cardboard Box",
@@ -517,8 +531,9 @@ def main() -> None:
         "Generalisation Pattern Box",
     ]
 
-    slope_datasets = [
-        "Slope",
+    slope_datasets: list[str | tuple[str, int]] = [
+        ("Slope", 3),  # First row: Slope sample 3
+        ("Slope", 1),  # Second row: Slope sample 1
         "Larvik",
         "Generalisation Larvik",
         "Rv 4",
