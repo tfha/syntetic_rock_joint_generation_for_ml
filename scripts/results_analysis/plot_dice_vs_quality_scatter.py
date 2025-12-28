@@ -249,7 +249,7 @@ def create_scatter_plot_all(
             print(f"  {group_name}: {len(group_data)} experiments")
 
     # Add labels and title
-    ax.set_xlabel("Val Dice Joints", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Validation Dice Joints", fontsize=12, fontweight="bold")
     ax.set_ylabel("Mean Quality Score", fontsize=12, fontweight="bold")
 
     # Set consistent axis limits (include low Rv 4 scores)
@@ -315,8 +315,6 @@ def create_scatter_plot_all(
         frameon=True,
         framealpha=0.9,
         fontsize=9,
-        title="Test Object",
-        title_fontsize=10,
         ncol=2,
     )
 
@@ -407,7 +405,7 @@ def create_scatter_plot_grid(
             ss_tot = np.sum((y - np.mean(y)) ** 2)
             r2_linear = 1 - (ss_res_linear / ss_tot)
 
-            ax.plot(line_x, line_y, "k--", linewidth=1.5, alpha=0.6)
+            ax.plot(line_x, line_y, "k--", linewidth=1.5, alpha=0.6, label="Linear")
 
             # Add polynomial (2nd degree) trend line
             poly_coeffs = np.polyfit(x, y, 2)
@@ -419,7 +417,10 @@ def create_scatter_plot_grid(
             r2_poly = 1 - (ss_res_poly / ss_tot)
             delta_r2 = r2_poly - r2_linear
 
-            ax.plot(line_x, poly_y, "r:", linewidth=1.5, alpha=0.6)
+            ax.plot(line_x, poly_y, "r:", linewidth=1.5, alpha=0.6, label="Polynomial")
+
+            # Add legend for trend lines
+            ax.legend(loc="lower right", frameon=True, framealpha=0.9, fontsize=8)
 
             # Add title with sample count and correlation
             ax.set_title(
@@ -444,8 +445,8 @@ def create_scatter_plot_grid(
             )
 
         # Labels
-        if row == 2:  # Bottom row
-            ax.set_xlabel("Val Dice Joints", fontsize=10, fontweight="bold")
+        if row == 4:  # Bottom row
+            ax.set_xlabel("Validation Dice Joints", fontsize=10, fontweight="bold")
         if col == 0:  # Left column
             ax.set_ylabel("Mean Quality Score", fontsize=10, fontweight="bold")
 
@@ -456,16 +457,7 @@ def create_scatter_plot_grid(
         ax.set_xlim(-0.05, 1.05)
         ax.set_ylim(0.8, 5.2)
 
-    # Overall title
-    fig.suptitle(
-        "Dice Joints vs Mean Quality Score by Test Object\n"
-        "Finetune: Best Epoch, Simplemixed: Final Epoch",
-        fontsize=14,
-        fontweight="bold",
-        y=0.995,
-    )
-
-    plt.tight_layout(rect=(0, 0, 1, 0.99))
+    plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     print(f"\nSaved grid plot: {output_path}")
 
