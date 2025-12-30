@@ -32,15 +32,15 @@ except Exception:
 if use_curated:
     subprocess.run([sys.executable, "scripts/install_missing_packages.py"], check=True)
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
+import hydra  # noqa: E402
+from omegaconf import DictConfig, OmegaConf  # noqa: E402
 
-from ml_segmentation.azure_core import configure_azure_logging_and_warning
-from ml_segmentation.azure_data_loading import setup_azure_dataloader
-from ml_segmentation.debug_functionality import better_traceback
-from ml_segmentation.define_model import choose_model
-from ml_segmentation.schema_config import ConfigSchema
-from ml_segmentation.utility import get_custom_console
+from ml_segmentation.azure_core import configure_azure_logging_and_warning  # noqa: E402
+from ml_segmentation.azure_data_loading import setup_azure_dataloader  # noqa: E402
+from ml_segmentation.debug_functionality import better_traceback  # noqa: E402
+from ml_segmentation.define_model import choose_model  # noqa: E402
+from ml_segmentation.schema_config import ConfigSchema  # noqa: E402
+from ml_segmentation.utility import get_custom_console  # noqa: E402
 
 
 def run_cmd(cmd: list[str]) -> tuple[int, str, str]:
@@ -299,7 +299,7 @@ def main(cfg: DictConfig) -> None:
         # One batch from train or val
         loader = tr_loader if len(tr_loader) > 0 else va_loader
         batch = next(iter(loader))
-        if isinstance(batch, (tuple, list)) and len(batch) >= 1:
+        if isinstance(batch, tuple | list) and len(batch) >= 1:
             images = batch[0]
         else:
             images = batch
