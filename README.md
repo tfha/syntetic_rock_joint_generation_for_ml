@@ -1025,6 +1025,113 @@ The Bayesian optimization approach efficiently explores the hyperparameter space
 
 After training models in Azure ML, use the results analysis tools to download metrics and images, create publication plots, and visualize training progression. For detailed usage instructions and examples, see [`scripts/results_analysis/README.md`](scripts/results_analysis/README.md).
 
+### Downloading Trained Models from Azure ML
+
+After completing experiments in Azure ML, you can download the best performing models for each experiment and strategy combination. The download script automatically selects models based on validation metrics and organizes them in a structured format.
+
+#### Prerequisites
+
+- Azure CLI installed and authenticated (`az login`)
+- Azure ML workspace credentials configured in `.env` file
+- Completed training experiments with results in Appendix F CSV file
+
+#### Running the Download Script
+
+```sh
+python scripts/download_experiment_models.py
+```
+
+The script will:
+1. Load experiment results from `Appendix_F.csv` and job mappings from `batch_jobs_summary.csv`
+2. Select best models for each experiment-strategy combination based on:
+   - **Best Dice score**: Model(s) with highest validation Dice coefficient
+   - **Best Quality score**: Model(s) with highest average quality score
+3. Handle tied scores by downloading all models that share the best metric value
+4. Connect to Azure ML workspace and download model files from blob storage
+5. Organize models in a hierarchical folder structure
+
+#### Model Selection Logic
+
+For each of the 20 experiment-strategy combinations (10 experiments × 2 strategies):
+- Finds the maximum Dice score and selects ALL models with that score
+- Finds the maximum Quality score and selects ALL models with that score
+- Removes duplicates if the same model wins both metrics
+- Ignores architecture (UNet vs DeepLabV3+) and proportion (10%-100%) during selection
+
+Example: If two UNet models trained on different proportions both achieve Dice=0.702, both are downloaded.
+
+#### Downloaded Folder Structure
+
+Models are organized as follows:
+
+```
+models/downloaded_experiments/
+├── box/
+│   ├── finetune/
+│   │   ├── best_val_dice_joint/
+│   │   │   └── unet-finetune_box_50-20251211-1618/
+│   │   │       ├── best_model.pth
+│   │   │       └── stage1_best_model.pth
+│   │   └── best_quality_score/
+│   │       └── unet-finetune_box_10-20251211-1615/
+│   │           ├── best_model.pth
+│   │           └── stage1_best_model.pth
+│   └── simplemixed/
+│       ├── best_val_dice_joint/
+│       │   └── unet-simplemixed_box_90-20251211-1603/
+│       │       ├── best_metrics_model.pth
+│       │       └── final_model.pth
+│       └── best_quality_score/
+│           └── unet-simplemixed_box_100-20251211-1605/
+│               ├── best_metrics_model.pth
+│               └── final_model.pth
+├── cardboard_box/
+│   ├── finetune/
+│   └── simplemixed/
+└── [8 more experiment folders...]
+```
+
+**Hierarchy levels:**
+1. **Experiment name** (10 folders): box, cardboard_box, generalisation_cardboard_box, etc.
+2. **Strategy** (2 subfolders): finetune, simplemixed
+3. **Selection metric** (1-2 folders): best_val_dice_joint, best_quality_score
+4. **Display name** (unique model identifier): {architecture}-{strategy}_{experiment}_{proportion}-{timestamp}
+5. **Model files** (.pth files)
+
+#### Model Files Explained
+
+**Finetune strategy** (2-stage training):
+- `stage1_best_model.pth` - Best model from Stage 1 (pretrained on synthetic data)
+- `best_model.pth` - Best model from Stage 2 (finetuned on real data)
+
+**Simplemixed strategy** (mixed training):
+- `best_metrics_model.pth` - Model checkpoint with best validation metrics
+- `final_model.pth` - Final model after all training epochs
+
+#### Loading Downloaded Models
+
+```python
+import torch
+from pathlib import Path
+
+# Load a specific model
+model_path = Path("models/downloaded_experiments/box/finetune/best_val_dice_joint/unet-finetune_box_50-20251211-1618/best_model.pth")
+model.load_state_dict(torch.load(model_path))
+model.eval()
+```
+
+#### Verification
+
+The script includes automatic verification that checks all selected models are truly the best in their category by comparing against all experiments in Appendix F. This ensures data integrity and correct model selection.
+
+#### Expected Output
+
+- Total experiments evaluated: 240 (10 experiments × 2 strategies × 2 architectures × 6 proportions)
+- Typical models selected: 46 unique models (varies based on tied scores)
+- Total .pth files downloaded: 92 (2 files per model)
+
+For publishing trained models or sharing with collaborators, each experiment folder can be compressed into a separate ZIP file for easier distribution.
+
 ### Inspect the experiment results in MLflow
 
 The experiments directory is stored in a shared location, so you can inspect the results of the experiments by running the following command:
