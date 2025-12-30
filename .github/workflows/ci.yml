@@ -29,11 +29,13 @@ jobs:
         poetry --version
 
     - name: Configure Poetry
-      run: poetry config virtualenvs.in-project true
+      run: |
+        poetry config virtualenvs.in-project true
+        poetry check
 
     - name: Install dependencies
       run: |
-        poetry install --with dev
+        poetry install --with dev --sync
 
     - name: Run ruff format check
       run: |
