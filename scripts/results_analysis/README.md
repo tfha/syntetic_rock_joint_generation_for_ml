@@ -5,10 +5,26 @@ This directory contains scripts for downloading, analyzing, and visualizing expe
 ## Overview
 
 After training models in Azure ML, use these tools to:
-1. Download training metrics (CSV files with epoch-by-epoch scores)
-2. Download example prediction images
-3. Generate publication-quality comparison plots
-4. Create training progression visualizations
+
+### Data Download
+1. **Download training metrics** - CSV files with epoch-by-epoch scores (Dice, IoU, precision, recall)
+2. **Download example prediction images** - Visual outputs showing original, ground truth, and model predictions
+3. **Download best trained models** - Retrieve top-performing model weights based on validation metrics and quality scores
+
+### Visualization
+3. **Generate publication-quality comparison plots** - Metrics vs synthetic/real data ratio, comparing strategies and architectures
+4. **Create epoch progression plots** - Training curves showing metric evolution over epochs (4-page format)
+5. **Create training progression visualizations** - Side-by-side comparison showing how predictions improve during training
+
+### Qualitative Evaluation
+6. **Interactive rating app** - Streamlit application for expert assessment of prediction quality on 4 geological criteria
+
+### Key Features
+- **Parallel downloads** with configurable workers for faster image retrieval
+- **Strategy-specific handling** for SimpleMixed and Finetune approaches
+- **Batch processing** for automatic generation of progression plots across all experiments
+- **Colorblind-friendly** plots optimized for publication
+- **Expert evaluation** tools to complement quantitative metrics with geological domain knowledge
 
 ## Scripts
 
@@ -16,6 +32,7 @@ After training models in Azure ML, use these tools to:
 
 - **`download_metrics.py`** - Download metrics CSV files from completed Azure ML jobs
 - **`download_images.py`** - Download example prediction images from Azure blob storage
+- **`download_experiment_models.py`** - Download best performing model weights based on validation metrics
 
 ### Visualization
 
@@ -107,7 +124,98 @@ experiments/results/images/
 - **Middle (598-940px)**: Ground truth mask (line drawing)
 - **Right (1008-1350px)**: Model prediction mask
 
-### 3. Create Publication Plots
+### 3. Download Best Trained Models
+
+Download the top-performing models for each experiment-strategy combination based on validation metrics:
+
+```bash
+poetry run python scripts/download_experiment_models.py
+```
+
+**Prerequisites:**
+- Azure CLI authenticated (`az login`)
+- Azure ML workspace credentials in `.env` file
+- Completed training experiments with results in `Appendix_F.csv`
+
+**What the script does:**
+1. Load experiment results from `Appendix_F.csv` and job mappings from `experiments/batch_jobs_summary.csv`
+2. Select best models for each experiment-strategy combination based on:
+   - **Best Dice score**: Model(s) with highest validation Dice coefficient
+   - **Best Quality score**: Model(s) with highest average quality score
+3. Handle tied scores by downloading all models that share the best metric value
+4. Connect to Azure ML workspace and download model files from blob storage
+5. Organize models in a hierarchical folder structure
+
+**Model selection logic:**
+- For each of the 20 experiment-strategy combinations (10 experiments × 2 strategies)
+- Finds the maximum Dice score and selects ALL models with that score
+- Finds the maximum Quality score and selects ALL models with that score
+- Removes duplicates if the same model wins both metrics
+- Ignores architecture (UNet vs DeepLabV3+) and proportion (10%-100%) during selection
+
+**Example:** If two UNet models trained on different proportions both achieve Dice=0.702, both are downloaded.
+
+**Output structure:**
+```
+models/downloaded_experiments/
+├── box/
+│   ├── finetune/
+│   │   ├── best_val_dice_joint/
+│   │   │   └── unet-finetune_box_50-20251211-1618/
+│   │   │       ├── best_model.pth
+│   │   │       └── stage1_best_model.pth
+│   │   └── best_quality_score/
+│   │       └── unet-finetune_box_10-20251211-1615/
+│   │           ├── best_model.pth
+│   │           └── stage1_best_model.pth
+│   └── simplemixed/
+│       ├── best_val_dice_joint/
+│       │   └── unet-simplemixed_box_90-20251211-1603/
+│       │       ├── best_metrics_model.pth
+│       │       └── final_model.pth
+│       └── best_quality_score/
+│           └── unet-simplemixed_box_100-20251211-1605/
+│               ├── best_metrics_model.pth
+│               └── final_model.pth
+└── [9 more experiment folders...]
+```
+
+**Hierarchy levels:**
+1. **Experiment name** (10 folders): box, cardboard_box, generalisation_cardboard_box, etc.
+2. **Strategy** (2 subfolders): finetune, simplemixed
+3. **Selection metric** (1-2 folders): best_val_dice_joint, best_quality_score
+4. **Display name** (unique model identifier): {architecture}-{strategy}_{experiment}_{proportion}-{timestamp}
+5. **Model files** (.pth files)
+
+**Model files explained:**
+
+*Finetune strategy* (2-stage training):
+- `stage1_best_model.pth` - Best model from Stage 1 (pretrained on synthetic data)
+- `best_model.pth` - Best model from Stage 2 (finetuned on real data)
+
+*Simplemixed strategy* (mixed training):
+- `best_metrics_model.pth` - Model checkpoint with best validation metrics
+- `final_model.pth` - Final model after all training epochs
+
+**Loading downloaded models:**
+```python
+import torch
+from pathlib import Path
+
+# Load a specific model
+model_path = Path("models/downloaded_experiments/box/finetune/best_val_dice_joint/unet-finetune_box_50-20251211-1618/best_model.pth")
+model.load_state_dict(torch.load(model_path))
+model.eval()
+```
+
+**Expected output:**
+- Total experiments evaluated: 240 (10 experiments × 2 strategies × 2 architectures × 6 proportions)
+- Typical models selected: ~46 unique models (varies based on tied scores)
+- Total .pth files downloaded: ~92 (2 files per model)
+
+**Verification:** The script automatically verifies that all selected models are truly the best in their category by comparing against all experiments in Appendix F.
+
+### 4. Create Publication Plots
 
 #### Metrics vs Proportion of Real Data
 
@@ -179,7 +287,7 @@ poetry run python scripts/results_analysis/plot_epoch_progression.py --metrics-d
 
 Available metrics: `dice_joints`, `dice`, `iou_joints`, `iou`, `loss`, `precision_joints`, `recall_joints`
 
-### 4. Create Training Progression Visualizations
+### 5. Create Training Progression Visualizations
 
 Generate visualizations showing how predictions improve during training:
 
@@ -255,7 +363,7 @@ Summary:
 
 This metric evaluates how accurately the model segments rock joints (fractures) at each training epoch.
 
-### 5. Qualitative Evaluation (Interactive)
+### 6. Qualitative Evaluation (Interactive)
 
 Launch the Streamlit app to rate epoch progression images interactively:
 
@@ -314,10 +422,11 @@ streamlit run scripts/results_analysis/qualitative_evaluation_app.py --server.po
 1. **Train models** in Azure ML (simplemixed and finetune strategies)
 2. **Download metrics** using `download_metrics.py` to get epoch-wise performance data
 3. **Download images** using `download_images.py` for visual inspection
-4. **Create comparison plots** using `plot_metrics_vs_proportion_real.py` and `plot_epoch_progression.py`
-5. **Visualize progression** using `plot_progression.py` to show training improvement
-6. **Qualitative evaluation** using `qualitative_evaluation_app.py` for expert ratings
-7. **Analyze results** to determine best models and strategies
+4. **Download best models** using `download_experiment_models.py` to retrieve trained model weights
+5. **Create comparison plots** using `plot_metrics_vs_proportion_real.py` and `plot_epoch_progression.py`
+6. **Visualize progression** using `plot_progression.py` to show training improvement
+7. **Qualitative evaluation** using `qualitative_evaluation_app.py` for expert ratings
+8. **Analyze results** to determine best models and strategies
 
 ## Configuration Files
 
@@ -343,4 +452,20 @@ experiments/results/
     ├── progression/
     │   └── {job-name}_progression.png
     └── validation_dice_joints_{comparison}.png
+
+models/downloaded_experiments/
+├── box/
+│   ├── finetune/
+│   │   ├── best_val_dice_joint/
+│   │   │   └── {job-display-name}/
+│   │   │       ├── best_model.pth
+│   │   │       └── stage1_best_model.pth
+│   │   └── best_quality_score/
+│   └── simplemixed/
+│       ├── best_val_dice_joint/
+│       │   └── {job-display-name}/
+│       │       ├── best_metrics_model.pth
+│       │       └── final_model.pth
+│       └── best_quality_score/
+└── [9 more experiment folders...]
 ```
