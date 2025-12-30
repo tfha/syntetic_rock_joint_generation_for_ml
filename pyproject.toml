@@ -2,28 +2,6 @@
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[project]
-name = "syntetic-rock-joint-generation-for-ml"
-version = "0.1.0"
-description = "Generating syntetic rock joint dataset and ML evaluation"
-authors = [
-  { name = "TFH", email = "tom.frode.hansen@ngi.no" },
-  { name = "KYC", email = "jessica.ka.yi.chiu@ngi.no" }
-]
-license = "MIT"
-readme = "README.md"
-packages = [
-  { include = "ml_segmentation", from = "src" }
-]
-dependencies = [
-  "numpy>=1.23,<1.24",
-  "scipy>=1.10.1",
-  # ...other deps...
-  # Remove the torch line below (torch is provided by the curated image / installed in Dockerfile)
-  # "torch (>=2.3.1+cu121,<3.0.0)",   # <-- REMOVE this entry
-]
-requires-python = ">=3.10,<4.0"
-
 [[tool.poetry.source]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu121"
@@ -37,6 +15,8 @@ authors = [
   "TFH <tom.frode.hansen@ngi.no>",
   "KYC <jessica.ka.yi.chiu@ngi.no>"
 ]
+license = "MIT"
+readme = "README.md"
 
 # ensure Poetry finds the src package
 packages = [
@@ -157,7 +137,3 @@ files = ["src", "tests", "scripts"]
 [tool.coverage.report]
 show_missing = true
 fail_under = 10 # 10% coverage
-
-[tool.poetry.extras]
-# valid key name (only letters, digits, hyphen, underscore, dot)
-scripts = ["hydra-core"]

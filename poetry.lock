@@ -5924,10 +5924,7 @@ enabler = ["pytest-enabler (>=2.2)"]
 test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_itertools", "pytest (>=6,!=8.1.*)", "pytest-ignore-flaky"]
 type = ["pytest-mypy"]
 
-[extras]
-scripts = ["hydra-core"]
-
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "9b63b06d78bc1c8ce90702b22fe9ff9d554996adacb6589622691f1bc3abd774"
+content-hash = "d42211977e9b50df56eb97bfe1eacce06e13841b963d9048b6ba24fd8f2cc7d1"
