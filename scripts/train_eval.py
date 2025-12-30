@@ -504,7 +504,7 @@ def main(cfg: DictConfig) -> None:
                 optimizer=optimizer,
                 device=device,
                 scaler=scaler,
-                threshold=pcfg.experiment.prediction_threshold,
+                threshold=0.5,
                 max_batches=pcfg.experiment.sanity_check_num_batches,
             )
             console.print(
@@ -524,7 +524,7 @@ def main(cfg: DictConfig) -> None:
                     dataloader=val_loader,
                     criterion=criterion,
                     device=device,
-                    threshold=pcfg.experiment.prediction_threshold,
+                    threshold=0.5,
                     max_batches=pcfg.experiment.sanity_check_num_batches,
                 )
 
@@ -610,7 +610,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=test_loader,
                 criterion=criterion,
                 device=device,
-                threshold=pcfg.experiment.prediction_threshold,
+                threshold=0.5,
                 max_batches=None,  # Evaluate on full test set
             )
             console.print(

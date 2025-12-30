@@ -47,26 +47,17 @@ def timeit(func: Callable) -> Callable:
 
 
 def nn_shape(func):
-    """Decorator to output debug info from a nn.
+    """Decorator to output debug info from a neural network.
     - input and output shape of forward method
-    TODO: Include the output shape of feature map for each convolution and pooling step
-    (cannot be seen from the input and outchannels in the initialization of a
-    conv-layer). This list of output-shapes should be printed for a certain net.
 
-    Formula for computing output shape (height*width) (w-f + 2p)/s + 1
+    Note: For detailed layer-by-layer output shapes and feature maps, use torchinfo.summary()
+    or PyTorch hooks (see PyTorch documentation).
+
+    Formula for computing output shape (height*width): (w-f + 2p)/s + 1
     - w: width and height of input feature map
     - f: kernel size
     - p: padding
     - s: stride
-
-    TODO: Set up a summary of the network as done in keras like this:
-    https://machinelearningmastery.com/how-to-use-transfer-learning-when-developing-convolutional-neural-network-models/
-
-    https://medium.com/the-dl/how-to-use-pytorch-hooks-5041d777f904#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjE3MTllYjk1N2Y2OTU2YjU4MThjMTk2OGZmMTZkZmY3NzRlNzA4ZGUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYmYiOjE2MjI2NjQyMjEsImF1ZCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsInN1YiI6IjExODM1OTEyNDY0MDI2OTk0MTUyNyIsImVtYWlsIjoidG9tLmZyb2RlLmhhbnNlbkBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiYXpwIjoiMjE2Mjk2MDM1ODM0LWsxazZxZTA2MHMydHAyYTJqYW00bGpkY21zMDBzdHRnLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29tIiwibmFtZSI6IlRGIEgiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EtL0FPaDE0R2dLRndIMnNaWWdYSllmR1NnSUFGV3luMHZ5b0pTR0dHbDNqQjk3WGc9czk2LWMiLCJnaXZlbl9uYW1lIjoiVEYiLCJmYW1pbHlfbmFtZSI6IkgiLCJpYXQiOjE2MjI2NjQ1MjEsImV4cCI6MTYyMjY2ODEyMSwianRpIjoiMTdiNDU0MWM0MmE2ZGYzODhkZWNiODM5M2U3MGM2ZTI2MGUwZWYzMyJ9.d3yg4Elw-L9JI83_dy6KSYLtkc9e06BS2q22aJBddP520W-CcN6rwwwcSCPDQnNM8lEakpYS1JveVnEIoeo8BVtOOM-GcuImkq0d1o_5Ts8H6m3TvxbP-7VU7vocTThZZkGmWZrrWrhdWjE-LpJ6AS26S1omclyfDt-As3IXOhXozU59Z9EOI_Ap3xarsBO9MKj0Y_LFF_XreTk3-WJ5UfInuK2aZKPRVI3j3YDMmwVj6q4vlky0Coo7MpBbIIRCc5nZic3v-d7g-iq7nfsJzR3t1fR_-9F9JqyC-8RccGIbWYU3fh144eDvhHLP5sx-dUgIRnZTgQwYJNFMOde_4Q
-
-    Can probably use a hook for this:
-    https://pytorch.org/tutorials/beginner/former_torchies/nnft_tutorial.html
-
     """
 
     def wrapper(*args, **kwargs):
@@ -84,12 +75,18 @@ def nn_shape(func):
 
 
 def nn_info(nn: nn.Module, print_structure=False):
-    """
-    Print information about a NN.
-    Use this in combination with the nn_shape decorator on the forward method
+    """Print information about a neural network.
 
-    - Number of trainable parameters
-    TODO: calculate the receptive field in each layer. Se lecture 5.
+    Args:
+        nn: The neural network module
+        print_structure: Whether to print the full structure (unused, kept for compatibility)
+
+    Prints:
+        - Number of trainable parameters
+        - Number of total parameters
+
+    Note: For detailed receptive field calculations and layer-wise analysis,
+    use torchinfo.summary() or specialized tools like torch-receptive-field.
     """
     num_trainable_params = sum(p.numel() for p in nn.parameters() if p.requires_grad)
     num_params = sum(p.numel() for p in nn.parameters())
