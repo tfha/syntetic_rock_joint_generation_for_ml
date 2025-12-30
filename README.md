@@ -14,6 +14,7 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [Hyperparameter Optimization](#hyperparameter-optimization)
+- [Results Analysis](#results-analysis)
 - [Contact](#contact)
 
 ## Introduction
