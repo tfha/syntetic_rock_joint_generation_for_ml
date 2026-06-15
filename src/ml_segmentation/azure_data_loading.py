@@ -132,7 +132,7 @@ def setup_azure_dataloader(
         f"Found {len(img_files)} images and {len(mask_files)} masks\n"
         f"Sample image files: {[f.name for f in img_files[:5]]}\n"
         f"Sample mask files: {[f.name for f in mask_files[:5]]}",
-        style="info",
+        style="blue",
     )
 
     # Get transformations
@@ -150,7 +150,7 @@ def setup_azure_dataloader(
     if splits_path is not None and splits_path.exists():
         console.print(
             f"Using registered splits from: {splits_path}",
-            style="info",
+            style="blue",
         )
 
         # Look for split files; support legacy *_files.json names as well.
@@ -195,13 +195,13 @@ def setup_azure_dataloader(
                 "Loaded splits from registered files: "
                 f"train={len(train_list)}, val={len(val_list)}, "
                 f"test={len(test_list)}",
-                style="info",
+                style="blue",
             )
 
             # VALIDATE NO DATA LEAKAGE (CRITICAL)
             console.print(
                 "Validating data integrity (checking for train/val/test leakage)...",
-                style="info",
+                style="blue",
             )
             experiment_name = os.environ.get(
                 "AZUREML_RUN_DISPLAY_NAME", "azure_experiment"
@@ -242,7 +242,7 @@ def setup_azure_dataloader(
         "Dataset splits: "
         f"train={len(train_list)}, val={len(val_list)}, "
         f"test={len(test_list)}",
-        style="info",
+        style="blue",
     )
 
     # Log to MLflow if in Azure ML environment
@@ -281,7 +281,7 @@ def setup_azure_dataloader(
         "Dataloader settings -> "
         f"batch_size={batch_size}, num_workers={num_workers}, "
         f"pin_memory={pin_memory}, persistent_workers={persistent_workers}",
-        style="info",
+        style="blue",
     )
 
     # Create data loaders

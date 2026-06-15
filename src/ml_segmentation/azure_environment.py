@@ -321,7 +321,7 @@ def build_and_register_environment(
         Azure ML Environment object
     """
     try:
-        console.print(f"Building environment: {environment_name}", style="info")
+        console.print(f"Building environment: {environment_name}", style="blue")
 
         # Create environment with build context
         env = Environment(
@@ -338,11 +338,11 @@ def build_and_register_environment(
 
         console.print(
             f"[OK] Environment registered: {environment.name} (v{environment.version})",
-            style="success",
+            style="green",
         )
 
         return environment
 
     except Exception as e:
-        console.print(f"Failed to build environment: {str(e)}", style="error")
+        console.print(f"Failed to build environment: {str(e)}", style="red")
         raise

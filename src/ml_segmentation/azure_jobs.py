@@ -27,7 +27,7 @@ def download_job_outputs(
         display_name: Display name for the job
     """
     try:
-        console.print("Downloading job outputs...", style="info")
+        console.print("Downloading job outputs...", style="blue")
 
         # Download job outputs
         ml_client.jobs.download(
@@ -35,13 +35,13 @@ def download_job_outputs(
             download_path="./outputs",
         )
 
-        console.print("[OK] Job outputs downloaded to ./outputs", style="success")
+        console.print("[OK] Job outputs downloaded to ./outputs", style="green")
 
     except Exception as e:
-        console.print(f"Failed to download job outputs: {str(e)}", style="warning")
+        console.print(f"Failed to download job outputs: {str(e)}", style="yellow")
         console.print(
             f"You can manually download outputs from: {job_run.studio_url}",
-            style="info",
+            style="blue",
         )
 
 
@@ -55,21 +55,21 @@ def get_job_details(ml_client, console: Console, job_run: Any) -> None:
         job_run: Azure ML job run object
     """
     try:
-        console.print("Getting job details...", style="info")
+        console.print("Getting job details...", style="blue")
 
         # Get fresh job details
         job_details = ml_client.jobs.get(job_run.name)
 
-        console.print(f"Job Name: {job_details.name}", style="info")
-        console.print(f"Status: {job_details.status}", style="info")
-        console.print(f"Compute: {job_details.compute}", style="info")
-        console.print(f"Environment: {job_details.environment}", style="info")
+        console.print(f"Job Name: {job_details.name}", style="blue")
+        console.print(f"Status: {job_details.status}", style="blue")
+        console.print(f"Compute: {job_details.compute}", style="blue")
+        console.print(f"Environment: {job_details.environment}", style="blue")
 
         if hasattr(job_details, "studio_url"):
-            console.print(f"Studio URL: {job_details.studio_url}", style="info")
+            console.print(f"Studio URL: {job_details.studio_url}", style="blue")
 
     except Exception as e:
-        console.print(f"Failed to get job details: {str(e)}", style="warning")
+        console.print(f"Failed to get job details: {str(e)}", style="yellow")
 
 
 def handle_job_submission_error(console: Console, error: Exception) -> None:
@@ -83,17 +83,17 @@ def handle_job_submission_error(console: Console, error: Exception) -> None:
     error_str = str(error).lower()
 
     if "noidentityoncompute" in error_str:
-        console.print("NoIdentityOnCompute Error detected", style="error")
+        console.print("NoIdentityOnCompute Error detected", style="red")
         _provide_identity_setup_guidance(console)
     elif "insufficient permissions" in error_str:
-        console.print("Insufficient permissions error detected", style="error")
+        console.print("Insufficient permissions error detected", style="red")
         console.print(
-            "Solution: Ensure compute identity has required permissions", style="info"
+            "Solution: Ensure compute identity has required permissions", style="blue"
         )
     else:
-        console.print(f"Job submission failed: {str(error)}", style="error")
+        console.print(f"Job submission failed: {str(error)}", style="red")
         console.print(
-            "Check job configuration and Azure ML workspace setup", style="info"
+            "Check job configuration and Azure ML workspace setup", style="blue"
         )
 
 
@@ -113,17 +113,17 @@ def handle_log_streaming_error(
 
     if "authentication" in error_str or "unauthorized" in error_str:
         console.print(
-            f"Authentication error on attempt {attempt}: {str(error)}", style="warning"
+            f"Authentication error on attempt {attempt}: {str(error)}", style="yellow"
         )
         console.print(
-            "This may be due to insufficient permissions or token expiry", style="info"
+            "This may be due to insufficient permissions or token expiry", style="blue"
         )
     elif "timeout" in error_str:
         console.print(
-            f"Timeout error on attempt {attempt}: {str(error)}", style="warning"
+            f"Timeout error on attempt {attempt}: {str(error)}", style="yellow"
         )
-        console.print("This may be a temporary network issue", style="info")
+        console.print("This may be a temporary network issue", style="blue")
     else:
         console.print(
-            f"Log streaming error on attempt {attempt}: {str(error)}", style="warning"
+            f"Log streaming error on attempt {attempt}: {str(error)}", style="yellow"
         )

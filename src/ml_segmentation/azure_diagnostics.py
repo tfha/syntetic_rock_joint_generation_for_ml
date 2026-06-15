@@ -28,7 +28,7 @@ def preflight_storage_permissions(
     with guidance on assigning the 'Storage Blob Data Reader' role to the
     compute identity at the storage account scope if mounting fails.
     """
-    console.print("Preflight: checking storage and identity context...", style="info")
+    console.print("Preflight: checking storage and identity context...", style="blue")
     # Compute principal ID
     try:
         comp = ml_client.compute.get(compute_name)
@@ -36,11 +36,11 @@ def preflight_storage_permissions(
             getattr(comp, "identity", None), "principal_id", None
         ) or getattr(getattr(comp, "identity", None), "principalId", None)
         if principal_id:
-            console.print(f"• Compute principalId: {principal_id}", style="info")
+            console.print(f"• Compute principalId: {principal_id}", style="blue")
         else:
-            console.print("• Compute principalId: <unknown>", style="warning")
+            console.print("• Compute principalId: <unknown>", style="yellow")
     except Exception as e:
-        console.print(f"• Could not read compute identity: {e}", style="warning")
+        console.print(f"• Could not read compute identity: {e}", style="yellow")
 
     # Default datastore details (usually workspaceblobstore)
     try:
@@ -61,42 +61,42 @@ def preflight_storage_permissions(
             )
             console.print(
                 f"• Default datastore: {default_ds.name} (acct={account}, container={container})",
-                style="info",
+                style="blue",
             )
             # Provide guidance for role assignment
             console.print(
                 "If input mounting fails with PermissionDenied, assign 'Storage Blob Data Reader' to the compute identity on the storage account.",
-                style="warning",
+                style="yellow",
             )
             console.print(
                 "Required scope: /subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.Storage/storageAccounts/"
                 + str(account),
-                style="info",
+                style="blue",
             )
         else:
-            console.print("• Could not resolve a default datastore.", style="warning")
+            console.print("• Could not resolve a default datastore.", style="yellow")
     except Exception as e:
-        console.print(f"• Could not list datastores: {e}", style="warning")
+        console.print(f"• Could not list datastores: {e}", style="yellow")
 
 
 def _test_permission_check(ml_client: MLClient, console: Console) -> None:
     """Test basic permission checking functionality."""
-    console.print("Testing permission checks...", style="info")
+    console.print("Testing permission checks...", style="blue")
 
     # Test workspace permissions
     workspace_ok = validate_workspace_permissions(ml_client, console)
 
     if workspace_ok:
-        console.print("[OK] Permission check test passed", style="success")
+        console.print("[OK] Permission check test passed", style="green")
     else:
         console.print(
-            "[WARNING] Permission check test completed with warnings", style="warning"
+            "[WARNING] Permission check test completed with warnings", style="yellow"
         )
 
 
 def _test_data_asset_retrieval(ml_client: MLClient, console: Console) -> None:
     """Test data asset retrieval functionality."""
-    console.print("Testing data asset retrieval...", style="info")
+    console.print("Testing data asset retrieval...", style="blue")
 
     try:
         # Test getting a data asset (this might fail if none exist)
@@ -106,19 +106,17 @@ def _test_data_asset_retrieval(ml_client: MLClient, console: Console) -> None:
 
         if assets:
             asset = assets[0]
-            console.print(f"[OK] Found data asset: {asset.name}", style="success")
+            console.print(f"[OK] Found data asset: {asset.name}", style="green")
         else:
-            console.print(
-                "[WARNING] No data assets found in workspace", style="warning"
-            )
+            console.print("[WARNING] No data assets found in workspace", style="yellow")
 
     except Exception as e:
-        console.print(f"[WARNING] Data asset test failed: {str(e)}", style="warning")
+        console.print(f"[WARNING] Data asset test failed: {str(e)}", style="yellow")
 
 
 def _test_compute_validation(ml_client: MLClient, console: Console) -> None:
     """Test compute validation functionality."""
-    console.print("Testing compute validation...", style="info")
+    console.print("Testing compute validation...", style="blue")
 
     try:
         # List available compute clusters
@@ -126,44 +124,44 @@ def _test_compute_validation(ml_client: MLClient, console: Console) -> None:
 
         if computes:
             compute_name = computes[0].name
-            console.print(f"Testing with compute: {compute_name}", style="info")
+            console.print(f"Testing with compute: {compute_name}", style="blue")
 
             # Test compute validation
             permissions = validate_and_refresh_compute(ml_client, console, compute_name)
 
             if permissions:
-                console.print("[OK] Compute validation test passed", style="success")
+                console.print("[OK] Compute validation test passed", style="green")
             else:
                 console.print(
                     "[WARNING] Compute validation test completed with warnings",
-                    style="warning",
+                    style="yellow",
                 )
         else:
             console.print(
-                "[WARNING] No compute clusters found in workspace", style="warning"
+                "[WARNING] No compute clusters found in workspace", style="yellow"
             )
 
     except Exception as e:
         console.print(
-            f"[WARNING] Compute validation test failed: {str(e)}", style="warning"
+            f"[WARNING] Compute validation test failed: {str(e)}", style="yellow"
         )
 
 
 def _test_job_submission_and_logging(ml_client: MLClient, console: Console) -> None:
     """Test job submission and logging functionality (dry run)."""
-    console.print("Testing job submission logic (dry run)...", style="info")
+    console.print("Testing job submission logic (dry run)...", style="blue")
 
     # This is a dry run test - we don't actually submit a job
     # but we test that the job configuration logic works
 
     try:
         # Test job configuration logic
-        console.print("[OK] Job configuration structure validated", style="success")
-        console.print("Note: Actual job submission skipped in test mode", style="info")
+        console.print("[OK] Job configuration structure validated", style="green")
+        console.print("Note: Actual job submission skipped in test mode", style="blue")
 
     except Exception as e:
         console.print(
-            f"[WARNING] Job configuration test failed: {str(e)}", style="warning"
+            f"[WARNING] Job configuration test failed: {str(e)}", style="yellow"
         )
 
 
@@ -195,9 +193,9 @@ def run_azure_diagnostic_tests(
     workspace_name = workspace_name or ws
 
     console.print("🧪 Starting Azure ML Diagnostic Tests", style="bold blue")
-    console.print(f"Workspace: {workspace_name}", style="info")
-    console.print(f"Resource Group: {resource_group}", style="info")
-    console.print(f"Subscription: {subscription_id}", style="info")
+    console.print(f"Workspace: {workspace_name}", style="blue")
+    console.print(f"Resource Group: {resource_group}", style="blue")
+    console.print(f"Subscription: {subscription_id}", style="blue")
 
     try:
         # Connect to Azure ML
@@ -219,12 +217,12 @@ def run_azure_diagnostic_tests(
         console.print("\n[OK] Diagnostic tests completed", style="bold green")
         console.print(
             "Review any warnings above and consult the documentation for solutions",
-            style="info",
+            style="blue",
         )
 
     except Exception as e:
         console.print(f"\n[X] Diagnostic tests failed: {str(e)}", style="bold red")
-        console.print("Check your Azure configuration and authentication", style="info")
+        console.print("Check your Azure configuration and authentication", style="blue")
         sys.exit(1)
 
 

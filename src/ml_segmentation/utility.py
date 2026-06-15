@@ -257,23 +257,23 @@ if __name__ == "__main__":
     console.print("[error]This is styled with 'error' (bold magenta)[/error]")
 
     console.print("\n=== Method 2: Using style parameter ===\n")
-    console.print("This is styled with 'info' (bold green)", style="info")
-    console.print("This is styled with 'warning' (yellow)", style="warning")
+    console.print("This is styled with 'info' (bold green)", style="blue")
+    console.print("This is styled with 'warning' (yellow)", style="yellow")
     console.print("This is styled with 'danger' (bold red)", style="danger")
-    console.print("This is styled with 'error' (bold magenta)", style="error")
+    console.print("This is styled with 'error' (bold magenta)", style="red")
 
     # Show examples of styles in different contexts using style parameter
     console.print("\n=== Practical Examples Using Style Parameter ===\n")
-    console.print("INFO: Model training complete. Accuracy: 92.5%", style="info")
+    console.print("INFO: Model training complete. Accuracy: 92.5%", style="blue")
     console.print(
-        "WARNING: Learning rate may be too high. Consider reducing it.", style="warning"
+        "WARNING: Learning rate may be too high. Consider reducing it.", style="yellow"
     )
     console.print(
         "DANGER: Out of memory error detected. Process will be terminated.",
         style="danger",
     )
     console.print(
-        "ERROR: Failed to load dataset from path: /data/train.csv", style="error"
+        "ERROR: Failed to load dataset from path: /data/train.csv", style="red"
     )
 
     # Example metrics for demonstration
@@ -299,28 +299,28 @@ if __name__ == "__main__":
 
     # Demonstrate combining style parameter with other formatting
     console.print("\n=== Mixing Style Parameter with Other Formatting ===\n")
-    console.print("Starting data preprocessing...", style="info")
+    console.print("Starting data preprocessing...", style="blue")
     console.print("Loading training dataset: ", end="")
     console.print("100% complete", style="bold")
     console.print("Processing images: ", end="")
     console.print("100% complete", style="bold")
-    console.print("Data preprocessing complete!", style="info")
+    console.print("Data preprocessing complete!", style="blue")
 
     # Simulate training progress with style parameter
     console.print("\n=== Training Progress Using Style Parameter ===\n")
     console.print(
-        "Epoch 1/10: Training accuracy: 85.2%, Validation accuracy: 83.7%", style="info"
+        "Epoch 1/10: Training accuracy: 85.2%, Validation accuracy: 83.7%", style="blue"
     )
     console.print(
-        "Epoch 2/10: Training accuracy: 87.9%, Validation accuracy: 86.1%", style="info"
+        "Epoch 2/10: Training accuracy: 87.9%, Validation accuracy: 86.1%", style="blue"
     )
-    console.print("Epoch 3/10: Learning rate reduced due to plateau", style="warning")
+    console.print("Epoch 3/10: Learning rate reduced due to plateau", style="yellow")
     console.print(
-        "Epoch 3/10: Training accuracy: 88.5%, Validation accuracy: 87.2%", style="info"
+        "Epoch 3/10: Training accuracy: 88.5%, Validation accuracy: 87.2%", style="blue"
     )
-    console.print("Epoch 4/10: CUDA out of memory. Batch size reduced.", style="error")
+    console.print("Epoch 4/10: CUDA out of memory. Batch size reduced.", style="red")
     console.print(
-        "Epoch 4/10: Training accuracy: 89.7%, Validation accuracy: 88.3%", style="info"
+        "Epoch 4/10: Training accuracy: 89.7%, Validation accuracy: 88.3%", style="blue"
     )
     console.print("Training stopped: Early stopping triggered", style="danger")
-    console.print("Best model saved with validation accuracy: 88.3%", style="info")
+    console.print("Best model saved with validation accuracy: 88.3%", style="blue")

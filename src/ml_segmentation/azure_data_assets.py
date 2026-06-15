@@ -145,7 +145,7 @@ def register_data_asset(
                     metadata["image_count"] = str(image_count)
         except Exception as e:
             console.print(
-                f"Couldn't analyze local directory stats: {str(e)}", style="warning"
+                f"Couldn't analyze local directory stats: {str(e)}", style="yellow"
             )
 
     try:
@@ -173,7 +173,7 @@ def register_data_asset(
             existing_data = ml_client.data.get(name=name, version=version)
             console.print(
                 f"Data asset already exists. Name: {name}, version: {version}",
-                style="info",
+                style="blue",
             )
             if not create_new_version:
                 return existing_data
@@ -185,12 +185,12 @@ def register_data_asset(
         console.print(
             f"Successfully registered data asset '{name}'"
             f" with version {result.version}",
-            style="success",
+            style="green",
         )
         return result
 
     except Exception as e:
-        console.print(f"Error registering data asset: {str(e)}", style="error")
+        console.print(f"Error registering data asset: {str(e)}", style="red")
         raise
 
 
@@ -227,7 +227,7 @@ def get_data_asset(
     data.short_uri = f"azureml:{data.name}:{data.version}"
 
     console.print(
-        f"Retrieved data asset '{name}' (version {data.version})", style="info"
+        f"Retrieved data asset '{name}' (version {data.version})", style="blue"
     )
     return data
 
@@ -251,7 +251,7 @@ def list_data_asset_versions(
         assets = list(ml_client.data.list(name=name))
 
         if not assets:
-            console.print(f"No data assets found with name '{name}'", style="warning")
+            console.print(f"No data assets found with name '{name}'", style="yellow")
             return pd.DataFrame()
 
         # Extract relevant information
@@ -279,7 +279,7 @@ def list_data_asset_versions(
         return df
 
     except Exception as e:
-        console.print(f"Error listing data asset versions: {str(e)}", style="error")
+        console.print(f"Error listing data asset versions: {str(e)}", style="red")
         return pd.DataFrame()
 
 
@@ -319,11 +319,11 @@ def get_azure_storage_client(
         missing_vars.append("AZURE_STORAGE_KEY")
 
     if missing_vars:
-        console.print("Error: Missing Azure storage configuration.", style="error")
+        console.print("Error: Missing Azure storage configuration.", style="red")
         console.print(
             "Please set the following environment variables: "
             f"{', '.join(missing_vars)}",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
@@ -341,7 +341,7 @@ def get_azure_storage_client(
     )
 
     # Connect to Azure Blob storage
-    console.print("Connecting to Azure Blob storage...", style="info")
+    console.print("Connecting to Azure Blob storage...", style="blue")
     try:
         blob_service_client: BlobServiceClient = (
             BlobServiceClient.from_connection_string(connection_string)
@@ -355,13 +355,11 @@ def get_azure_storage_client(
             container_name
         )  # type: ignore[arg-type]
         console.print(
-            f"Successfully connected to container: {container_name}", style="success"
+            f"Successfully connected to container: {container_name}", style="green"
         )
         return container_client, container_name, storage_account, storage_key
     except Exception as e:
-        console.print(
-            f"Error connecting to Azure Blob storage: {str(e)}", style="error"
-        )
+        console.print(f"Error connecting to Azure Blob storage: {str(e)}", style="red")
         return None, container_name, storage_account, storage_key
 
 
@@ -384,10 +382,10 @@ def upload_files(
     files = [f for f in files if f.is_file()]
 
     if not files:
-        console.print(f"No files found in {local_folder_path}", style="warning")
+        console.print(f"No files found in {local_folder_path}", style="yellow")
         return
 
-    console.print(f"Uploading {len(files)} files to {blob_folder}/...", style="info")
+    console.print(f"Uploading {len(files)} files to {blob_folder}/...", style="blue")
 
     # Set content types based on file extensions
     content_types = {
@@ -418,7 +416,7 @@ def upload_files(
                     data, overwrite=True, content_settings=content_settings
                 )
         except Exception as e:
-            console.print(f"Error uploading {file}: {str(e)}", style="error")
+            console.print(f"Error uploading {file}: {str(e)}", style="red")
 
 
 def upload_base_data_to_azure_blob(
@@ -435,7 +433,7 @@ def upload_base_data_to_azure_blob(
             (may contain config variables)
     """
 
-    console.print("Preparing to upload data to Azure Blob storage...", style="info")
+    console.print("Preparing to upload data to Azure Blob storage...", style="blue")
 
     # Check if paths exist
     paths_to_check = {
@@ -446,31 +444,31 @@ def upload_base_data_to_azure_blob(
 
     for name, path in paths_to_check.items():
         if not path.exists():
-            console.print(f"Error: {name} path does not exist: {path}", style="error")
+            console.print(f"Error: {name} path does not exist: {path}", style="red")
             return
 
-    console.print("Local data paths:", style="info")
-    console.print(f"  Images: {path_images}", style="info")
-    console.print(f"  Raw masks: {path_raw_masks}", style="info")
-    console.print(f"  Processed masks: {path_processed_masks}", style="info")
+    console.print("Local data paths:", style="blue")
+    console.print(f"  Images: {path_images}", style="blue")
+    console.print(f"  Raw masks: {path_raw_masks}", style="blue")
+    console.print(f"  Processed masks: {path_processed_masks}", style="blue")
 
     # Confirm before uploading
-    console.print("\nReady to upload data to Azure Blob storage", style="warning")
+    console.print("\nReady to upload data to Azure Blob storage", style="yellow")
     console.print(
-        "This may take a while depending on the size of your data.", style="warning"
+        "This may take a while depending on the size of your data.", style="yellow"
     )
 
     confirmation = input("Do you want to continue? (y/n): ")
 
     if confirmation.strip().lower() != "y":
-        console.print("Upload canceled.", style="warning")
+        console.print("Upload canceled.", style="yellow")
         return
 
     # Get storage config and connect to Azure Blob storage in one step
     container_client, _, _, _ = get_azure_storage_client(console, require_key=True)
 
     if not container_client:
-        console.print("Failed to connect to Azure Blob storage", style="error")
+        console.print("Failed to connect to Azure Blob storage", style="red")
         return
 
     # Upload images
@@ -497,12 +495,12 @@ def upload_base_data_to_azure_blob(
         blob_folder="label/raw_data",
     )
 
-    console.print("\nUpload complete!", style="success")
-    console.print("You can now register the data assets using:", style="info")
+    console.print("\nUpload complete!", style="green")
+    console.print("You can now register the data assets using:", style="blue")
     console.print(
         "python scripts/azure_manage_data_assets.py "
         "azure_data_assets.command=register-base-datasets",
-        style="info",
+        style="blue",
     )
 
 
@@ -514,14 +512,14 @@ def register_base_datasets(ml_client: MLClient, console: Console):
         console: Console object for pretty printing
     """
 
-    console.print("Registering base datasets in Azure ML", style="info")
+    console.print("Registering base datasets in Azure ML", style="blue")
 
     # Get storage config and connect to Azure Blob storage in one step
     _, container_name, storage_account, _ = get_azure_storage_client(
         console, require_key=False
     )
 
-    console.print("Reading dataset paths...", style="info")
+    console.print("Reading dataset paths...", style="blue")
     # Define the dataset paths using proper Azure Blob storage URL format
     # wasbs is a protocol identifier for Azure Blob Storage secure connection
     # (with SSL/TLS)
@@ -531,10 +529,10 @@ def register_base_datasets(ml_client: MLClient, console: Console):
         "raw": f"wasbs://{container_name}@{storage_account}.blob.core.windows.net/label/raw_data",
     }
 
-    console.print("Using dataset paths:", style="info")
-    console.print(f"  Images: {dataset_paths['images']}", style="info")
-    console.print(f"  Masks: {dataset_paths['masks']}", style="info")
-    console.print(f"  Raw: {dataset_paths['raw']}", style="info")
+    console.print("Using dataset paths:", style="blue")
+    console.print(f"  Images: {dataset_paths['images']}", style="blue")
+    console.print(f"  Masks: {dataset_paths['masks']}", style="blue")
+    console.print(f"  Raw: {dataset_paths['raw']}", style="blue")
 
     # Generate a version based on current timestamp for dataset versioning in Azure ML
     version = datetime.now().strftime("%Y%m%d.%H%M")
@@ -544,7 +542,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 
     # 1. Register the images dataset
     #########################################################
-    console.print("Registering images dataset...", style="info")
+    console.print("Registering images dataset...", style="blue")
     images_metadata = {
         "content_type": "image/jpeg, image/png",
         "description": "Rock mass joint images",
@@ -566,7 +564,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 
     # 2. Register the masks dataset
     #########################################################
-    console.print("Registering masks dataset...", style="info")
+    console.print("Registering masks dataset...", style="blue")
     masks_metadata = {
         "content_type": "image/png",
         "description": "Binary masks for rock mass joints",
@@ -589,7 +587,7 @@ def register_base_datasets(ml_client: MLClient, console: Console):
 
     # 3. Register raw data
     #########################################################
-    console.print("Registering raw data...", style="info")
+    console.print("Registering raw data...", style="blue")
     raw_metadata = {
         "description": "Raw unprocessed data for rock mass joints",
         "domain": "geology",
@@ -610,13 +608,13 @@ def register_base_datasets(ml_client: MLClient, console: Console):
     assets["raw"] = raw_asset
 
     # Print summary of registered assets
-    console.print("\nSummary of registered data assets:", style="success")
+    console.print("\nSummary of registered data assets:", style="green")
     for name, asset in assets.items():
-        console.print(f"- {name}: {asset.name} (version {asset.version})", style="info")
+        console.print(f"- {name}: {asset.name} (version {asset.version})", style="blue")
 
     console.print(
         "\nThese data assets can now be used in your Azure ML pipelines!",
-        style="success",
+        style="green",
     )
 
 
@@ -628,7 +626,7 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
     if container_client is None:
         console.print(
             "Failed to connect to Azure Blob Storage; cannot upload split files.",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
@@ -640,14 +638,14 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
     if not split_dir.exists():
         console.print(
             f"Error: Split directory '{split_dir}' not found. Generate splits first.",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
     for fname in ["train.json", "val.json", "test.json"]:
         if not (split_dir / fname).exists():
             console.print(
-                f"Error: Missing split file: {split_dir / fname}", style="error"
+                f"Error: Missing split file: {split_dir / fname}", style="red"
             )
             sys.exit(1)
 
@@ -661,10 +659,10 @@ def upload_split_data_to_azure_blob(console: Console, experiment_strategy: str):
         )
         console.print(
             f"Uploaded split files to Azure Blob Storage: {blob_folder}",
-            style="success",
+            style="green",
         )
     except Exception as e:
-        console.print(f"Error uploading split files: {str(e)}", style="error")
+        console.print(f"Error uploading split files: {str(e)}", style="red")
         sys.exit(1)
 
 
@@ -681,7 +679,7 @@ def upload_finetune_split_data_to_azure_blob(
     if container_client is None:
         console.print(
             "Failed to connect to Azure Blob Storage; cannot upload split files.",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
@@ -729,7 +727,7 @@ def upload_finetune_split_data_to_azure_blob(
     else:
         console.print(
             f"Error: Unknown Wachter strategy pattern '{experiment_strategy}'",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
@@ -740,7 +738,7 @@ def upload_finetune_split_data_to_azure_blob(
     if not split_dir.exists():
         console.print(
             f"Error: Split directory '{split_dir}' not found. Generate splits first.",
-            style="error",
+            style="red",
         )
         sys.exit(1)
 
@@ -754,7 +752,7 @@ def upload_finetune_split_data_to_azure_blob(
         if not (split_dir / fname).exists():
             console.print(
                 f"Error: Missing split file: {split_dir / fname}",
-                style="error",
+                style="red",
             )
             sys.exit(1)
 
@@ -769,10 +767,10 @@ def upload_finetune_split_data_to_azure_blob(
         )
         console.print(
             f"Uploaded Wachter split files to Azure: {blob_folder}",
-            style="success",
+            style="green",
         )
     except Exception as e:
-        console.print(f"Error uploading split files: {str(e)}", style="error")
+        console.print(f"Error uploading split files: {str(e)}", style="red")
         sys.exit(1)
 
 
@@ -818,9 +816,9 @@ def register_split_data_asset(
     console.print(
         "\nSuccessfully registered split asset: "
         f"{asset.name} (version {asset.version})",
-        style="success",
+        style="green",
     )
-    console.print(f"Asset path: {splits_blob_uri}", style="info")
+    console.print(f"Asset path: {splits_blob_uri}", style="blue")
 
 
 def list_data_assets(
@@ -835,27 +833,25 @@ def list_data_assets(
     """
 
     if asset_name:  # List versions of a specific asset
-        console.print(f"Listing versions of data asset: {asset_name}", style="info")
+        console.print(f"Listing versions of data asset: {asset_name}", style="blue")
         df = list_data_asset_versions(ml_client, console, asset_name)
 
         if df.empty:
-            console.print(
-                f"No versions found for asset '{asset_name}'", style="warning"
-            )
+            console.print(f"No versions found for asset '{asset_name}'", style="yellow")
         else:
-            console.print(f"\nFound {len(df)} versions:", style="info")
+            console.print(f"\nFound {len(df)} versions:", style="blue")
             print(df.to_string(index=False))
 
     else:
         # List all data assets
-        console.print("Listing all data assets in the workspace:", style="info")
+        console.print("Listing all data assets in the workspace:", style="blue")
 
         try:
             # Get all data assets
             assets = list(ml_client.data.list())
 
             if not assets:
-                console.print("No data assets found in the workspace", style="warning")
+                console.print("No data assets found in the workspace", style="yellow")
                 return
 
             # Group assets by name to show latest version
@@ -879,7 +875,7 @@ def list_data_assets(
 
             # Print summary of latest versions
             console.print(
-                f"\nFound {len(assets_by_name)} unique data assets:", style="info"
+                f"\nFound {len(assets_by_name)} unique data assets:", style="blue"
             )
 
             # Create a table of latest versions
@@ -895,14 +891,14 @@ def list_data_assets(
                 df = df.sort_values("name").reset_index(drop=True)
                 print(df.to_string(index=False))
             else:
-                console.print("No data assets found to display", style="warning")
+                console.print("No data assets found to display", style="yellow")
 
         except Exception as e:
-            console.print(f"Error listing data assets: {str(e)}", style="error")
+            console.print(f"Error listing data assets: {str(e)}", style="red")
             console.print(
                 "This could be due to permission issues or "
                 "invalid Azure ML configuration.",
-                style="warning",
+                style="yellow",
             )
 
 
@@ -959,7 +955,7 @@ def compare_data_asset_versions(
         return comparison
 
     except Exception as e:
-        console.print(f"Error comparing data asset versions: {str(e)}", style="error")
+        console.print(f"Error comparing data asset versions: {str(e)}", style="red")
         return {"error": str(e)}
 
 
@@ -981,10 +977,10 @@ def compare_assets(
             "Error: Missing required parameters. Please provide asset_name, "
             "version1, and version2."
         )
-        console.print(err_msg, style="error")
+        console.print(err_msg, style="red")
         return console.print(
             f"Comparing versions {version1} and {version2} of asset '{asset_name}'",
-            style="info",
+            style="blue",
         )
 
     # Compare the versions
@@ -993,24 +989,24 @@ def compare_assets(
     )
 
     if "error" in comparison:
-        console.print(f"Error comparing versions: {comparison['error']}", style="error")
+        console.print(f"Error comparing versions: {comparison['error']}", style="red")
         return
 
     # Print comparison results
-    console.print("\nComparison results:", style="info")
-    console.print(f"Asset name: {comparison['name']}", style="info")
+    console.print("\nComparison results:", style="blue")
+    console.print(f"Asset name: {comparison['name']}", style="blue")
     console.print(
         f"Comparing version {comparison['version1']} with {comparison['version2']}",
-        style="info",
+        style="blue",
     )
-    console.print(f"Path changed: {comparison['path_changed']}", style="info")
+    console.print(f"Path changed: {comparison['path_changed']}", style="blue")
 
     if comparison["metadata_differences"]:
-        console.print("\nMetadata differences:", style="warning")
+        console.print("\nMetadata differences:", style="yellow")
         for diff in comparison["metadata_differences"]:
             console.print(f"- {diff}")
     else:
-        console.print("\nNo metadata differences found", style="success")
+        console.print("\nNo metadata differences found", style="green")
 
 
 def prepare_and_save_dataset_splits(
@@ -1059,7 +1055,7 @@ def prepare_and_save_dataset_splits(
             If provided, overrides global settings for specific strategies.
     """
 
-    console.print("Preparing dataset splits for Azure ML", style="info")
+    console.print("Preparing dataset splits for Azure ML", style="blue")
 
     # Get strategy-specific or global split configuration
     (
@@ -1085,13 +1081,13 @@ def prepare_and_save_dataset_splits(
 
     if not images_directory.exists():
         console.print(
-            f"Error: Images directory '{images_directory}' not found", style="error"
+            f"Error: Images directory '{images_directory}' not found", style="red"
         )
         sys.exit(1)
 
     if not labels_directory.exists():
         console.print(
-            f"Error: Labels directory '{labels_directory}' not found", style="error"
+            f"Error: Labels directory '{labels_directory}' not found", style="red"
         )
         sys.exit(1)
 
@@ -1109,9 +1105,9 @@ def prepare_and_save_dataset_splits(
         "python scripts/azure_manage_data_assets.py "
         "azure_data_assets.command=register-splits"
     )
-    console.print(cmd, style="info")
+    console.print(cmd, style="blue")
 
-    console.print(f"Split files will be saved to: {split_dir}", style="info")
+    console.print(f"Split files will be saved to: {split_dir}", style="blue")
 
     # returns the prefixes for train and test datasets
     prefixes = get_datasets_prefixes(
@@ -1127,10 +1123,10 @@ def prepare_and_save_dataset_splits(
     )
 
     # Show which dataset prefixes are used for training and testing
-    console.print(f"Train prefixes: {train_prefixes_list}", style="info")
-    console.print(f"Test prefixes: {test_prefixes_list}", style="info")
+    console.print(f"Train prefixes: {train_prefixes_list}", style="blue")
+    console.print(f"Test prefixes: {test_prefixes_list}", style="blue")
 
-    console.print("Getting data files for given prefixes...", style="info")
+    console.print("Getting data files for given prefixes...", style="blue")
     train_files, test_files = get_data_files(
         images_directory, labels_directory, train_prefixes_list, test_prefixes_list
     )
@@ -1141,7 +1137,7 @@ def prepare_and_save_dataset_splits(
         console.print(
             "Train and test sets are disjoint. No splitting performed; "
             "using all train and test files as provided.",
-            style="info",
+            style="blue",
         )
         train_list = list(train_files)
         val_list: list[str] = []
@@ -1160,14 +1156,14 @@ def prepare_and_save_dataset_splits(
                 f"Splitting data with train fraction: {strategy_train_frac}, "
                 f"val fraction: {strategy_val_frac}, "
                 f"test fraction: {strategy_test_frac}...",
-                style="info",
+                style="blue",
             )
         elif has_counts:
             console.print(
                 f"Splitting data with train count: {strategy_train_count}, "
                 f"val count: {strategy_val_count}, "
                 f"test count: {strategy_test_count}...",
-                style="info",
+                style="blue",
             )
 
         train_list, val_list, test_list = split_data(
@@ -1189,27 +1185,27 @@ def prepare_and_save_dataset_splits(
     with open(split_dir / "test.json", "w") as f:
         json.dump(test_list, f)
 
-    console.print(f"Number of training samples: {len(train_list)}", style="success")
-    console.print(f"Number of validation samples: {len(val_list)}", style="success")
-    console.print(f"Number of test samples: {len(test_list)}", style="success")
+    console.print(f"Number of training samples: {len(train_list)}", style="green")
+    console.print(f"Number of validation samples: {len(val_list)}", style="green")
+    console.print(f"Number of test samples: {len(test_list)}", style="green")
 
-    console.print("\nSplit files have been saved to:", style="success")
-    console.print(f"  - {split_dir / 'train.json'}", style="info")
-    console.print(f"  - {split_dir / 'val.json'}", style="info")
-    console.print(f"  - {split_dir / 'test.json'}", style="info")
+    console.print("\nSplit files have been saved to:", style="green")
+    console.print(f"  - {split_dir / 'train.json'}", style="blue")
+    console.print(f"  - {split_dir / 'val.json'}", style="blue")
+    console.print(f"  - {split_dir / 'test.json'}", style="blue")
     console.print(
         "\nYou can now upload and register these splits in Azure ML using:",
-        style="info",
+        style="blue",
     )
     console.print(
         "  python scripts/azure_manage_data_assets.py "
         "azure_data_assets.command=upload-splits",
-        style="info",
+        style="blue",
     )
     console.print(
         "  python scripts/azure_manage_data_assets.py "
         "azure_data_assets.command=register-splits",
-        style="info",
+        style="blue",
     )
 
 
@@ -1238,7 +1234,7 @@ def retrieve_and_validate_data_assets(
         SystemExit: If data assets cannot be retrieved
     """
     try:
-        console.print("Retrieving latest data assets from Azure ML...", style="info")
+        console.print("Retrieving latest data assets from Azure ML...", style="blue")
 
         # Apply retry logic to data asset retrieval
         get_data_asset_with_retry = retry_azure_operation(
@@ -1257,15 +1253,15 @@ def retrieve_and_validate_data_assets(
         # Log dataset information
         console.print(
             f"[OK] Using split asset: {split_asset_name} (v{splits_dataset.version})",
-            style="success",
+            style="green",
         )
         console.print(
             f"[OK] Using images dataset version: {images_dataset.version}",
-            style="success",
+            style="green",
         )
         console.print(
             f"[OK] Using masks dataset version: {masks_dataset.version}",
-            style="success",
+            style="green",
         )
 
         # Verify data asset permissions
@@ -1274,20 +1270,20 @@ def retrieve_and_validate_data_assets(
         return images_dataset, masks_dataset, splits_dataset
 
     except ResourceNotFoundError as e:
-        console.print(f"Data asset not found: {str(e)}", style="error")
+        console.print(f"Data asset not found: {str(e)}", style="red")
         console.print(
             "Solution: Register data assets using:\n"
             "python scripts/azure_manage_data_assets.py "
             "azure_data_assets.command=register-all",
-            style="info",
+            style="blue",
         )
         sys.exit(1)
     except Exception as e:
-        console.print(f"Error retrieving data assets: {str(e)}", style="error")
+        console.print(f"Error retrieving data assets: {str(e)}", style="red")
         console.print(
             "Solution: Ensure data assets are registered and you have "
             "access permissions",
-            style="info",
+            style="blue",
         )
         sys.exit(1)
 
@@ -1295,13 +1291,13 @@ def retrieve_and_validate_data_assets(
 def _validate_data_asset_permissions(ml_client: MLClient, console: Console) -> None:
     """Validate permissions to access data assets."""
     try:
-        console.print("Verifying data asset permissions...", style="info")
+        console.print("Verifying data asset permissions...", style="blue")
         assets = ml_client.data.list()
         asset_count = sum(1 for _ in assets)
         console.print(
-            f"[OK] Verified access to {asset_count} data assets", style="success"
+            f"[OK] Verified access to {asset_count} data assets", style="green"
         )
     except Exception as perm_e:
         console.print(
-            f"Warning: Limited data asset permissions: {str(perm_e)}", style="warning"
+            f"Warning: Limited data asset permissions: {str(perm_e)}", style="yellow"
         )
