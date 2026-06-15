@@ -82,8 +82,24 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def get_base_model_name(model_name: str) -> str:
+    """Extract base model name (without strategy suffix).
+
+    Examples:
+        'deeplabv3plus-finetune_box_50' -> 'deeplabv3plus'
+        'unet-simplemixed_slope_50' -> 'unet'
+    """
+    parts = model_name.split("-")
+    return parts[0]
+
+
 def get_experiment_strategy(model_name: str) -> str:
-    """Extract experiment strategy from model name."""
+    """Extract experiment strategy from model name.
+
+    Examples:
+        'deeplabv3plus-finetune_box_50' -> 'finetune_box_50'
+        'unet-simplemixed_slope_50' -> 'simplemixed_slope_50'
+    """
     parts = model_name.split("-")
     if len(parts) >= 2:
         return "-".join(parts[1:])
@@ -106,10 +122,13 @@ def build_training_command(
     else:
         training_script = "azure_train_eval.py"
 
+    # Extract base model name (without strategy suffix) for Hydra config
+    base_model = get_base_model_name(model_name)
+
     # Build command
     command_parts = [
         f"python scripts/{training_script}",
-        f"model={model_name}",
+        f"model={base_model}",
         f"model.num_epochs={num_epochs}",
         f"experiment.experiment_strategy={strategy}",
         f"experiment.loss_function={loss_function}",
