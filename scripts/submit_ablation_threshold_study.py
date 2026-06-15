@@ -230,17 +230,18 @@ def main() -> int:
 
     # Setup Azure environment
     console.print("[INFO] Setting up Azure environment...")
-    subscription_id, resource_group, workspace_name = None, None, None
+
+    ml_client = None
+    images_dataset = None
+    masks_dataset = None
+    splits_dataset = None
 
     # Only authenticate to Azure if not a dry-run
     if not args.dry_run:
-        subscription_id, resource_group, workspace_name = (
+        # Real submission - authenticate to Azure
+        _, subscription_id, resource_group, workspace_name = (
             setup_azure_environment_variables()
         )
-
-    # Connect to Azure ML (unless dry-run)
-    ml_client = None
-    if not args.dry_run:
         ml_client = connect_to_azure_ml(
             subscription_id=subscription_id,
             console=console,
@@ -253,6 +254,7 @@ def main() -> int:
     # Retrieve data assets (unless dry-run)
     console.print("[INFO] Retrieving data assets...")
     if not args.dry_run:
+        assert ml_client is not None  # Ensure ml_client exists in non-dry-run
         images_dataset, masks_dataset, splits_dataset = (
             retrieve_and_validate_data_assets(
                 ml_client=ml_client,
@@ -262,12 +264,11 @@ def main() -> int:
             )
         )
         console.print("[OK] Data assets retrieved")
-    else:
-        images_dataset = masks_dataset = splits_dataset = None
 
     # Validate compute cluster (unless dry-run)
     compute_name = "Standard-NC6s-v3"
     if not args.dry_run:
+        assert ml_client is not None  # Ensure ml_client exists in non-dry-run
         console.print(f"[INFO] Validating compute cluster: {compute_name}")
         validate_and_refresh_compute(ml_client, console, compute_name)
         if not args.skip_preflight:
@@ -292,6 +293,9 @@ def main() -> int:
 
     if not args.dry_run:
         # Setup job inputs/outputs
+        assert images_dataset is not None  # Guaranteed by non-dry-run check
+        assert masks_dataset is not None  # Guaranteed by non-dry-run check
+        assert splits_dataset is not None  # Guaranteed by non-dry-run check
         job_config["inputs"] = {
             "images_data": Input(
                 type="uri_folder", path=images_dataset.id, mode="ro_mount"
@@ -360,6 +364,7 @@ def main() -> int:
         return 0
 
     # Real submission with parallel execution
+    assert ml_client is not None  # Ensure ml_client exists in non-dry-run
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),

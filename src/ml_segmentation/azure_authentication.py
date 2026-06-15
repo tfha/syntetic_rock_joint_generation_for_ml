@@ -46,28 +46,26 @@ def setup_azure_environment_variables(
 
     if not subscription_id:
         console.print(
-            "AZURE_SUBSCRIPTION_ID environment variable is not set", style="error"
+            "AZURE_SUBSCRIPTION_ID environment variable is not set", style="red"
         )
         console.print(
-            "Please set this variable in your .env file or environment", style="info"
+            "Please set this variable in your .env file or environment", style="blue"
         )
         sys.exit(1)
 
     if not resource_group:
         console.print(
-            "AZURE_RESOURCE_GROUP environment variable is not set", style="error"
+            "AZURE_RESOURCE_GROUP environment variable is not set", style="red"
         )
         console.print(
-            "Please set this variable in your .env file or environment", style="info"
+            "Please set this variable in your .env file or environment", style="blue"
         )
         sys.exit(1)
 
     if not workspace_name:
+        console.print("AZURE_ML_WORKSPACE environment variable is not set", style="red")
         console.print(
-            "AZURE_ML_WORKSPACE environment variable is not set", style="error"
-        )
-        console.print(
-            "Please set this variable in your .env file or environment", style="info"
+            "Please set this variable in your .env file or environment", style="blue"
         )
         sys.exit(1)
 
@@ -100,10 +98,10 @@ def connect_to_azure_ml(
     workspace_name = workspace_name or os.environ.get("AZURE_ML_WORKSPACE")
 
     if not subscription_id or not resource_group or not workspace_name:
-        console.print("Missing required Azure configuration parameters", style="error")
+        console.print("Missing required Azure configuration parameters", style="red")
         sys.exit(1)
 
-    console.print(f"Connecting to Azure ML workspace: {workspace_name}", style="info")
+    console.print(f"Connecting to Azure ML workspace: {workspace_name}", style="blue")
 
     try:
         # Use DefaultAzureCredential for authentication
@@ -116,16 +114,16 @@ def connect_to_azure_ml(
         )
 
         console.print(
-            "[OK] Successfully connected to Azure ML workspace", style="success"
+            "[OK] Successfully connected to Azure ML workspace", style="green"
         )
         return ml_client
 
     except Exception as e:
-        console.print(f"Failed to connect to Azure ML: {str(e)}", style="error")
+        console.print(f"Failed to connect to Azure ML: {str(e)}", style="red")
         console.print(
             "Ensure you are authenticated with Azure CLI or have "
             "appropriate credentials",
-            style="info",
+            style="blue",
         )
         sys.exit(1)
 
@@ -145,25 +143,25 @@ def validate_workspace_permissions(ml_client: MLClient, console: Console) -> boo
         bool: True if workspace access is confirmed, False otherwise
     """
     try:
-        console.print("Verifying workspace permissions...", style="info")
+        console.print("Verifying workspace permissions...", style="blue")
 
         # Test basic workspace operations
         _ = list(ml_client.datastores.list())
-        console.print("[OK] Workspace access verified", style="success")
+        console.print("[OK] Workspace access verified", style="green")
         return True
 
     except Exception as perm_error:
         console.print(
             f"Warning: Connected to workspace but may have limited permissions. "
             f"Error: {str(perm_error)}",
-            style="warning",
+            style="yellow",
         )
         console.print(
             "What this means: your user or managed identity can authenticate to the "
             "Azure ML workspace, but is missing RBAC permissions to perform standard "
             "operations (e.g., list datastores, jobs, computes, environments, or read the "
             "workspace's default storage).",
-            style="info",
+            style="blue",
         )
         console.print(
             "How to fix (assign roles at the workspace or resource group scope):\n"
@@ -172,12 +170,12 @@ def validate_workspace_permissions(ml_client: MLClient, console: Console) -> boo
             "Storage Blob Data Contributor if you need to write outputs/artifacts\n"
             "- Key Vault Secrets User on the workspace Key Vault if your workflows access secrets\n"
             "- AzureML Compute Operator if you need to create or refresh compute",
-            style="info",
+            style="blue",
         )
         console.print(
             "Also verify you're using the intended subscription/tenant and that role assignments "
             "have propagated (can take a few minutes). If you're using a managed identity, ensure "
             "the above roles are assigned to that identity as well.",
-            style="info",
+            style="blue",
         )
         return False
