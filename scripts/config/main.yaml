@@ -1,5 +1,5 @@
 defaults: #points to sub-configs
-  - model: unet
+  - model: deeplabv3plus
   - _self_ # main overrides sub-cfg in case of duplicates
 
 
