@@ -1,0 +1,148 @@
+# Visual Statistics Multi-Dataset Analysis Configuration
+# For comparing visual features (color, texture, edges) across multiple image sets
+
+# Data paths
+# Can be relative paths (e.g., data/raw) or absolute paths (e.g., C:/path/to/images)
+# For absolute paths on Windows: use forward slashes OR double backslashes
+image_folder: C:/Users/KYC/OneDrive - NGI/Documents/PhD/Paper - Synthetic rock joint generation for ML/Data/rockmass  # Folder containing all images organized by prefix
+output_folder: C:/Users/KYC/OneDrive - NGI/Documents/PhD/Paper - Synthetic rock joint generation for ML/Visual statistics analysis  # Output organized by domain
+
+# Dataset specifications
+# Each dataset defined by:
+#   - prefix: filename prefix to search for
+#   - pattern: optional substring filter (e.g., "cardboard" or "pattern" in filename)
+#   - domain: organization folder (slope_domain or box_domain)
+datasets:
+  FracMan:
+    prefix: FracMan
+    pattern: null
+    domain: slope_domain
+    description: "Synthetic DFN rock fractures"
+
+  Benchmark:
+    prefix: Benchmark
+    pattern: null
+    domain: box_domain
+    description: "Synthetic box benchmark"
+
+  Box_cardboard:
+    prefix: Box
+    pattern: cardboard
+    domain: box_domain
+    description: "Real-world cardboard box"
+
+  Box_pattern:
+    prefix: Box
+    pattern: pattern
+    domain: box_domain
+    description: "Real-world pattern box"
+
+  Larvik:
+    prefix: Larvik
+    pattern: null
+    domain: slope_domain
+    description: "Real rock slope - Larvik site"
+
+  Rv4:
+    prefix: Rv4
+    pattern: null
+    domain: slope_domain
+    description: "Real rock slope - Rv4 site"
+
+# Image search settings
+image_extensions:
+  - ".png"
+  - ".jpg"
+  - ".jpeg"
+  - ".tif"
+  - ".tiff"
+
+# GLCM (Gray-Level Co-occurrence Matrix) texture parameters
+glcm:
+  levels: 32  # Quantization levels for gray image
+  distances: [1]  # Pixel distances for GLCM computation
+  angles: [0, 0.785, 1.571, 2.356]  # Angles in radians (0°, 45°, 90°, 135°)
+
+# Statistical comparisons to generate
+# Each comparison is (dataset1, dataset2)
+comparisons:
+  slope_domain:
+    - ["Larvik", "Rv4"]
+    - ["FracMan", "Larvik"]
+    - ["FracMan", "Rv4"]
+  box_domain:
+    - ["Box_cardboard", "Box_pattern"]
+    - ["Benchmark", "Box_cardboard"]
+    - ["Benchmark", "Box_pattern"]
+
+# Features to extract and analyze
+features:
+  color:
+    - R_mean
+    - G_mean
+    - B_mean
+    - R_std
+    - G_std
+    - B_std
+
+  color_hsv:
+    - H_mean
+    - S_mean
+    - V_mean
+    - H_std
+    - S_std
+    - V_std
+
+  luminance_contrast:
+    - Luminance_mean
+    - Contrast_std
+
+  edge_texture:
+    - Entropy
+    - Edge_density
+    - Sobel_mean
+
+  texture_glcm:
+    - GLCM_contrast
+    - GLCM_homogeneity
+    - GLCM_energy
+    - GLCM_correlation
+
+# Visualization settings
+plotting:
+  boxplots:
+    enabled: true
+    features_to_plot:  # Subset for cleaner visualizations
+      - Luminance_mean
+      - Contrast_std
+      - Entropy
+      - Edge_density
+      - GLCM_contrast
+      - GLCM_homogeneity
+    dpi: 300
+    figsize: [6, 4.5]
+
+  summary_bars:
+    enabled: true
+    dpi: 300
+    figsize: [12, 5]
+
+# Statistical tests to perform
+statistics:
+  tests:
+    - t_test  # Independent samples t-test
+    - ranksum  # Wilcoxon rank-sum (Mann-Whitney U)
+    - ks_test  # Kolmogorov-Smirnov test
+  effect_size: true  # Compute Cohen's d
+
+# Output formats
+output:
+  csv: true
+  excel: true  # Combined workbook per domain
+  visualizations: true
+  per_image_data: true  # Full per-image statistics
+
+# Logging
+logging:
+  level: INFO  # DEBUG, INFO, WARNING
+  file: outputs/visual_statistics/analysis.log
