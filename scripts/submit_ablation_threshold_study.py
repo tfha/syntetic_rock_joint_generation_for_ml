@@ -129,10 +129,11 @@ def submit_single_job(
     model_name: str,
     threshold: float,
     job_config: dict[str, Any],
+    splits_by_strategy: dict[str, Any],
     dry_run: bool = False,
 ) -> tuple[str, str, bool]:
     """Submit a single ablation job."""
-    from azure.ai.ml import command
+    from azure.ai.ml import Input, command
     from azure.ai.ml.entities import ManagedIdentityConfiguration
 
     from ml_segmentation.azure_core import retry_azure_operation
@@ -155,6 +156,20 @@ def submit_single_job(
         if dry_run:
             return (display_name, f"[DRY-RUN] {train_command[:80]}...", True)
 
+        # Get the correct splits dataset for this job's strategy
+        if strategy not in splits_by_strategy:
+            raise ValueError(
+                f"No splits dataset found for strategy '{strategy}'. "
+                f"Available: {list(splits_by_strategy.keys())}"
+            )
+        splits_dataset = splits_by_strategy[strategy]
+
+        # Create job inputs with the correct splits for this strategy
+        job_inputs = dict(job_config["inputs"])  # Copy base inputs
+        job_inputs["splits_data"] = Input(
+            type="uri_folder", path=splits_dataset.id, mode="ro_mount"
+        )
+
         # Create and submit job
         job = command(
             code="./",
@@ -163,7 +178,7 @@ def submit_single_job(
             compute=job_config["compute_name"],
             display_name=display_name,
             experiment_name=job_config["experiment_name"],
-            inputs=job_config["inputs"],
+            inputs=job_inputs,
             outputs=job_config["outputs"],
             tags={
                 "model": model_name,
@@ -253,16 +268,30 @@ def main() -> int:
 
     # Retrieve data assets (unless dry-run)
     console.print("[INFO] Retrieving data assets...")
+    images_dataset = None
+    masks_dataset = None
+    splits_by_strategy: dict[str, Any] = {}
+
     if not args.dry_run:
         assert ml_client is not None  # Ensure ml_client exists in non-dry-run
-        images_dataset, masks_dataset, splits_dataset = (
-            retrieve_and_validate_data_assets(
-                ml_client=ml_client,
-                console=console,
-                experiment_strategy="finetune_box_50",
-                get_data_asset_func=get_data_asset,
+
+        # Get unique strategies from MODELS
+        unique_strategies = sorted({get_experiment_strategy(m) for m in MODELS})
+        console.print(f"[INFO] Retrieving splits for strategies: {unique_strategies}")
+
+        # Retrieve splits for each strategy
+        for strategy in unique_strategies:
+            images_dataset, masks_dataset, splits_dataset = (
+                retrieve_and_validate_data_assets(
+                    ml_client=ml_client,
+                    console=console,
+                    experiment_strategy=strategy,
+                    get_data_asset_func=get_data_asset,
+                )
             )
-        )
+            splits_by_strategy[strategy] = splits_dataset
+            console.print(f"  [OK] Retrieved splits for {strategy}")
+
         console.print("[OK] Data assets retrieved")
 
     # Validate compute cluster (unless dry-run)
@@ -292,10 +321,10 @@ def main() -> int:
     }
 
     if not args.dry_run:
-        # Setup job inputs/outputs
+        # Setup shared job inputs (images and masks are common to all jobs)
         assert images_dataset is not None  # Guaranteed by non-dry-run check
         assert masks_dataset is not None  # Guaranteed by non-dry-run check
-        assert splits_dataset is not None  # Guaranteed by non-dry-run check
+        assert len(splits_by_strategy) > 0  # At least one strategy's splits
         job_config["inputs"] = {
             "images_data": Input(
                 type="uri_folder", path=images_dataset.id, mode="ro_mount"
@@ -303,9 +332,7 @@ def main() -> int:
             "masks_data": Input(
                 type="uri_folder", path=masks_dataset.id, mode="ro_mount"
             ),
-            "splits_data": Input(
-                type="uri_folder", path=splits_dataset.id, mode="ro_mount"
-            ),
+            # Note: splits_data will be set per-job in submit_single_job
         }
     else:
         job_config["inputs"] = {}
@@ -383,6 +410,7 @@ def main() -> int:
                     model,
                     threshold,
                     job_config,
+                    splits_by_strategy,
                     args.dry_run,
                 ): (model, threshold)
                 for model, threshold in job_combinations
