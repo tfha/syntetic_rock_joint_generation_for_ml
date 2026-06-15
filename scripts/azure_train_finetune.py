@@ -511,6 +511,18 @@ def main(cfg: DictConfig) -> None:
         console.print("Using BCEWithLogits Loss", style="info")
         mlflow.log_param("loss_function", "bce")
 
+    # Determine effective threshold (ablation_threshold overrides prediction_threshold)
+    effective_threshold: float = (
+        pcfg.experiment.ablation_threshold
+        if pcfg.experiment.ablation_threshold is not None
+        else pcfg.experiment.prediction_threshold
+    )
+    console.print(
+        f"Using prediction threshold: {effective_threshold}",
+        style="info",
+    )
+    mlflow.log_param("prediction_threshold", effective_threshold)
+
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
 
@@ -585,6 +597,7 @@ def main(cfg: DictConfig) -> None:
             optimizer=optimizer,
             device=device,
             scaler=scaler,
+            threshold=effective_threshold,
         )
 
         # Validate on REAL data (this is the key metric for stage 1)
@@ -593,6 +606,7 @@ def main(cfg: DictConfig) -> None:
             dataloader=val_loader,
             criterion=criterion,
             device=device,
+            threshold=effective_threshold,
         )
 
         # Display results
@@ -730,6 +744,7 @@ def main(cfg: DictConfig) -> None:
             optimizer=optimizer,
             device=device,
             scaler=scaler,
+            threshold=effective_threshold,
         )
 
         # Validate on real data
@@ -738,6 +753,7 @@ def main(cfg: DictConfig) -> None:
             dataloader=val_loader,
             criterion=criterion,
             device=device,
+            threshold=effective_threshold,
         )
 
         # Display results
@@ -839,6 +855,7 @@ def main(cfg: DictConfig) -> None:
         dataloader=test_loader,
         criterion=criterion,
         device=device,
+        threshold=effective_threshold,
     )
 
     console.print(create_results_table(0, metrics_test, session="Test"))

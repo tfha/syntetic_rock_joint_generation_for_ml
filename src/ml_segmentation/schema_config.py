@@ -429,6 +429,14 @@ class ExperimentConfig(BaseModel):
             "Default 0.5 is neutral. Range: 0.1-0.9."
         ),
     )
+    ablation_threshold: float | None = Field(
+        None,
+        description=(
+            "Override prediction_threshold for ablation study. "
+            "If set, this value overrides prediction_threshold. "
+            "Used for threshold sensitivity analysis. Range: 0.1-0.9 or None."
+        ),
+    )
     generate_gradcam: bool = Field(
         False,
         description=(

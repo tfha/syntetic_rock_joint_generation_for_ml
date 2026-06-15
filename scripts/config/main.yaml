@@ -71,7 +71,10 @@ experiment:
   # Prediction threshold for binary classification
   # For severe class imbalance, lower threshold makes model more sensitive to joints
   # Default 0.5 is neutral; 0.3-0.4 favors minority class (joints)
-  prediction_threshold: 0.3  # Lower threshold = more likely to predict joints (kind_carnival setting)
+  prediction_threshold: 0.5  # Default threshold for binary predictions; overridden by ablation_threshold if set
+  # Ablation study configuration for threshold analysis
+  # Set ablation_threshold to override prediction_threshold during ablation study
+  ablation_threshold: null  # Values: null (use prediction_threshold), 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
   # GradCAM explainability visualization
   generate_gradcam: false  # Enable GradCAM heatmaps for model explainability (use local script after training)
   gradcam_samples: 20      # Number of validation samples to visualize with GradCAM
@@ -936,3 +939,9 @@ mlflow:
 optuna:
   n_trials: 5
   path_results: experiments/hyperparameters
+
+# Ablation Study Configuration
+ablation_study:
+  enabled: false  # Set to true to run ablation study
+  thresholds: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]  # Threshold values to test
+  experiment_strategies: [simplemixed_slope_50, finetune_slope_100]  # Strategies to ablate

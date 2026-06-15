@@ -427,6 +427,18 @@ def main(cfg: DictConfig) -> None:
         console.print("Using Dice Loss", style="info")
         mlflow.log_param("loss_function", "dice")
 
+    # Determine effective threshold (ablation_threshold overrides prediction_threshold)
+    effective_threshold: float = (
+        pcfg.experiment.ablation_threshold
+        if pcfg.experiment.ablation_threshold is not None
+        else pcfg.experiment.prediction_threshold
+    )
+    console.print(
+        f"Using prediction threshold: {effective_threshold}",
+        style="info",
+    )
+    mlflow.log_param("prediction_threshold", effective_threshold)
+
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=pcfg.model.learning_rate)
 
@@ -474,7 +486,7 @@ def main(cfg: DictConfig) -> None:
                 optimizer=optimizer,
                 device=device,
                 scaler=scaler,
-                threshold=0.5,
+                threshold=effective_threshold,
                 max_batches=pcfg.experiment.sanity_check_num_batches,
             )
             console.print(
@@ -510,7 +522,7 @@ def main(cfg: DictConfig) -> None:
                     dataloader=val_loader,
                     criterion=criterion,
                     device=device,
-                    threshold=0.5,
+                    threshold=effective_threshold,
                     max_batches=pcfg.experiment.sanity_check_num_batches,
                 )
                 console.print(
@@ -808,7 +820,7 @@ def main(cfg: DictConfig) -> None:
             dataloader=test_loader,
             criterion=criterion,
             device=device,
-            threshold=0.5,
+            threshold=effective_threshold,
         )
         console.print(
             create_results_table(

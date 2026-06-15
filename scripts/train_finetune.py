@@ -240,6 +240,17 @@ def main(cfg: DictConfig) -> None:
             focal_gamma=pcfg.experiment.focal_gamma,
         )
 
+        # Determine effective threshold (ablation_threshold overrides prediction_threshold)
+        effective_threshold: float = (
+            pcfg.experiment.ablation_threshold
+            if pcfg.experiment.ablation_threshold is not None
+            else pcfg.experiment.prediction_threshold
+        )
+        console.print(
+            f"Using prediction threshold: {effective_threshold}",
+            style="info",
+        )
+
         # Optimizer
         optimizer = torch.optim.Adam(
             model.parameters(),
@@ -297,6 +308,7 @@ def main(cfg: DictConfig) -> None:
                 optimizer=optimizer,
                 device=device,
                 scaler=scaler,
+                threshold=effective_threshold,
             )
 
             # Validate on REAL data (this is the key metric for stage 1)
@@ -305,6 +317,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=val_loader,
                 loss_fn=loss_fn,
                 device=device,
+                threshold=effective_threshold,
             )
 
             # Display results
@@ -397,6 +410,7 @@ def main(cfg: DictConfig) -> None:
                 optimizer=optimizer,
                 device=device,
                 scaler=scaler,
+                threshold=effective_threshold,
             )
 
             # Validate on real data
@@ -405,6 +419,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader=val_loader,
                 loss_fn=loss_fn,
                 device=device,
+                threshold=effective_threshold,
             )
 
             # Display results
@@ -478,6 +493,7 @@ def main(cfg: DictConfig) -> None:
             dataloader=test_loader,
             loss_fn=loss_fn,
             device=device,
+            threshold=effective_threshold,
         )
 
         console.print(create_results_table(0, metrics_test, session="Test"))
