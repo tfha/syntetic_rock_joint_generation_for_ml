@@ -740,7 +740,8 @@ def main(cfg: DictConfig) -> None:
 
         # Log model in MLflow format for easier deployment
         final_registered_name = (
-            f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-final"
+            f"{pcfg.model.name}-{pcfg.experiment.experiment_strategy}-"
+            f"threshold_{effective_threshold}-final"
         )
         mlflow.pytorch.log_model(
             model,
