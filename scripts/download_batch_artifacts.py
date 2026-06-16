@@ -80,25 +80,24 @@ def load_manifest(manifest_path: Path, console: Console) -> dict:
     Returns:
         Manifest dictionary
     """
-    console.print(f"Loading manifest: {manifest_path.name}", style="info")
+    console.print(f"Loading manifest: {manifest_path.name}")
 
     try:
         with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
     except Exception as e:
-        console.print(f"Error loading manifest: {e}", style="danger")
+        console.print(f"[ERROR] Loading manifest: {e}")
         sys.exit(1)
 
     # Validate manifest structure
     required_keys = ["submission_time", "total_jobs", "jobs"]
     for key in required_keys:
         if key not in manifest:
-            console.print(f"Invalid manifest: missing '{key}' field", style="danger")
+            console.print(f"[ERROR] Invalid manifest: missing '{key}' field")
             sys.exit(1)
 
     console.print(
-        f"Manifest loaded: {len(manifest['jobs'])} jobs from {manifest['submission_time']}",
-        style="success",
+        f"[OK] Manifest loaded: {len(manifest['jobs'])} jobs from {manifest['submission_time']}"
     )
     return manifest
 
@@ -156,15 +155,15 @@ def download_job_artifacts(
         True if successful, False otherwise
     """
     if dry_run:
-        console.print(f"[DRY RUN] Would download job: {job_name}", style="info")
-        console.print(f"[DRY RUN] Output directory: {output_dir}", style="info")
+        console.print(f"[DRY RUN] Would download job: {job_name}")
+        console.print(f"[DRY RUN] Output directory: {output_dir}")
         return True
 
     try:
         # Get job details
         job = ml_client.jobs.get(job_name)
-        console.print(f"Downloading artifacts for job: {job_name}", style="info")
-        console.print(f"  Status: {job.status}", style="info")
+        console.print(f"Downloading artifacts for job: {job_name}")
+        console.print(f"  Status: {job.status}")
 
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -174,31 +173,28 @@ def download_job_artifacts(
             # Download specific outputs
             for output_name in outputs:
                 try:
-                    console.print(f"  Downloading output: {output_name}", style="info")
+                    console.print(f"  Downloading output: {output_name}")
                     ml_client.jobs.download(
                         name=job_name,
                         download_path=str(output_dir),
                         output_name=output_name,
                     )
                 except Exception as e:
-                    console.print(
-                        f"  Warning: Could not download '{output_name}': {e}",
-                        style="warning",
-                    )
+                    console.print(f"  [WARN] Could not download '{output_name}': {e}")
         else:
             # Download all outputs
-            console.print("  Downloading all outputs...", style="info")
+            console.print("  Downloading all outputs...")
             ml_client.jobs.download(
                 name=job_name,
                 download_path=str(output_dir),
                 all=True,
             )
 
-        console.print(f"✓ Downloaded to: {output_dir}", style="success")
+        console.print(f"[OK] Downloaded to: {output_dir}")
         return True
 
     except Exception as e:
-        console.print(f"✗ Error downloading job {job_name}: {e}", style="danger")
+        console.print(f"[ERROR] Error downloading job {job_name}: {e}")
         return False
 
 
@@ -252,26 +248,22 @@ def main() -> None:
     if args.manifest:
         manifest_path = args.manifest
         if not manifest_path.exists():
-            console.print(f"Error: Manifest not found: {manifest_path}", style="danger")
+            console.print(f"[ERROR] Manifest not found: {manifest_path}")
             sys.exit(1)
     else:
         manifest_path = find_latest_manifest(project_root)
         if not manifest_path:
             console.print(
-                "Error: No manifest files found in experiments/batch_submissions/",
-                style="danger",
+                "[ERROR] No manifest files found in experiments/batch_submissions/"
             )
-            console.print(
-                "Run submit_batch_jobs.py first to create a manifest.",
-                style="warning",
-            )
+            console.print("Run submit_batch_jobs.py first to create a manifest.")
             sys.exit(1)
 
     # Load manifest
     manifest = load_manifest(manifest_path, console)
 
     # Filter jobs
-    console.print("\nFiltering jobs...", style="info")
+    console.print("\nFiltering jobs...")
     filtered_jobs = filter_jobs(
         manifest,
         model=args.model,
@@ -280,16 +272,16 @@ def main() -> None:
     )
 
     if not filtered_jobs:
-        console.print("No jobs match the filter criteria", style="warning")
+        console.print("[WARN] No jobs match the filter criteria")
         sys.exit(0)
 
-    console.print(f"Found {len(filtered_jobs)} jobs matching filters:", style="success")
+    console.print(f"[OK] Found {len(filtered_jobs)} jobs matching filters:")
     if args.model:
-        console.print(f"  Model: {args.model}", style="info")
+        console.print(f"  Model: {args.model}")
     if args.strategy:
-        console.print(f"  Strategy: {args.strategy}", style="info")
+        console.print(f"  Strategy: {args.strategy}")
     if args.status:
-        console.print(f"  Status: {args.status}", style="info")
+        console.print(f"  Status: {args.status}")
 
     # Setup output directory
     if args.output_dir:
@@ -300,12 +292,12 @@ def main() -> None:
             project_root / "experiments" / "batch_downloads" / manifest_timestamp
         )
 
-    console.print(f"\nOutput directory: {output_base}", style="info")
+    console.print(f"\nOutput directory: {output_base}")
 
     # Connect to Azure ML (skip for dry run)
     ml_client = None
     if not args.dry_run:
-        console.print("\nConnecting to Azure ML...", style="info")
+        console.print("\nConnecting to Azure ML...")
         try:
             import os
 
@@ -314,13 +306,9 @@ def main() -> None:
             workspace_name = os.getenv("AZURE_WORKSPACE_NAME")
 
             if not all([subscription_id, resource_group, workspace_name]):
+                console.print("[ERROR] Azure environment variables not set")
                 console.print(
-                    "Error: Azure environment variables not set",
-                    style="danger",
-                )
-                console.print(
-                    "Required: AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_WORKSPACE_NAME",
-                    style="warning",
+                    "Required: AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_WORKSPACE_NAME"
                 )
                 sys.exit(1)
 
@@ -331,10 +319,10 @@ def main() -> None:
                 resource_group_name=resource_group,
                 workspace_name=workspace_name,
             )
-            console.print("✓ Connected to Azure ML workspace", style="success")
+            console.print("[OK] Connected to Azure ML workspace")
 
         except Exception as e:
-            console.print(f"Error connecting to Azure ML: {e}", style="danger")
+            console.print(f"[ERROR] Connecting to Azure ML: {e}")
             sys.exit(1)
 
     # Download artifacts
@@ -348,10 +336,7 @@ def main() -> None:
     for job_record in track(filtered_jobs, description="Downloading..."):
         job_name = job_record.get("job_name")
         if not job_name:
-            console.print(
-                f"Warning: Job {job_record.get('index')} has no job_name",
-                style="warning",
-            )
+            console.print(f"[WARN] Job {job_record.get('index')} has no job_name")
             continue
 
         # Create job-specific output directory

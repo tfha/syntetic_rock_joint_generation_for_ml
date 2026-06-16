@@ -1,0 +1,202 @@
+{
+  "total_jobs": 28,
+  "submission_time": "20260616_091940",
+  "jobs": [
+    {
+      "status": "submitted",
+      "index": 0,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "red_tiger_8ryz7v91yg",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 1,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "clever_yuca_rvw81p6374",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 2,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "joyful_garage_lkckb2z4c7",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 3,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "cool_pump_y5rt0xmvmq",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 4,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "frank_needle_qjl74cbjjn",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 5,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "plum_floor_r5m41c1vjn",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 6,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "maroon_sheep_2v0zd1l03g",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 7,
+      "experiment_strategy": "simplemixed_slope_50",
+      "job_name": "boring_pipe_73hdzhw8h3",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 8,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "frank_spider_l1232srrr4",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 9,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "cool_deer_2gn2zkc7hl",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 10,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "careful_plastic_dyynbt64x0",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 11,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "happy_pillow_8zcyrnldb1",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 12,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "strong_shark_08m0k9zq4p",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 13,
+      "experiment_strategy": "finetune_slope_50",
+      "job_name": "icy_thread_30v5d829ts",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 14,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "musing_mangos_32thzdh7j3",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 15,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "patient_island_y7dc4shh31",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 16,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "musing_sun_m8dk7l9zc0",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 17,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "jovial_bone_yj0052q3m9",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 18,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "musing_stem_ffb3b3ks4m",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 19,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "neat_lock_6r6bs5wv89",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 20,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "maroon_oregano_sdlh0wyp8c",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 21,
+      "experiment_strategy": "simplemixed_box_50",
+      "job_name": "sincere_skin_qvmp0vwc6k",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 22,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "placid_okra_3tt45575f4",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 23,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "amiable_tray_y403dhfdzd",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 24,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "amiable_chin_4xwrcjj2bw",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 25,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "polite_longan_rzq3905ym3",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 26,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "plucky_bread_hv2d57b3zq",
+      "model": "deeplabv3plus"
+    },
+    {
+      "status": "submitted",
+      "index": 27,
+      "experiment_strategy": "finetune_box_50",
+      "job_name": "frank_napa_v23p23kd0q",
+      "model": "deeplabv3plus"
+    }
+  ]
+}
