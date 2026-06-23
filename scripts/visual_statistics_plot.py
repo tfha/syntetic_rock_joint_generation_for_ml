@@ -174,10 +174,35 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
         "GLCM_correlation": (-1, 1),
     }
 
+    # Define descriptive labels for features
+    feature_labels = {
+        "H_mean": "Hue mean",
+        "H_std": "Hue standard deviation",
+        "S_mean": "Saturation mean",
+        "S_std": "Saturation standard deviation",
+        "V_mean": "Value mean",
+        "V_std": "Value standard deviation",
+        "R_mean": "Red mean",
+        "R_std": "Red standard deviation",
+        "G_mean": "Green mean",
+        "G_std": "Green standard deviation",
+        "B_mean": "Blue mean",
+        "B_std": "Blue standard deviation",
+        "Luminance_mean": "Luminance mean",
+        "Contrast_std": "Contrast standard deviation",
+        "Entropy": "Entropy",
+        "Edge_density": "Edge density",
+        "Sobel_mean": "Sobel mean",
+        "GLCM_contrast": "GLCM contrast",
+        "GLCM_homogeneity": "GLCM homogeneity",
+        "GLCM_energy": "GLCM energy",
+        "GLCM_correlation": "GLCM correlation",
+    }
+
     # Create figure with 3 columns, proportional heights
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(16, 20))
     gs = fig.add_gridspec(
-        4, 3, left=0.08, right=0.96, height_ratios=[1, 1, 1, 1], hspace=0.5, wspace=0.15
+        4, 3, left=0.08, right=0.96, height_ratios=[1, 1, 1, 1], hspace=0.3, wspace=0.15
     )
 
     col_idx = 0
@@ -219,7 +244,7 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
             sub_gs = gs[:4, col_idx]
 
         # Create sub-gridspec for individual features in this column
-        sub_gs_inner = sub_gs.subgridspec(n_features, 1, hspace=0.6)
+        sub_gs_inner = sub_gs.subgridspec(n_features, 1, hspace=0.4)
 
         # Add category title (centered over each column)
         fig.text(
@@ -293,20 +318,14 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
                     linewidth=0,
                     legend=False,
                     linecolor="k",
-                    inner_kws={"box_width": 3, "whis_width": 1, "color": "black"},
+                    inner_kws={"box_width": 10, "whis_width": 2, "color": "black"},
                 )
 
-                # # Customize box properties (thick black outline, white median)
-                # for patch in ax.artists:
-                #     patch.set_alpha(0.6)
-                #     patch.set_edgecolor("black")
-                #     patch.set_linewidth(0.5)
-
-                # # Style the box plot elements (median line only)
+                # # Customize box properties to make median line more visible
                 # for line in ax.get_lines():
                 #     if line.get_linestyle() == '-':  # Median line
-                #         line.set_color("white")
-                #         line.set_linewidth(3)
+                #         line.set_color("black")
+                #         line.set_linewidth(1)
 
                 # Create legend entries
                 for dataset_name in dataset_list:
@@ -329,7 +348,8 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
             ax.set_yticklabels([])
 
             # Feature name as xlabel
-            ax.set_xlabel(feature.replace("_", " "), fontsize=10, fontweight="bold")
+            label = feature_labels.get(feature, feature.replace("_", " "))
+            ax.set_xlabel(label, fontsize=10, fontweight="bold")
             ax.grid(True, axis="x", alpha=0.3)
 
             # Add domain separator line at midpoint (box-domain / slope-domain boundary)
@@ -381,7 +401,7 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
                 break
 
     legend_x_anchor = 0.8
-    legend_y_anchor = 0.3
+    legend_y_anchor = 0.25
 
     # Add Box-domain legend
     if box_handles:
@@ -405,7 +425,7 @@ def save_comparison_grid(datasets_dict: dict, output_folder: Path) -> None:
             loc="upper left",
             fontsize=11,
             framealpha=0.95,
-            bbox_to_anchor=(legend_x_anchor, legend_y_anchor - 0.1),
+            bbox_to_anchor=(legend_x_anchor, legend_y_anchor - 0.05),
             frameon=True,
             title="Slope-domain",
             title_fontsize=11,
@@ -444,8 +464,15 @@ def main():
     parser.add_argument(
         "--datasets",
         nargs="+",
-        default=["Larvik", "Rv4"],
-        help="Dataset names to plot (default: Larvik Rv4)",
+        default=[
+            "Benchmark",
+            "Box_cardboard",
+            "Box_pattern",
+            "FracMan",
+            "Larvik",
+            "Rv4",
+        ],
+        help="Dataset names to plot (default: all six datasets)",
     )
 
     args = parser.parse_args()
